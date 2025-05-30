@@ -610,11 +610,10 @@ def test_remove_node_from_everywhere(pip_settings):
     cur = conn.cursor()
 
     # Verify the node is removed from all relevant tables
-    tables_to_check = ["nodes", "entries", "node_tags", "node_relation"]
-    for table in tables_to_check:
-        cur.execute(f"SELECT * FROM {table} WHERE id=? OR node_id=? OR child_id=? OR parent_id=?", (node_id, node_id, node_id, node_id))
-        result = cur.fetchone()
-        assert result is None, f"Node {node_id} was not fully removed from table {table}."
+    assert pipeline_db.get_rows_with_node_id_in_entries(cur, node_id) == [], "Node was not removed from entries."
+    assert pipeline_db.get_rows_node_id_in_nodes(cur, node_id) == [], "Node was not removed from nodes."
+    assert pipeline_db.get_rows_with_node_id_in_tags(cur, node_id) == [], "Node was not removed from tags."
+    assert pipeline_db.get_rows_with_node_id_relations(cur, node_id) == [], "Node was not removed from relations."
 
     conn.close()
 

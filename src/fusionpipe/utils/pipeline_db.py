@@ -185,3 +185,22 @@ def remove_node_from_everywhere(cur, node_id):
     remove_node_from_relations(cur, node_id)
     remove_node_from_nodes(cur, node_id)
     return cur.rowcount
+
+
+
+# To be tested
+def get_rows_with_node_id_in_entries(cur, node_id):
+    cur.execute('SELECT * FROM entries WHERE node_id = ?', (node_id,))
+    return cur.fetchall()
+
+def get_rows_node_id_in_nodes(cur, node_id):
+    cur.execute('SELECT * FROM nodes WHERE node_id = ?', (node_id,))
+    return cur.fetchall()
+
+def get_rows_with_node_id_relations(cur, node_id):
+    cur.execute('SELECT * FROM node_relation WHERE child_id = ? OR parent_id = ?', (node_id, node_id))
+    return cur.fetchall()
+
+def get_rows_with_node_id_in_tags(cur, node_id):
+    cur.execute('SELECT * FROM node_tags WHERE node_id = ?', (node_id,))
+    return cur.fetchall()
