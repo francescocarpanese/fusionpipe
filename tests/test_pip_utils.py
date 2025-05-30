@@ -4,7 +4,6 @@ import os
 
 # Define useful fixtures
 
-
 local = False
 
 if not local:

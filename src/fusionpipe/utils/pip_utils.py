@@ -178,7 +178,6 @@ def db_to_graph_from_pip_id(cur, pip_id):
 
 
 
-
 # def db_to_graph(cur, pip_id):
 #     # Load the pipeline from the database
 #     pipeline_data = pipeline_db.get_pipeline(cur, pip_id=pip_id)
