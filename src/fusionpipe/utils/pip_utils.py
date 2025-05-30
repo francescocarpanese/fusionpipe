@@ -1,10 +1,10 @@
 from datetime import datetime
 import random
 import os
-
 import networkx as nx
 import matplotlib.pyplot as plt
 import json
+from fusionpipe.utils import pipeline_db
 
 
 from enum import Enum
@@ -24,16 +24,19 @@ def generate_id():
     unique_id = now.strftime("%Y%m%d%H%M%S") + "_" +  f"{random.randint(1000, 9999):04d}"
     return unique_id
 
+def generate_node_id():
+    return "n_" + generate_id()
 
-def create_node_folder(settings, verbose=False):
+def generate_pip_id():
+    return "p_" + generate_id()
+
+def init_node_folder(settings, node_id, verbose=False):
+    # Create folder structure for new node
 
     pth_node_folder = settings["node_folder"]
     
-    # Generate a unique ID
-    node_id = generate_id()
-    
     # Create the node folder path
-    node_folder_path = f"{pth_node_folder}/n_{node_id}"
+    node_folder_path = f"{pth_node_folder}/{node_id}"
     
     # Create the main node folder
     os.makedirs(node_folder_path, exist_ok=True)
@@ -41,6 +44,7 @@ def create_node_folder(settings, verbose=False):
     # Create subfolders 'code' and 'data'
     os.makedirs(f"{node_folder_path}/code", exist_ok=True)
     os.makedirs(f"{node_folder_path}/data", exist_ok=True)
+    os.makedirs(f"{node_folder_path}/reports", exist_ok=True)
     
     if verbose:
         print(f"Node folder created at: {node_folder_path}")
@@ -50,7 +54,6 @@ def create_node_folder(settings, verbose=False):
     with open(f"{node_folder_path}/meta.json", "w") as meta_file:
         json.dump(meta, meta_file, indent=2)
 
-    return node_id
 
 def delete_node_folder(settings, node_id, verbose=False):
     pth_node_folder = settings["node_folder"]
@@ -67,32 +70,32 @@ def delete_node_folder(settings, node_id, verbose=False):
         if verbose:
             print(f"Node folder does not exist: {node_folder_path}")
 
-def create_pipeline_file(settings, verbose=False):
-    pth_pipeline_folder = settings["pipeline_folder"]
+
+
+# TODO. Still convenient for debuggiong to generate the file from the database
+# def create_pipeline_file(settings, pip_id, verbose=False):
+#     pth_pipeline_folder = settings["pipeline_folder"]
     
-    # Generate a unique ID
-    pip_id = generate_id()
+#     # Create the pipeline file path
+#     pipeline_file_path = f"{pth_pipeline_folder}/{pip_id}.json"
 
-    # Create the pipeline file path
-    pipeline_file_path = f"{pth_pipeline_folder}/p_{pip_id}.json"
+#     pip_template = generate_pipeline_template(name=pip_id)
 
-    pip_template = generate_pipeline_template(name=pip_id)
-
-    # Write the pipeline template to a JSON file
-    with open(pipeline_file_path, 'w') as f:
-        import json
-        json.dump(pip_template, f, indent=2)
+#     # Write the pipeline template to a JSON file
+#     with open(pipeline_file_path, 'w') as f:
+#         import json
+#         json.dump(pip_template, f, indent=2)
     
-    return pip_id
+#     return pip_id
 
 
-def generate_pipeline_template(name=""):
-    # Define a basic pipeline template
-    pipeline_template = {
-        "name": name,
-        "nodes": [],
-        }
-    return pipeline_template
+# def generate_pipeline_template(name=""):
+#     # Define a basic pipeline template
+#     pipeline_template = {
+#         "name": name,
+#         "nodes": [],
+#         }
+#     return pipeline_template
 
 def generate_node_meta_template(node_id):
     node_meta = {
@@ -110,32 +113,49 @@ def check_node_exist(settings, node_id):
     # Check if the node folder exists
     return os.path.exists(node_folder_path)
 
-def generate_node_dic(node_id, dependencies=[]):
-    # Define a basic node template
-    node_dic = {
-        "nid": node_id,
-        "dependencies": dependencies,
-    }
-    return node_dic
+# def generate_node_dic(node_id, dependencies=[]):
+#     # Define a basic node template
+#     node_dic = {
+#         "nid": node_id,
+#         "dependencies": dependencies,
+#     }
+#     return node_dic
 
 
 def graph_to_dict(graph):
     pipeline_data = {
-        'name': graph.name,
+        'name': graph.name, # This is the tag that can be given to the pipeline
         'nodes': []
     }
     for node in graph.nodes:
         dependencies = list(graph.predecessors(node))
         pipeline_data['nodes'].append({
             'nid': node,
-            'dependencies': dependencies
+            'parents': dependencies
         })
     return pipeline_data
 
-def save_pipeline(settings, pip_id = None, verbose=False):
-    pipeline_data = graph_to_dict()
-    pipeline_id = pip_id if pip_id else generate_id()
-    path_pip_file = f"{settings['pipeline_folder']}/p_{pipeline_id}.json"
+
+
+def graph_to_db(graph, pip_id, cur):
+    # Add the pipeline to the database
+    pipeline_db.add_pipeline(cur, pipeline_id=pip_id, tag=graph.name)
+    
+    # Add nodes and their dependencies directly from the graph
+    for node in graph.nodes:
+        pipeline_db.add_node(cur, node_id=node)
+        pipeline_db.add_node_tag(cur, node_id=node, pipeline_id=pip_id, tag=graph.nodes[node].get("tag", None))
+        for parent in graph.predecessors(node):
+            pipeline_db.add_node_relation(cur, child_id=node, parent_id=parent)
+    return pip_id
+
+
+
+
+def serialize_pipeline(settings, graph, pip_id = None, verbose=False):
+    pipeline_data = graph_to_dict(graph)
+    pipeline_id = pip_id if pip_id else generate_pip_id()
+    path_pip_file = f"{settings['pipeline_folder']}/{pipeline_id}.json"
     with open(path_pip_file, 'w') as file:
         json.dump(pipeline_data, file, indent=2)
     if verbose:
@@ -218,9 +238,9 @@ def connect_node_to_parent(settings, graph, node_id, parent_node_id, verbose=Fal
         print(f"Node {node_id} connected to parent node {parent_node_id}.")
     return graph
 
-def load_pipeline_dict(settings, pip_id):
+def load_pipeline_dict_from_file(settings, pip_id):
     pipeline_id = pip_id
-    path_pip_file = f"{settings['pipeline_folder']}/p_{pipeline_id}.json"
+    path_pip_file = f"{settings['pipeline_folder']}/{pipeline_id}.json"
     if os.path.exists(path_pip_file):
         with open(path_pip_file, 'r') as file:
             return json.load(file)
@@ -228,7 +248,7 @@ def load_pipeline_dict(settings, pip_id):
         raise FileNotFoundError(f"Pipeline file {path_pip_file} does not exist.")
 
 def load_pipeline_from_file(settings, pip_id):
-    pipeline_data = load_pipeline_dict(settings=settings, pip_id=pip_id)
+    pipeline_data = load_pipeline_dict_from_file(settings=settings, pip_id=pip_id)
     # Create a directed graph
     G = nx.DiGraph()
     G.name = pipeline_data['name']  # Set the graph name from the pipeline data
@@ -236,8 +256,8 @@ def load_pipeline_from_file(settings, pip_id):
         if not check_node_exist(settings, node['nid']):
             raise ValueError(f"Node {node['nid']} does not exist in the node folder.")
         G.add_node(node['nid'])  # Add node with attributes
-        if 'dependencies' in node:
-            for dep in node['dependencies']:
+        if 'parents' in node:
+            for dep in node['parents']:
                 G.add_edge(dep, node['nid'])  # Add edges based on dependencies
     # Load the status of each node and add it as an attribute to the graph
     for node in G.nodes:
@@ -254,11 +274,12 @@ def load_pipeline_from_file(settings, pip_id):
     return G
 
 
-def generate_data_folder_structure(base_path, verbose=False):
+def generate_data_folder(base_path):
     os.makedirs(os.path.join(base_path, "nodes"), exist_ok=True)
-    os.makedirs(os.path.join(base_path, "pipelines"), exist_ok=True)
-    if verbose:
-        print(f"Data folder structure created at: {base_path}")
+    
+    return {
+        "nodes": os.path.join(base_path, "nodes"),
+    }
 
 
 # def save_pipeline(verbose=False):

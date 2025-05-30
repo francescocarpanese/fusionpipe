@@ -9,7 +9,9 @@ from fusionpipe.utils.pip_utils import (
     check_node_exist,
     load_pipeline_from_file,
     add_node,
+    generate_data_folder_structure
 )
+
 import os
 import json
 
@@ -17,9 +19,13 @@ import json
 %autoreload 2
 
 
+base_path = "/misc/carpanes/fusionpipe/bin"
+
+generate_data_folder_structure(base_path)
+
 settings = {
     "pipeline_folder": "/home/cisko90/fusionpipe/bin/pipelines",
-    "node_folder": "/home/cisko90/fusionpipe/bin/nodes",
+    "node_folder": "/misc/carpanes/fusionpipe/bin/pipelines",
 }
 
 
