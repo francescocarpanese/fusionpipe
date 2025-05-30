@@ -10,11 +10,11 @@ from fusionpipe.utils import pipeline_db
 from enum import Enum
 
 class NodeState(Enum):
-    PENDING = "null"       # Node is created but not yet processed
+    READY = "ready"       # Node is created but not yet processed
     RUNNING = "running"       # Node is currently being processed
     COMPLETED = "completed"   # Node has finished processing successfully
     FAILED = "failed"         # Node processing failed
-    STALE = "stale"           # Node is outdated or no longer valid
+    STALEDATA = "staledata"           # Node is outdated or no longer valid
 
 
 def generate_id():
@@ -48,12 +48,6 @@ def init_node_folder(settings, node_id, verbose=False):
     
     if verbose:
         print(f"Node folder created at: {node_folder_path}")
-
-    meta = generate_node_meta_template(node_id)
-    # Dump the metadata to a JSON file
-    with open(f"{node_folder_path}/meta.json", "w") as meta_file:
-        json.dump(meta, meta_file, indent=2)
-
 
 def delete_node_folder(settings, node_id, verbose=False):
     pth_node_folder = settings["node_folder"]
@@ -136,19 +130,80 @@ def graph_to_dict(graph):
     return pipeline_data
 
 
-
-def graph_to_db(graph, pip_id, cur):
+def graph_to_db(Gnx, cur):
     # Add the pipeline to the database
-    pipeline_db.add_pipeline(cur, pipeline_id=pip_id, tag=graph.name)
-    
-    # Add nodes and their dependencies directly from the graph
-    for node in graph.nodes:
-        pipeline_db.add_node(cur, node_id=node)
-        pipeline_db.add_node_tag(cur, node_id=node, pipeline_id=pip_id, tag=graph.nodes[node].get("tag", None))
-        for parent in graph.predecessors(node):
-            pipeline_db.add_node_relation(cur, child_id=node, parent_id=parent)
-    return pip_id
+    pip_id = Gnx.graph['id']
+    graph_tag = Gnx.graph.get('tag', None)
+    pipeline_db.add_pipeline(cur, pipeline_id=pip_id, tag=graph_tag)
 
+    # Add nodes and their dependencies directly from the graph
+    for node in Gnx.nodes:
+        pipeline_db.add_node(cur, node_id=node)
+        pipeline_db.add_node_tag(cur, node_id=node, pipeline_id=pip_id, tag=Gnx.nodes[node].get("tag", None))
+        for parent in Gnx.predecessors(node):
+            pipeline_db.add_node_relation(cur, child_id=node, parent_id=parent)
+        pipeline_db.add_node_to_entries(cur, node_id=node, pipeline_id=pip_id)
+        pipeline_db.update_node_status(cur, node_id=node, status=Gnx.nodes[node].get("status", "null"))
+
+def db_to_graph_from_pip_id(cur, pip_id):
+    # Load the pipeline from the database
+    if not pipeline_db.check_pipeline_exists(cur, pip_id):
+        raise ValueError(f"Pipeline with ID {pip_id} does not exist in the database.")
+ 
+    # Create a directed graph
+    G = nx.DiGraph()
+    G.graph['tag'] = pipeline_db.get_pipeline_tag(cur, pipeline_id=pip_id)  # Set the graph tag from the pipeline data
+    G.graph['id'] = pip_id  # Set the graph ID from the pipeline data
+
+    # Add nodes and their dependencies
+    for node_id in pipeline_db.get_all_nodes_from_pip_id(cur, pipeline_id=pip_id):
+        G.add_node(node_id)  # Add node with attributes
+        # Get the status of the node from the database and add as an attribute
+        status = pipeline_db.get_node_status(cur, node_id=node_id)
+        if status not in NodeState._value2member_map_:
+            raise ValueError(f"Invalid status '{status}' for node {node_id}. Must be one of {list(NodeState._value2member_map_.keys())}.")
+        G.nodes[node_id]['status'] = status
+
+        # Add edges based on parent relationships
+        for parent_id in pipeline_db.get_node_parents(cur, node_id=node_id):
+            G.add_edge(parent_id, node_id)
+    
+        # Add node tag if it exists
+        tag = pipeline_db.get_node_tag(cur, node_id=node_id, pipeline_id=pip_id)
+        if tag:
+            G.nodes[node_id]['tag'] = tag
+
+    return G
+
+
+
+
+
+# def db_to_graph(cur, pip_id):
+#     # Load the pipeline from the database
+#     pipeline_data = pipeline_db.get_pipeline(cur, pip_id=pip_id)
+#     if not pipeline_data:
+#         raise ValueError(f"Pipeline with ID {pip_id} does not exist in the database.")
+
+#     # Create a directed graph
+#     G = nx.DiGraph()
+#     G["tag"] = pipeline_data['tag'] # Set the graph tag from the pipeline data
+#     G["id"] = pip_id  # Set the graph ID from the pipeline data
+
+#     # Add nodes and their dependencies
+#     for node in pipeline_data['nodes']:
+#         G.add_node(node['nid'])  # Add node with attributes
+#         for dep in node.get('parents', []):
+#             G.add_edge(dep, node['nid'])  # Add edges based on dependencies
+
+#     # Load the status of each node and add it as an attribute to the graph
+#     for node in G.nodes:
+#         status = pipeline_db.get_node_status(cur, node_id=node)
+#         if status not in NodeState._value2member_map_:
+#             raise ValueError(f"Invalid status '{status}' for node {node}. Must be one of {list(NodeState._value2member_map_.keys())}.")
+#         G.nodes[node]['status'] = status
+
+#     return G
 
 
 
@@ -161,9 +216,9 @@ def serialize_pipeline(settings, graph, pip_id = None, verbose=False):
     if verbose:
         print(f"Pipeline {pipeline_id} saved successfully.")
 
-def duplicate_pip(settings, graph):
-    new_pip_id = create_pipeline_file(settings)
-    save_pipeline(settings, pip_id=new_pip_id, verbose=True)
+# def duplicate_pip(settings, graph):
+#     new_pip_id = create_pipeline_file(settings)
+#     save_pipeline(settings, pip_id=new_pip_id, verbose=True)
 
 def add_node(settings, graph, node_id, dependencies=None):
     if not check_node_exist(settings, node_id):

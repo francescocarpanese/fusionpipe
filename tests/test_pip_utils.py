@@ -4,33 +4,39 @@ import os
 
 # Define useful fixtures
 
-# @pytest.fixture
-# def tmp_base_dir():
-#     with tempfile.TemporaryDirectory() as tmpdir:
-#         yield tmpdir
 
-# @pytest.fixture
-# def pip_settings(tmp_base_dir):
-#     return {
-#         "pipeline_folder": os.path.join(tmp_base_dir, "pipelines"),
-#         "node_folder": os.path.join(tmp_base_dir, "nodes"),
-#     }
+local = False
 
+if not local:
+    @pytest.fixture
+    def tmp_base_dir():
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield tmpdir
 
-@pytest.fixture
-def tmp_base_dir():
-    yield "/misc/carpanes/fusionpipe/bin"
+    @pytest.fixture
+    def pip_settings(tmp_base_dir):
+        return {
+            "connection_db_filepath": os.path.join(tmp_base_dir, "connection.db"),
+            "node_folder": os.path.join(tmp_base_dir, "nodes"),
+        }
 
-@pytest.fixture
-def pip_settings(tmp_base_dir):
-    return {
-        "connection_db_filepath": "/misc/carpanes/fusionpipe/bin/connection.db",
-        "node_folder": "/misc/carpanes/fusionpipe/bin/nodes",
-    }
+else:
+    @pytest.fixture
+    def tmp_base_dir():
+        yield "/misc/carpanes/fusionpipe/bin"
+
+    @pytest.fixture
+    def pip_settings(tmp_base_dir):
+        return {
+            "connection_db_filepath": "/misc/carpanes/fusionpipe/bin/connection.db",
+            "node_folder": "/misc/carpanes/fusionpipe/bin/nodes",
+        }
+
 
 @pytest.fixture
 def dag_graph_dummy_1():
     import networkx as nx
+    from fusionpipe.utils.pip_utils import NodeState 
     # Create a simple directed acyclic graph (DAG) for testing
     G = nx.DiGraph()
     G.add_edges_from([
@@ -38,22 +44,15 @@ def dag_graph_dummy_1():
         ("A", "C"),
         ("C", "D"),
     ])
-    G.name = "test_dag"
     G.graph['description'] = "A simple test DAG"
     G.graph['id'] = "12345"
-    return G
+    G.graph['tag'] = "test_tag"
 
-@pytest.fixture
-def dict_graph_dummy_1():
-    return  {
-        "name": "test_dag",
-        "nodes": [
-            {"nid": "A", "parents": []},
-            {"nid": "B", "parents": ["A"]},
-            {"nid": "C", "parents": ["A"]},
-            {"nid": "D", "parents": ["C"]}
-        ]
-    }
+    # Add a 'status' attribute to each node using NodeState
+    for node in G.nodes:
+        G.nodes[node]['status'] = NodeState.READY.value
+
+    return G
 
 
 def test_generate_data_folder(tmp_base_dir):
@@ -322,3 +321,149 @@ def test_add_pipeline_description(pip_settings):
     assert rowid1 is not None, "Failed to add pipeline description."
     assert isinstance(rowid1, int), "Row ID should be an integer."
     assert rowid1 > 0, "Row ID should be greater than zero."
+
+
+def test_update_node_status(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id, NodeState
+    from fusionpipe.utils import pipeline_db
+
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create a node
+    node_id = generate_node_id()
+    pipeline_db.add_node(cur, node_id=node_id)
+    conn.commit()
+
+    # Update node status to RUNNING
+    pipeline_db.update_node_status(cur, node_id=node_id, status=NodeState.RUNNING.value)
+    conn.commit()
+
+    # Check if the status was updated
+    cur.execute("SELECT status FROM nodes WHERE id=?", (node_id,))
+    result = cur.fetchone()
+    assert result is not None, "Node not found in database."
+    assert result[0] == NodeState.RUNNING.value, f"Expected status {NodeState.RUNNING.value}, got {result[0]}"
+
+    conn.close()
+
+
+
+def test_get_pipeline_tag(pip_settings):
+    from fusionpipe.utils import pipeline_db
+    from fusionpipe.utils.pip_utils import generate_pip_id
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Add a pipeline with a specific tag
+    pipeline_id = generate_pip_id()
+    tag = "my_test_tag"
+    pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag=tag)
+    conn.commit()
+
+    # Test get_pipeline_tag returns the correct tag
+    fetched_tag = pipeline_db.get_pipeline_tag(cur, pipeline_id)
+    assert fetched_tag == tag, f"Expected tag '{tag}', got '{fetched_tag}'"
+
+    # Test get_pipeline_tag returns None for non-existent pipeline
+    non_existent_id = "nonexistent_id"
+    assert pipeline_db.get_pipeline_tag(cur, non_existent_id) is None
+
+    conn.close()
+
+
+
+def test_get_all_nodes_from_pip_id(pip_settings):
+    from fusionpipe.utils import pipeline_db
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create a pipeline and nodes
+    pipeline_id = generate_pip_id()
+    node_ids = [generate_node_id() for _ in range(3)]
+    pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    for node_id in node_ids:
+        pipeline_db.add_node(cur, node_id=node_id)
+        pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+    conn.commit()
+
+
+    result_nodes = pipeline_db.get_all_nodes_from_pip_id(cur, pipeline_id)
+    assert set(result_nodes) == set(node_ids), f"Expected nodes {node_ids}, got {result_nodes}"
+
+    # Test with a pipeline that has no nodes
+    empty_pipeline_id = generate_pip_id()
+    pipeline_db.add_pipeline(cur, pipeline_id=empty_pipeline_id, tag="empty_pipeline")
+    conn.commit()
+    result_empty = pipeline_db.get_all_nodes_from_pip_id(cur, empty_pipeline_id)
+    assert result_empty == [], "Expected empty list for pipeline with no nodes"
+
+    conn.close()
+
+
+
+def test_graph_to_db(pip_settings, dag_graph_dummy_1):
+    import networkx as nx
+    from fusionpipe.utils.pip_utils import graph_to_db
+    from fusionpipe.utils import pipeline_db
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+
+    # Setup database
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    G = dag_graph_dummy_1
+
+    # Call the function
+    graph_to_db(G, cur)
+    conn.commit()
+
+    # Check pipeline exists
+    cur.execute("SELECT * FROM pipelines WHERE id=?", (G.graph['id'],))
+    pipeline_row = cur.fetchone()
+    assert pipeline_row is not None, "Pipeline was not added to the database."
+    assert pipeline_row[1] == G.graph['tag'], "Pipeline tag does not match expected value."
+
+    # Check nodes exist
+    for node in G.nodes:
+        cur.execute("SELECT * FROM nodes WHERE id=?", (node,))
+        node_row = cur.fetchone()
+        assert node_row is not None, f"Node {node} was not added to the database."
+        assert node_row[1] == G.nodes[node]['status'], f"Node {node} status does not match expected value."
+
+    # Check edges exist
+    for parent, child in G.edges:
+        cur.execute("SELECT * FROM node_relation WHERE parent_id=? AND child_id=?", (parent, child))
+        relation_row = cur.fetchone()
+        assert relation_row is not None, f"Relation between {parent} and {child} was not added to the database."
+
+
+def test_db_to_graph(pip_settings, dag_graph_dummy_1):
+    from fusionpipe.utils import pipeline_db
+    from fusionpipe.utils.pip_utils import graph_to_db, db_to_graph_from_pip_id
+    import networkx as nx
+
+    # Setup database
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Add the dummy graph to the database
+    graph_to_db(dag_graph_dummy_1, cur)
+    conn.commit()
+
+    # Call the function to convert DB back to graph
+    G_retrieved = db_to_graph_from_pip_id(cur, dag_graph_dummy_1.graph['id'])
+
+    # Check if the retrieved graph matches the original
+    assert nx.is_isomorphic(G_retrieved, dag_graph_dummy_1), "Retrieved graph does not match the original graph."
+
+    conn.close()

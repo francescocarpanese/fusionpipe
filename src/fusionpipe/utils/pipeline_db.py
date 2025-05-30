@@ -23,7 +23,8 @@ def init_graph_db(conn):
 
     cur.execute('''
         CREATE TABLE IF NOT EXISTS nodes (
-            id TEXT PRIMARY KEY
+            id TEXT PRIMARY KEY,
+            status TEXT CHECK(status IN ('ready', 'running', 'completed', 'failed', 'staledata')) DEFAULT 'ready'
         )
     ''')
 
@@ -123,3 +124,26 @@ def add_pipeline_description(cur, pipeline_id, description):
         ON CONFLICT(pipeline_id) DO UPDATE SET description=excluded.description
     ''', (pipeline_id, description))
     return cur.lastrowid
+
+def update_node_status(cur, node_id, status):
+    cur.execute('UPDATE nodes SET status = ? WHERE id = ?', (status, node_id))
+    return cur.rowcount
+
+def get_node_status(cur, node_id):
+    cur.execute('SELECT status FROM nodes WHERE id = ?', (node_id,))
+    row = cur.fetchone()
+    return row[0] if row else None
+
+
+def get_pipeline_tag(cur, pipeline_id):
+    cur.execute('SELECT tag FROM pipelines WHERE id = ?', (pipeline_id,))
+    row = cur.fetchone()
+    return row[0] if row else None
+
+def check_pipeline_exists(cur, pipeline_id):
+    cur.execute('SELECT 1 FROM pipelines WHERE id = ?', (pipeline_id,))
+    return cur.fetchone() is not None
+
+def get_all_nodes_from_pip_id(cur, pipeline_id):
+    cur.execute('SELECT node_id FROM entries WHERE pipeline_id = ?', (pipeline_id,))
+    return [row[0] for row in cur.fetchall()]
