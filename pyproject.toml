@@ -1,0 +1,22 @@
+[project]
+name = "fusionpipe"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Francesco Carpanese", email = "francesco.carpanese@epfl.ch" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "datetime>=5.5",
+    "matplotlib>=3.10.3",
+    "networkx>=3.5",
+    "pytest>=8.3.5",
+]
+
+[project.scripts]
+fusionpipe = "fusionpipe:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
