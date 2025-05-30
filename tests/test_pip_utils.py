@@ -154,7 +154,7 @@ def test_add_node(pip_settings):
     # Check if the node was added
     conn = pipeline_db.load_db(db_path)
     cur = conn.cursor()
-    cur.execute("SELECT * FROM nodes WHERE id=?", (node_id,))
+    cur.execute("SELECT * FROM nodes WHERE node_id=?", (node_id,))
     result = cur.fetchone()
     
     assert result is not None, f"Node {node_id} was not added to the database."
@@ -360,7 +360,7 @@ def test_update_node_status(pip_settings):
     conn.commit()
 
     # Check if the status was updated
-    cur.execute("SELECT status FROM nodes WHERE id=?", (node_id,))
+    cur.execute("SELECT status FROM nodes WHERE node_id=?", (node_id,))
     result = cur.fetchone()
     assert result is not None, "Node not found in database."
     assert result[0] == NodeState.RUNNING.value, f"Expected status {NodeState.RUNNING.value}, got {result[0]}"
@@ -452,7 +452,7 @@ def test_graph_to_db(pip_settings, dag_graph_dummy_1):
 
     # Check nodes exist
     for node in G.nodes:
-        cur.execute("SELECT * FROM nodes WHERE id=?", (node,))
+        cur.execute("SELECT * FROM nodes WHERE node_id=?", (node,))
         node_row = cur.fetchone()
         assert node_row is not None, f"Node {node} was not added to the database."
         assert node_row[1] == G.nodes[node]['status'], f"Node {node} status does not match expected value."

@@ -23,7 +23,7 @@ def init_graph_db(conn):
 
     cur.execute('''
         CREATE TABLE IF NOT EXISTS nodes (
-            id TEXT PRIMARY KEY,
+            node_id TEXT PRIMARY KEY,
             status TEXT CHECK(status IN ('ready', 'running', 'completed', 'failed', 'staledata')) DEFAULT 'ready'
         )
     ''')
@@ -81,7 +81,7 @@ def add_pipeline(cur, pipeline_id, tag=None):
     return cur.lastrowid
 
 def add_node_to_nodes(cur, node_id):
-    cur.execute('INSERT INTO nodes (id) VALUES (?)', (node_id,))
+    cur.execute('INSERT INTO nodes (node_id) VALUES (?)', (node_id,))
     return cur.lastrowid
 
 def remove_node_from_pipeline(cur, node_id, pipeline_id):
@@ -89,7 +89,7 @@ def remove_node_from_pipeline(cur, node_id, pipeline_id):
     return cur.rowcount
 
 def remove_node_from_nodes(cur, node_id):
-    cur.execute('DELETE FROM nodes WHERE id = ?', (node_id,))
+    cur.execute('DELETE FROM nodes WHERE node_id = ?', (node_id,))
     return cur.rowcount
 
 def add_node_to_entries(cur, node_id, pipeline_id, user=None):
@@ -130,11 +130,11 @@ def add_pipeline_description(cur, pipeline_id, description):
     return cur.lastrowid
 
 def update_node_status(cur, node_id, status):
-    cur.execute('UPDATE nodes SET status = ? WHERE id = ?', (status, node_id))
+    cur.execute('UPDATE nodes SET status = ? WHERE node_id = ?', (status, node_id))
     return cur.rowcount
 
 def get_node_status(cur, node_id):
-    cur.execute('SELECT status FROM nodes WHERE id = ?', (node_id,))
+    cur.execute('SELECT status FROM nodes WHERE node_id = ?', (node_id,))
     row = cur.fetchone()
     return row[0] if row else None
 
@@ -153,8 +153,8 @@ def get_all_nodes_from_pip_id(cur, pipeline_id):
 
 def get_nodes_without_pipeline(cur):
     cur.execute('''
-        SELECT id FROM nodes
-        WHERE id NOT IN (SELECT node_id FROM entries)
+        SELECT node_id FROM nodes
+        WHERE node_id NOT IN (SELECT node_id FROM entries)
     ''')
     return [row[0] for row in cur.fetchall()]
 
