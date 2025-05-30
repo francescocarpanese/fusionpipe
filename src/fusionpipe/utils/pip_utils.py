@@ -138,7 +138,7 @@ def graph_to_db(Gnx, cur):
 
     # Add nodes and their dependencies directly from the graph
     for node in Gnx.nodes:
-        pipeline_db.add_node(cur, node_id=node)
+        pipeline_db.add_node_to_nodes(cur, node_id=node)
         pipeline_db.add_node_tag(cur, node_id=node, pipeline_id=pip_id, tag=Gnx.nodes[node].get("tag", None))
         for parent in Gnx.predecessors(node):
             pipeline_db.add_node_relation(cur, child_id=node, parent_id=parent)

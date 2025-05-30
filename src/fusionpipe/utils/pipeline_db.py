@@ -80,12 +80,16 @@ def add_pipeline(cur, pipeline_id, tag=None):
     cur.execute('INSERT INTO pipelines (id, tag) VALUES (?, ?)', (pipeline_id, tag))
     return cur.lastrowid
 
-def add_node(cur, node_id):
+def add_node_to_nodes(cur, node_id):
     cur.execute('INSERT INTO nodes (id) VALUES (?)', (node_id,))
     return cur.lastrowid
 
-def remove_node_from_entries(cur, node_id, pipeline_id):
+def remove_node_from_pipeline(cur, node_id, pipeline_id):
     cur.execute('DELETE FROM entries WHERE node_id = ? AND pipeline_id = ?', (node_id, pipeline_id))
+    return cur.rowcount
+
+def remove_node_from_nodes(cur, node_id):
+    cur.execute('DELETE FROM nodes WHERE id = ?', (node_id,))
     return cur.rowcount
 
 def add_node_to_entries(cur, node_id, pipeline_id, user=None):
@@ -134,7 +138,6 @@ def get_node_status(cur, node_id):
     row = cur.fetchone()
     return row[0] if row else None
 
-
 def get_pipeline_tag(cur, pipeline_id):
     cur.execute('SELECT tag FROM pipelines WHERE id = ?', (pipeline_id,))
     row = cur.fetchone()
@@ -147,3 +150,38 @@ def check_pipeline_exists(cur, pipeline_id):
 def get_all_nodes_from_pip_id(cur, pipeline_id):
     cur.execute('SELECT node_id FROM entries WHERE pipeline_id = ?', (pipeline_id,))
     return [row[0] for row in cur.fetchall()]
+
+def get_nodes_without_pipeline(cur):
+    cur.execute('''
+        SELECT id FROM nodes
+        WHERE id NOT IN (SELECT node_id FROM entries)
+    ''')
+    return [row[0] for row in cur.fetchall()]
+
+def clear_database(cur):
+    cur.execute('DELETE FROM pipelines')
+    cur.execute('DELETE FROM nodes')
+    cur.execute('DELETE FROM node_tags')
+    cur.execute('DELETE FROM entries')
+    cur.execute('DELETE FROM node_relation')
+    cur.execute('DELETE FROM pipeline_desciption')
+    return cur
+
+def remove_node_from_tags(cur, node_id):
+    cur.execute('DELETE FROM node_tags WHERE node_id = ?', (node_id,))
+    return cur.rowcount
+
+def remove_node_from_relations(cur, node_id):
+    cur.execute('DELETE FROM node_relation WHERE child_id = ? OR parent_id = ?', (node_id, node_id))
+    return cur.rowcount
+
+def remove_node_from_entries(cur, node_id):
+    cur.execute('DELETE FROM entries WHERE node_id = ?', (node_id,))
+    return cur.rowcount
+
+def remove_node_from_everywhere(cur, node_id):
+    remove_node_from_entries(cur, node_id)
+    remove_node_from_tags(cur, node_id)
+    remove_node_from_relations(cur, node_id)
+    remove_node_from_nodes(cur, node_id)
+    return cur.rowcount

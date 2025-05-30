@@ -18,19 +18,37 @@ if not local:
             "connection_db_filepath": os.path.join(tmp_base_dir, "connection.db"),
             "node_folder": os.path.join(tmp_base_dir, "nodes"),
         }
+    
+    @pytest.fixture
+    def tmp_database_path(tmp_base_dir):
+        return os.path.join(tmp_base_dir, "connection.db")
+
+    @pytest.fixture
+    def tmp_database_path(tmp_base_dir):
+        db_path  = os.path.join(tmp_base_dir, "connection.db")
+        yield db_path
+        if os.path.exists(db_path):  # Cleanup after the test
+            os.remove(db_path)       
 
 else:
     @pytest.fixture
     def tmp_base_dir():
-        yield "/misc/carpanes/fusionpipe/bin"
+        yield "/home/cisko90/fusionpipe/bin"
 
     @pytest.fixture
     def pip_settings(tmp_base_dir):
         return {
-            "connection_db_filepath": "/misc/carpanes/fusionpipe/bin/connection.db",
-            "node_folder": "/misc/carpanes/fusionpipe/bin/nodes",
+            "connection_db_filepath": f"{tmp_base_dir}/connection.db",
+            "node_folder": "f{tmp_base_dir}/nodes",
         }
-
+    
+    @pytest.fixture
+    def tmp_database_path(tmp_base_dir):
+        # This does not remove the database so that it can be inspected
+        db_path  = os.path.join(tmp_base_dir, "connection.db")
+        yield db_path
+        if os.path.exists(db_path):  # Cleanup after the test
+            os.remove(db_path)   
 
 @pytest.fixture
 def dag_graph_dummy_1():
@@ -125,8 +143,9 @@ def test_add_node(pip_settings):
     conn = pipeline_db.init_db(db_path)
     cur = conn.cursor()
 
+
     node_id = generate_node_id()
-    pipeline_db.add_node(cur, node_id=node_id)
+    pipeline_db.add_node_to_nodes(cur, node_id=node_id)
     
     # Commit and close the connection
     conn.commit()
@@ -151,7 +170,7 @@ def test_add_node_to_entries(pip_settings):
     # Create a node and a pipeline
     node_id = generate_node_id()
     pipeline_id = generate_pip_id()
-    pipeline_db.add_node(cur, node_id=node_id)
+    pipeline_db.add_node_to_nodes(cur, node_id=node_id)
     pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Add entry to entries table
@@ -171,8 +190,8 @@ def test_add_node_to_entries(pip_settings):
     assert result[2] == user, "User in entry does not match."
 
 
-def test_remove_node_from_entries(pip_settings):
-    from fusionpipe.utils.pipeline_db import remove_node_from_entries
+def test_remove_node_from_pipeline(pip_settings):
+    from fusionpipe.utils.pipeline_db import remove_node_from_pipeline
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import pipeline_db
 
@@ -184,7 +203,7 @@ def test_remove_node_from_entries(pip_settings):
     # Create a node and a pipeline
     node_id = generate_node_id()
     pipeline_id = generate_pip_id()
-    pipeline_db.add_node(cur, node_id=node_id)
+    pipeline_db.add_node_to_nodes(cur, node_id=node_id)
     pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Add entry to entries table
@@ -193,7 +212,7 @@ def test_remove_node_from_entries(pip_settings):
     conn.commit()
 
     # Remove the entry
-    rows_deleted = remove_node_from_entries(cur, node_id=node_id, pipeline_id=pipeline_id)
+    rows_deleted = remove_node_from_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
     assert rows_deleted == 1, "Entry was not deleted from the database."
 
@@ -214,8 +233,8 @@ def test_add_node_relation(pip_settings):
     # Create two nodes
     child_id = generate_node_id()
     parent_id = generate_node_id()
-    pipeline_db.add_node(cur, node_id=child_id)
-    pipeline_db.add_node(cur, node_id=parent_id)
+    pipeline_db.add_node_to_nodes(cur, node_id=child_id)
+    pipeline_db.add_node_to_nodes(cur, node_id=parent_id)
 
     # Add relation
     relation_id = pipeline_db.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
@@ -241,9 +260,9 @@ def test_get_node_parents(pip_settings):
     node1 = generate_node_id()
     node2 = generate_node_id()
     node3 = generate_node_id()
-    pipeline_db.add_node(cur, node_id=node1)
-    pipeline_db.add_node(cur, node_id=node2)
-    pipeline_db.add_node(cur, node_id=node3)
+    pipeline_db.add_node_to_nodes(cur, node_id=node1)
+    pipeline_db.add_node_to_nodes(cur, node_id=node2)
+    pipeline_db.add_node_to_nodes(cur, node_id=node3)
 
     # Add relation: node1 is parent of node2
     pipeline_db.add_node_relation(cur, child_id=node2, parent_id=node1)
@@ -277,9 +296,9 @@ def test_get_node_children(pip_settings):
     node1 = generate_node_id()
     node2 = generate_node_id()
     node3 = generate_node_id()
-    pipeline_db.add_node(cur, node_id=node1)
-    pipeline_db.add_node(cur, node_id=node2)
-    pipeline_db.add_node(cur, node_id=node3)
+    pipeline_db.add_node_to_nodes(cur, node_id=node1)
+    pipeline_db.add_node_to_nodes(cur, node_id=node2)
+    pipeline_db.add_node_to_nodes(cur, node_id=node3)
 
     # Add relation: node1 is parent of node2
     pipeline_db.add_node_relation(cur, child_id=node2, parent_id=node1)
@@ -333,7 +352,7 @@ def test_update_node_status(pip_settings):
 
     # Create a node
     node_id = generate_node_id()
-    pipeline_db.add_node(cur, node_id=node_id)
+    pipeline_db.add_node_to_nodes(cur, node_id=node_id)
     conn.commit()
 
     # Update node status to RUNNING
@@ -389,7 +408,7 @@ def test_get_all_nodes_from_pip_id(pip_settings):
     node_ids = [generate_node_id() for _ in range(3)]
     pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     for node_id in node_ids:
-        pipeline_db.add_node(cur, node_id=node_id)
+        pipeline_db.add_node_to_nodes(cur, node_id=node_id)
         pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
     conn.commit()
 
@@ -466,3 +485,165 @@ def test_db_to_graph(pip_settings, dag_graph_dummy_1):
     assert nx.is_isomorphic(G_retrieved, dag_graph_dummy_1), "Retrieved graph does not match the original graph."
 
     conn.close()
+
+
+def test_get_nodes_without_pipeline(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+    from fusionpipe.utils import pipeline_db
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create nodes
+    node_ids = [generate_node_id() for _ in range(3)]
+    for node_id in node_ids:
+        pipeline_db.add_node_to_nodes(cur, node_id=node_id)
+
+    # Create a pipeline and associate one node with it
+    pipeline_id = generate_pip_id()
+    pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    pipeline_db.add_node_to_entries(cur, node_id=node_ids[0], pipeline_id=pipeline_id, user="test_user")
+    conn.commit()
+
+    # Get nodes without a pipeline
+    nodes_without_pipeline = pipeline_db.get_nodes_without_pipeline(cur)
+    conn.close()
+
+    # Check that only the nodes not associated with a pipeline are returned
+    expected_nodes = set(node_ids[1:])
+    assert set(nodes_without_pipeline) == expected_nodes, f"Expected nodes without pipeline: {expected_nodes}, got: {nodes_without_pipeline}"
+
+def test_remove_node_from_tags(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+    from fusionpipe.utils import pipeline_db
+
+
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create a node and a pipeline
+    node_id = generate_node_id()
+    pipeline_id = generate_pip_id()
+    pipeline_db.add_node_to_nodes(cur, node_id=node_id)
+    pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+
+    # Add a tag to the node
+    tag = "test_tag"
+    pipeline_db.add_node_tag(cur, node_id=node_id, pipeline_id=pipeline_id, tag=tag)
+    conn.commit()
+
+    # Remove the tag
+    rows_deleted = pipeline_db.remove_node_from_tags(cur, node_id=node_id)
+    conn.commit()
+    assert rows_deleted == 1, "Tag was not removed from the database."
+
+    # Check if the tag was actually removed
+    cur.execute("SELECT * FROM node_tags WHERE node_id=? AND pipeline_id=?", (node_id, pipeline_id))
+    result = cur.fetchone()
+    conn.close()
+    assert result is None, "Tag was not removed from the database."
+
+
+def test_remove_node_from_relations(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id
+    from fusionpipe.utils import pipeline_db
+
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create nodes
+    parent_id = generate_node_id()
+    child_id = generate_node_id()
+    pipeline_db.add_node_to_nodes(cur, node_id=parent_id)
+    pipeline_db.add_node_to_nodes(cur, node_id=child_id)
+
+    # Add relation
+    pipeline_db.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
+    conn.commit()
+
+    # Remove the relation
+    rows_deleted = pipeline_db.remove_node_from_relations(cur, node_id=child_id)
+    conn.commit()
+    assert rows_deleted == 1, "Relation was not removed from the database."
+
+    # Check if the relation was actually removed
+    cur.execute("SELECT * FROM node_relation WHERE child_id=? OR parent_id=?", (child_id, child_id))
+    result = cur.fetchone()
+    conn.close()
+    assert result is None, "Relation was not removed from the database."
+
+def test_remove_node_from_everywhere(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+    from fusionpipe.utils import pipeline_db
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create a node and a pipeline
+    node_id = generate_node_id()
+    pipeline_id = generate_pip_id()
+    pipeline_db.add_node_to_nodes(cur, node_id=node_id)
+    pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+
+    # Add the node to entries
+    pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+
+    # Add a tag to the node
+    tag = "test_tag"
+    pipeline_db.add_node_tag(cur, node_id=node_id, pipeline_id=pipeline_id, tag=tag)
+
+    # Add a relation involving the node
+    parent_id = generate_node_id()
+    pipeline_db.add_node_to_nodes(cur, node_id=parent_id)
+    pipeline_db.add_node_relation(cur, child_id=node_id, parent_id=parent_id)
+    conn.commit()
+
+    # Remove the node from everywhere
+    pipeline_db.remove_node_from_everywhere(cur, node_id=node_id)
+    conn.commit()
+    cur = conn.cursor()
+
+    # Verify the node is removed from all relevant tables
+    tables_to_check = ["nodes", "entries", "node_tags", "node_relation"]
+    for table in tables_to_check:
+        cur.execute(f"SELECT * FROM {table} WHERE id=? OR node_id=? OR child_id=? OR parent_id=?", (node_id, node_id, node_id, node_id))
+        result = cur.fetchone()
+        assert result is None, f"Node {node_id} was not fully removed from table {table}."
+
+    conn.close()
+
+def test_remove_node_from_entries(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+    from fusionpipe.utils import pipeline_db
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create a node and a pipeline
+    node_id = generate_node_id()
+    pipeline_id = generate_pip_id()
+    pipeline_db.add_node_to_nodes(cur, node_id=node_id)
+    pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+
+    # Add the node to entries
+    user = "test_user"
+    entry_id = pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
+    conn.commit()
+
+    # Remove the node from entries
+    rows_deleted = pipeline_db.remove_node_from_entries(cur, node_id=node_id)
+    conn.commit()
+    assert rows_deleted == 1, "Entry was not removed from the database."
+
+    # Verify the entry is removed
+    cur.execute("SELECT * FROM entries WHERE node_id=? AND pipeline_id=?", (node_id, pipeline_id))
+    result = cur.fetchone()
+    conn.close()
+    assert result is None, "Entry was not removed from the database."
