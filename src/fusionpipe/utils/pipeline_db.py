@@ -16,7 +16,7 @@ def init_graph_db(conn):
 
     cur.execute('''
         CREATE TABLE IF NOT EXISTS pipelines (
-            id TEXT PRIMARY KEY,
+            pipeline_id TEXT PRIMARY KEY,
             tag TEXT DEFAULT NULL
         )
     ''')
@@ -77,7 +77,7 @@ def init_graph_db(conn):
 
 
 def add_pipeline(cur, pipeline_id, tag=None):
-    cur.execute('INSERT INTO pipelines (id, tag) VALUES (?, ?)', (pipeline_id, tag))
+    cur.execute('INSERT INTO pipelines (pipeline_id, tag) VALUES (?, ?)', (pipeline_id, tag))
     return cur.lastrowid
 
 def add_node_to_nodes(cur, node_id):
@@ -139,12 +139,12 @@ def get_node_status(cur, node_id):
     return row[0] if row else None
 
 def get_pipeline_tag(cur, pipeline_id):
-    cur.execute('SELECT tag FROM pipelines WHERE id = ?', (pipeline_id,))
+    cur.execute('SELECT tag FROM pipelines WHERE pipeline_id = ?', (pipeline_id,))
     row = cur.fetchone()
     return row[0] if row else None
 
 def check_pipeline_exists(cur, pipeline_id):
-    cur.execute('SELECT 1 FROM pipelines WHERE id = ?', (pipeline_id,))
+    cur.execute('SELECT 1 FROM pipelines WHERE pipeline_id = ?', (pipeline_id,))
     return cur.fetchone() is not None
 
 def get_all_nodes_from_pip_id(cur, pipeline_id):

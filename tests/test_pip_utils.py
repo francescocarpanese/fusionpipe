@@ -128,7 +128,7 @@ def test_add_pipeline(pip_settings):
     # Check if the pipeline was added
     conn = pipeline_db.load_db(db_path)
     cur = conn.cursor()
-    cur.execute("SELECT * FROM pipelines WHERE id=?", (pip_id,))
+    cur.execute("SELECT * FROM pipelines WHERE pipeline_id=?", (pip_id,))
     result = cur.fetchone()
     
     assert result is not None, f"Pipeline {pip_id} was not added to the database."
@@ -445,7 +445,7 @@ def test_graph_to_db(pip_settings, dag_graph_dummy_1):
     conn.commit()
 
     # Check pipeline exists
-    cur.execute("SELECT * FROM pipelines WHERE id=?", (G.graph['id'],))
+    cur.execute("SELECT * FROM pipelines WHERE pipeline_id=?", (G.graph['id'],))
     pipeline_row = cur.fetchone()
     assert pipeline_row is not None, "Pipeline was not added to the database."
     assert pipeline_row[1] == G.graph['tag'], "Pipeline tag does not match expected value."
