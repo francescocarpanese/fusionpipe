@@ -1,6 +1,7 @@
 import pytest
 import tempfile
 import os
+import sqlite3
 
 # Define useful fixtures
 
@@ -519,7 +520,6 @@ def test_remove_node_from_tags(pip_settings):
     from fusionpipe.utils import pipeline_db
 
 
-
     db_path = pip_settings["connection_db_filepath"]
     conn = pipeline_db.init_db(db_path)
     cur = conn.cursor()
@@ -612,7 +612,7 @@ def test_remove_node_from_everywhere(pip_settings):
     # Verify the node is removed from all relevant tables
     assert pipeline_db.get_rows_with_node_id_in_entries(cur, node_id) == [], "Node was not removed from entries."
     assert pipeline_db.get_rows_node_id_in_nodes(cur, node_id) == [], "Node was not removed from nodes."
-    assert pipeline_db.get_rows_with_node_id_in_tags(cur, node_id) == [], "Node was not removed from tags."
+    assert pipeline_db.get_rows_with_node_id_in_node_tags(cur, node_id) == [], "Node was not removed from tags."
     assert pipeline_db.get_rows_with_node_id_relations(cur, node_id) == [], "Node was not removed from relations."
 
     conn.close()
@@ -646,3 +646,257 @@ def test_remove_node_from_entries(pip_settings):
     result = cur.fetchone()
     conn.close()
     assert result is None, "Entry was not removed from the database."
+
+
+def test_get_rows_with_node_id_in_entries(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+    from fusionpipe.utils import pipeline_db
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create a node and a pipeline
+    node_id = generate_node_id()
+    pipeline_id = generate_pip_id()
+    pipeline_db.add_node_to_nodes(cur, node_id=node_id)
+    pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+
+    # Add the node to entries
+    user = "test_user"
+    entry_id = pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
+    conn.commit()
+
+    # Get rows with the node ID in entries
+    rows = pipeline_db.get_rows_with_node_id_in_entries(cur, node_id)
+    assert len(rows) == 1, "Expected one entry with the node ID."
+    assert rows[0][3] == node_id, "Node ID in entry does not match expected value."
+    assert rows[0][4] == pipeline_id, "Pipeline ID in entry does not match expected value."
+    
+    conn.close()
+
+
+def test_get_rows_node_id_in_nodes(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id
+    from fusionpipe.utils import pipeline_db
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create a node
+    node_id = generate_node_id()
+    pipeline_db.add_node_to_nodes(cur, node_id=node_id)
+    conn.commit()
+
+    # Get rows with the node ID in nodes
+    rows = pipeline_db.get_rows_node_id_in_nodes(cur, node_id)
+    assert len(rows) == 1, "Expected one row with the node ID."
+    assert rows[0][0] == node_id, "Node ID in row does not match expected value."
+
+    conn.close()
+
+def test_get_rows_with_node_id_in_node_tags(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+    from fusionpipe.utils import pipeline_db
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create a node and a pipeline
+    node_id = generate_node_id()
+    pipeline_id = generate_pip_id()
+    pipeline_db.add_node_to_nodes(cur, node_id=node_id)
+    pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+
+    # Add a tag to the node
+    tag = "test_tag"
+    pipeline_db.add_node_tag(cur, node_id=node_id, pipeline_id=pipeline_id, tag=tag)
+    conn.commit()
+
+    # Get rows with the node ID in tags
+    rows = pipeline_db.get_rows_with_node_id_in_node_tags(cur, node_id)
+    assert len(rows) == 1, "Expected one row with the node ID in tags."
+
+    conn.close()
+
+
+def test_get_rows_with_node_id_relations(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+
+    from fusionpipe.utils.pip_utils import generate_node_id
+    from fusionpipe.utils import pipeline_db
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create two nodes and a relation
+    parent_id = generate_node_id()
+    child_id = generate_node_id()
+    pipeline_db.add_node_to_nodes(cur, node_id=parent_id)
+    pipeline_db.add_node_to_nodes(cur, node_id=child_id)
+    pipeline_db.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
+    conn.commit()
+
+    # Get rows with the child node ID in relations
+    rows = pipeline_db.get_rows_with_node_id_relations(cur, child_id)
+
+    conn.close()
+    assert len(rows) == 1, "Expected one row with the child node ID in relations."
+
+def test_get_rows_with_pipeline_id_in_entries(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+    from fusionpipe.utils import pipeline_db
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create a pipeline and nodes
+    pipeline_id = generate_pip_id()
+    node_ids = [generate_node_id() for _ in range(2)]
+    pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    for node_id in node_ids:
+        pipeline_db.add_node_to_nodes(cur, node_id=node_id)
+        pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+    conn.commit()
+
+    # Get rows with the pipeline ID in entries
+    rows = pipeline_db.get_rows_with_pipeline_id_in_entries(cur, pipeline_id)
+    conn.close()
+
+    # Verify the rows match the expected data
+    assert len(rows) == len(node_ids), f"Expected {len(node_ids)} rows, got {len(rows)}."
+    for row in rows:
+        assert row[4] == pipeline_id, f"Pipeline ID in row does not match expected value {pipeline_id}."
+        assert row[3] in node_ids, f"Node ID {row[3]} in row is not in the expected node IDs {node_ids}."
+
+
+def test_get_rows_with_pipeline_id_in_pipelines(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_pip_id
+    from fusionpipe.utils import pipeline_db
+
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create a pipeline
+    pipeline_id = generate_pip_id()
+    tag = "test_pipeline"
+    pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag=tag)
+    conn.commit()
+
+    # Get rows with the pipeline ID in pipelines
+    rows = pipeline_db.get_rows_with_pipeline_id_in_pipelines(cur, pipeline_id)
+    conn.close()
+
+    # Verify the rows match the expected data
+    assert len(rows) == 1, f"Expected one row, got {len(rows)}."
+    assert rows[0][0] == pipeline_id, f"Pipeline ID in row does not match expected value {pipeline_id}."
+    assert rows[0][1] == tag, f"Pipeline tag in row does not match expected value {tag}."
+
+
+
+# @pytest.fixture
+# def setup_db():
+#     # Create an in-memory SQLite database for testing
+#     conn = sqlite3.connect(":memory:")
+#     init_db(conn)
+#     yield conn
+#     conn.close()
+
+def test_duplicate_pipeline(pip_settings):
+    from fusionpipe.utils import pipeline_db
+    from fusionpipe.utils.pipeline_db import add_pipeline, add_pipeline_description, add_node_to_entries, add_node_tag, duplicate_pipeline
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Add a source pipeline
+    source_pipeline_id = "source_pipeline"
+    add_pipeline(cur, pipeline_id=source_pipeline_id, tag="v1.0")
+    add_pipeline_description(cur, pipeline_id=source_pipeline_id, description="Test pipeline description")
+
+    # Add nodes and entries to the source pipeline
+    add_node_to_entries(cur, node_id="node1", pipeline_id=source_pipeline_id, user="user1")
+    add_node_to_entries(cur, node_id="node2", pipeline_id=source_pipeline_id, user="user2")
+    add_node_tag(cur, node_id="node1", pipeline_id=source_pipeline_id, tag="tag1")
+    add_node_tag(cur, node_id="node2", pipeline_id=source_pipeline_id, tag="tag2")
+
+    # Commit changes
+    conn.commit()
+
+    # Duplicate the pipeline
+    new_pipeline_id = "new_pipeline"
+    duplicate_pipeline(cur, source_pipeline_id, new_pipeline_id)
+
+    # Verify the new pipeline exists in the pipelines table
+    cur.execute("SELECT * FROM pipelines WHERE pipeline_id = ?", (new_pipeline_id,))
+    new_pipeline = cur.fetchone()
+    assert new_pipeline is not None, "New pipeline was not created."
+    assert new_pipeline[0] == new_pipeline_id
+    assert new_pipeline[1] == "v1.0"  # Tag should match the source pipeline
+
+    # Verify the entries table
+    cur.execute("SELECT * FROM entries WHERE pipeline_id = ?", (new_pipeline_id,))
+    entries = cur.fetchall()
+    assert len(entries) == 2, "Entries were not duplicated correctly."
+    assert entries[0][3] == "node1"
+    assert entries[1][3] == "node2"
+
+    # Verify the node_tags table
+    cur.execute("SELECT * FROM node_tags WHERE pipeline_id = ?", (new_pipeline_id,))
+    node_tags = cur.fetchall()
+    assert len(node_tags) == 2, "Node tags were not duplicated correctly."
+    assert node_tags[0][1] == "tag1"
+    assert node_tags[1][1] == "tag2"
+
+    # Verify the pipeline_description table
+    cur.execute("SELECT * FROM pipeline_desciption WHERE pipeline_id = ?", (new_pipeline_id,))
+    description = cur.fetchone()
+    assert description is not None, "Pipeline description was not duplicated."
+    assert description[1] == "Test pipeline description"
+
+    print("All assertions passed for test_duplicate_pipeline.")
+
+
+def test_duplicate_pipeline_graph_comparison(pip_settings, dag_graph_dummy_1):
+    from fusionpipe.utils import pipeline_db
+    from fusionpipe.utils.pip_utils import graph_to_db, db_to_graph_from_pip_id
+    import networkx as nx
+
+    # Setup database
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Add the original graph to the database
+    original_graph = dag_graph_dummy_1
+    graph_to_db(original_graph, cur)
+    conn.commit()
+
+    # Duplicate the pipeline
+    original_pipeline_id = original_graph.graph['id']
+    new_pipeline_id = "duplicated_pipeline"
+    pipeline_db.duplicate_pipeline(cur, original_pipeline_id, new_pipeline_id)
+    conn.commit()
+
+    # Load the original and duplicated pipelines as graphs
+    original_graph_loaded = db_to_graph_from_pip_id(cur, original_pipeline_id)
+    duplicated_graph_loaded = db_to_graph_from_pip_id(cur, new_pipeline_id)
+
+    # Compare the graphs
+    assert nx.is_isomorphic(
+        original_graph_loaded, duplicated_graph_loaded,
+        node_match=lambda n1, n2: n1['status'] == n2['status']
+    ), "Duplicated graph does not match the original graph structure and attributes."
+
+    # Ensure the pipeline IDs are different
+    assert original_graph_loaded.graph['id'] != duplicated_graph_loaded.graph['id'], \
+        "Pipeline IDs should be different between the original and duplicated graphs."
+
+    conn.close()

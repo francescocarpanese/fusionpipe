@@ -1,5 +1,13 @@
 import sqlite3
 
+table_names = [
+    'pipelines',
+    'nodes',
+    'node_tags',
+    'entries',
+    'node_relation',
+    'pipeline_desciption'
+]
 
 def load_db(db_path='pipeline.db'):
     conn = sqlite3.connect(db_path)
@@ -17,7 +25,8 @@ def init_graph_db(conn):
     cur.execute('''
         CREATE TABLE IF NOT EXISTS pipelines (
             pipeline_id TEXT PRIMARY KEY,
-            tag TEXT DEFAULT NULL
+            tag TEXT DEFAULT NULL,
+            owner TEXT DEFAULT NULL
         )
     ''')
 
@@ -186,9 +195,6 @@ def remove_node_from_everywhere(cur, node_id):
     remove_node_from_nodes(cur, node_id)
     return cur.rowcount
 
-
-
-# To be tested
 def get_rows_with_node_id_in_entries(cur, node_id):
     cur.execute('SELECT * FROM entries WHERE node_id = ?', (node_id,))
     return cur.fetchall()
@@ -201,6 +207,65 @@ def get_rows_with_node_id_relations(cur, node_id):
     cur.execute('SELECT * FROM node_relation WHERE child_id = ? OR parent_id = ?', (node_id, node_id))
     return cur.fetchall()
 
-def get_rows_with_node_id_in_tags(cur, node_id):
+def get_rows_with_node_id_in_node_tags(cur, node_id):
     cur.execute('SELECT * FROM node_tags WHERE node_id = ?', (node_id,))
     return cur.fetchall()
+
+
+def get_rows_with_pipeline_id_in_entries(cur, pipeline_id):
+    cur.execute('SELECT * FROM entries WHERE pipeline_id = ?', (pipeline_id,))
+    return cur.fetchall()
+
+def get_rows_with_pipeline_id_in_pipelines(cur, pipeline_id):
+    cur.execute('SELECT * FROM pipelines WHERE pipeline_id = ?', (pipeline_id,))
+    return cur.fetchall()
+
+
+
+def duplicate_pipeline(cur, source_pipeline_id, new_pipeline_id):
+
+    # Duplicate pipelines table
+    cur.execute('''
+        INSERT INTO pipelines (pipeline_id, tag, owner)
+        SELECT ?, tag, owner
+        FROM pipelines
+        WHERE pipeline_id = ?
+    ''', (new_pipeline_id, source_pipeline_id))
+
+    # Duplicate entries table
+    cur.execute('''
+        INSERT INTO entries (last_update, user, node_id, pipeline_id)
+        SELECT last_update, user, node_id, ?
+        FROM entries
+        WHERE pipeline_id = ?
+    ''', (new_pipeline_id, source_pipeline_id))
+
+    # Duplicate node_tags table
+    cur.execute('''
+        INSERT INTO node_tags (tag, node_id, pipeline_id)
+        SELECT tag, node_id, ?
+        FROM node_tags
+        WHERE pipeline_id = ?
+    ''', (new_pipeline_id, source_pipeline_id))
+
+    # Duplicate pipeline_desciption table
+    cur.execute('''
+        INSERT INTO pipeline_desciption (pipeline_id, description)
+        SELECT ?, description
+        FROM pipeline_desciption
+        WHERE pipeline_id = ?
+    ''', (new_pipeline_id, source_pipeline_id))
+
+    return new_pipeline_id
+
+# To be tested
+def get_rows_with_pipeline_id_in_node_tags(cur, pipeline_id):
+    cur.execute('SELECT * FROM node_tags WHERE pipeline_id = ?', (pipeline_id,))
+    return cur.fetchall()
+
+def get_rows_with_pipeline_id_in_pipeline_description(cur, pipeline_id):
+    cur.execute('SELECT * FROM pipeline_desciption WHERE pipeline_id = ?', (pipeline_id,))
+    return cur.fetchall()
+
+
+
