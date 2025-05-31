@@ -6,7 +6,7 @@ table_names = [
     'node_tags',
     'node_pipeline_relation',
     'node_relation',
-    'pipeline_desciption'
+    'pipeline_description'
 ]
 
 def load_db(db_path='pipeline.db'):
@@ -74,7 +74,7 @@ def init_graph_db(conn):
     ''')
 
     cur.execute('''
-        CREATE TABLE IF NOT EXISTS pipeline_desciption (
+        CREATE TABLE IF NOT EXISTS pipeline_description (
             pipeline_id TEXT PRIMARY KEY,
             description TEXT,
             FOREIGN KEY (pipeline_id) REFERENCES pipelines(id)
@@ -129,7 +129,7 @@ def get_node_tag(cur, node_id, pipeline_id):
 
 def add_pipeline_description(cur, pipeline_id, description):
     cur.execute('''
-        INSERT INTO pipeline_desciption (pipeline_id, description)
+        INSERT INTO pipeline_description (pipeline_id, description)
         VALUES (?, ?)
         ON CONFLICT(pipeline_id) DO UPDATE SET description=excluded.description
     ''', (pipeline_id, description))
@@ -170,7 +170,7 @@ def clear_database(cur):
     cur.execute('DELETE FROM node_tags')
     cur.execute('DELETE FROM node_pipeline_relation')
     cur.execute('DELETE FROM node_relation')
-    cur.execute('DELETE FROM pipeline_desciption')
+    cur.execute('DELETE FROM pipeline_description')
     return cur
 
 def remove_node_from_tags(cur, node_id):
@@ -255,11 +255,11 @@ def duplicate_pipeline(cur, source_pipeline_id, new_pipeline_id):
         WHERE pipeline_id = ?
     ''', (new_pipeline_id, source_pipeline_id))
 
-    # Duplicate pipeline_desciption table
+    # Duplicate pipeline_description table
     cur.execute('''
-        INSERT INTO pipeline_desciption (pipeline_id, description)
+        INSERT INTO pipeline_description (pipeline_id, description)
         SELECT ?, description
-        FROM pipeline_desciption
+        FROM pipeline_description
         WHERE pipeline_id = ?
     ''', (new_pipeline_id, source_pipeline_id))
 
@@ -335,7 +335,7 @@ def get_rows_with_pipeline_id_in_node_tags(cur, pipeline_id):
     return cur.fetchall()
 
 def get_rows_with_pipeline_id_in_pipeline_description(cur, pipeline_id):
-    cur.execute('SELECT * FROM pipeline_desciption WHERE pipeline_id = ?', (pipeline_id,))
+    cur.execute('SELECT * FROM pipeline_description WHERE pipeline_id = ?', (pipeline_id,))
     return cur.fetchall()
 
 

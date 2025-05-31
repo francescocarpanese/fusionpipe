@@ -852,7 +852,7 @@ def test_duplicate_pipeline(pip_settings):
     assert node_tags[1][1] == "tag2"
 
     # Verify the pipeline_description table
-    cur.execute("SELECT * FROM pipeline_desciption WHERE pipeline_id = ?", (new_pipeline_id,))
+    cur.execute("SELECT * FROM pipeline_description WHERE pipeline_id = ?", (new_pipeline_id,))
     description = cur.fetchone()
     assert description is not None, "Pipeline description was not duplicated."
     assert description[1] == "Test pipeline description"
