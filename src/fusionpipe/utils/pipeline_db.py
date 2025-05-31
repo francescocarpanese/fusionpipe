@@ -220,6 +220,14 @@ def get_rows_with_pipeline_id_in_pipelines(cur, pipeline_id):
     cur.execute('SELECT * FROM pipelines WHERE pipeline_id = ?', (pipeline_id,))
     return cur.fetchall()
 
+def remove_node_from_pipeline(cur, node_id, pipeline_id):
+    # Remove node from entries
+    cur.execute('DELETE FROM entries WHERE node_id = ? AND pipeline_id = ?', (node_id, pipeline_id))
+    
+    # Remove node from node_tags
+    cur.execute('DELETE FROM node_tags WHERE node_id = ? AND pipeline_id = ?', (node_id, pipeline_id))
+
+    return cur.rowcount
 
 
 def duplicate_pipeline(cur, source_pipeline_id, new_pipeline_id):
@@ -260,7 +268,7 @@ def duplicate_pipeline(cur, source_pipeline_id, new_pipeline_id):
 
 
 
-def dupicate_node_in_pipeline(cur, source_node_id, new_node_id):
+def dupicate_node_in_pipeline(cur, source_node_id, new_node_id, pipeline_id):
     # Duplicate the node in a pipeline without copying relations
 
     # Duplicate nodes table
@@ -276,16 +284,16 @@ def dupicate_node_in_pipeline(cur, source_node_id, new_node_id):
         INSERT INTO entries (last_update, user, node_id, pipeline_id)
         SELECT last_update, user, ?, pipeline_id
         FROM entries
-        WHERE node_id = ?
-    ''', (new_node_id, source_node_id))
+        WHERE node_id = ? AND pipeline_id = ?
+    ''', (new_node_id, source_node_id, pipeline_id))
 
     # Duplicate node_tags table
     cur.execute('''
         INSERT INTO node_tags (tag, node_id, pipeline_id)
         SELECT tag, ?, pipeline_id
         FROM node_tags
-        WHERE node_id = ?
-    ''', (new_node_id, source_node_id))
+        WHERE node_id = ? AND pipeline_id = ?
+    ''', (new_node_id, source_node_id, pipeline_id))
 
     return new_node_id
 
@@ -308,11 +316,19 @@ def copy_node_relations(cur, source_node_id, new_node_id):
 
     return new_node_id
 
-def duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id):
+def duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id, pipeline_id):
     # Duplicate the node in a pipeline with copying relations
-    dupicate_node_in_pipeline(cur, source_node_id, new_node_id)
+    dupicate_node_in_pipeline(cur, source_node_id, new_node_id, pipeline_id)
     copy_node_relations(cur, source_node_id, new_node_id)
     return new_node_id
+
+def replace_node_in_pipeline(cur, old_node_id, new_node_id, pipeline_id):
+
+    duplicate_node_in_pipeline_with_relations(cur, old_node_id, new_node_id, pipeline_id)
+    # Remove old node from entries
+    remove_node_from_pipeline(cur, old_node_id, pipeline_id)
+    return new_node_id
+
 
 # TODO To be tested
 def get_rows_with_pipeline_id_in_node_tags(cur, pipeline_id):
