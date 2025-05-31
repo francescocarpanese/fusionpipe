@@ -383,6 +383,7 @@ def update_editable_status_for_all_nodes(cur):
     else:
         print("All nodes are editable.")
 
+
 # TODO To be tested
 def get_rows_with_pipeline_id_in_node_tags(cur, pipeline_id):
     cur.execute('SELECT * FROM node_tags WHERE pipeline_id = ?', (pipeline_id,))
@@ -392,3 +393,6 @@ def get_rows_with_pipeline_id_in_pipeline_description(cur, pipeline_id):
     cur.execute('SELECT * FROM pipeline_description WHERE pipeline_id = ?', (pipeline_id,))
     return cur.fetchall()
 
+def get_all_pipeline_ids(cur):
+    cur.execute('SELECT pipeline_id FROM pipelines')
+    return [row[0] for row in cur.fetchall()]

@@ -67,9 +67,6 @@ def delete_node_folder(settings, node_id, verbose=False):
 
 
 
-
-
-
 # TODO. Still convenient for debuggiong to generate the file from the database
 # def create_pipeline_file(settings, pip_id, verbose=False):
 #     pth_pipeline_folder = settings["pipeline_folder"]
@@ -119,13 +116,14 @@ def graph_to_dict(graph):
         'nodes': []
     }
     for node in graph.nodes:
-        dependencies = list(graph.predecessors(node))
+        parents = list(graph.predecessors(node))
         pipeline_data['nodes'].append({
             'nid': node,
-            'parents': dependencies
+            'parents': parents,
+            'status': graph.nodes[node].get('status', 'null'),  # Default status is 'null'
+            'editable': graph.nodes[node].get('editable', True),  # Default editable is True
         })
     return pipeline_data
-
 
 def graph_to_db(Gnx, cur):
     # Add the pipeline to the database
@@ -159,7 +157,9 @@ def db_to_graph_from_pip_id(cur, pip_id):
         status = pipeline_db.get_node_status(cur, node_id=node_id)
         if status not in NodeState._value2member_map_:
             raise ValueError(f"Invalid status '{status}' for node {node_id}. Must be one of {list(NodeState._value2member_map_.keys())}.")
+        editable = pipeline_db.is_node_editable(cur, node_id=node_id)
         G.nodes[node_id]['status'] = status
+        G.nodes[node_id]['editable'] = editable
 
         # Add edges based on parent relationships
         for parent_id in pipeline_db.get_node_parents(cur, node_id=node_id):
@@ -173,17 +173,14 @@ def db_to_graph_from_pip_id(cur, pip_id):
     return G
 
 
-
-
-
-# def serialize_pipeline(settings, graph, pip_id = None, verbose=False):
-#     pipeline_data = graph_to_dict(graph)
-#     pipeline_id = pip_id if pip_id else generate_pip_id()
-#     path_pip_file = f"{settings['pipeline_folder']}/{pipeline_id}.json"
-#     with open(path_pip_file, 'w') as file:
-#         json.dump(pipeline_data, file, indent=2)
-#     if verbose:
-#         print(f"Pipeline {pipeline_id} saved successfully.")
+def serialize_pipeline(settings, graph, pip_id = None, verbose=False):
+    pipeline_data = graph_to_dict(graph)
+    pipeline_id = pip_id if pip_id else generate_pip_id()
+    path_pip_file = f"{settings['pipeline_folder']}/{pipeline_id}.json"
+    with open(path_pip_file, 'w') as file:
+        json.dump(pipeline_data, file, indent=2)
+    if verbose:
+        print(f"Pipeline {pipeline_id} saved successfully.")
 
 # def duplicate_pip(settings, graph):
 #     new_pip_id = create_pipeline_file(settings)
