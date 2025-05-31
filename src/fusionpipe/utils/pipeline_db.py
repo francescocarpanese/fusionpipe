@@ -356,6 +356,33 @@ def is_node_editable(cur, node_id):
     row = cur.fetchone()
     return bool(row[0])
 
+def update_editable_status_for_all_nodes(cur):
+    # Get the list of all nodes
+    cur.execute('SELECT node_id FROM nodes')
+    nodes = [row[0] for row in cur.fetchall()]
+
+    report = []
+
+    for node_id in nodes:
+        # Check the number of pipelines the node is associated with
+        cur.execute('SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id = ?', (node_id,))
+        pipeline_count = cur.fetchone()[0]
+
+        # Update editable status based on the pipeline count
+        if pipeline_count <= 1:
+            cur.execute('UPDATE nodes SET editable = TRUE WHERE node_id = ?', (node_id,))
+        else:
+            cur.execute('UPDATE nodes SET editable = FALSE WHERE node_id = ?', (node_id,))
+            report.append(node_id)
+
+    # Print a report of nodes that did not match the logic
+    if report:
+        print("Nodes with editable set to FALSE due to being in multiple pipelines:")
+        for node_id in report:
+            print(f" - Node ID: {node_id}")
+    else:
+        print("All nodes are editable.")
+
 # TODO To be tested
 def get_rows_with_pipeline_id_in_node_tags(cur, pipeline_id):
     cur.execute('SELECT * FROM node_tags WHERE pipeline_id = ?', (pipeline_id,))

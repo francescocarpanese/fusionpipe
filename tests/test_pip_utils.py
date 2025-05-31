@@ -1257,3 +1257,47 @@ def test_is_node_editable(pip_settings):
     assert editable is False, f"Expected node {node_id} to be non-editable when associated with more than one pipeline."
 
     conn.close()
+
+def test_update_editable_status_for_all_nodes(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+    from fusionpipe.utils import pipeline_db
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create nodes
+    node1 = generate_node_id()
+    node2 = generate_node_id()
+    node3 = generate_node_id()
+    pipeline_db.add_node_to_nodes(cur, node_id=node1)
+    pipeline_db.add_node_to_nodes(cur, node_id=node2)
+    pipeline_db.add_node_to_nodes(cur, node_id=node3)
+
+    # Create pipelines
+    pipeline1 = generate_pip_id()
+    pipeline2 = generate_pip_id()
+    pipeline_db.add_pipeline(cur, pipeline_id=pipeline1, tag="pipeline1")
+    pipeline_db.add_pipeline(cur, pipeline_id=pipeline2, tag="pipeline2")
+
+    # Associate nodes with pipelines
+    pipeline_db.add_node_to_pipeline(cur, node_id=node1, pipeline_id=pipeline1, user="test_user")
+    pipeline_db.add_node_to_pipeline(cur, node_id=node2, pipeline_id=pipeline1, user="test_user")
+    pipeline_db.add_node_to_pipeline(cur, node_id=node2, pipeline_id=pipeline2, user="test_user")
+    conn.commit()
+
+    # Call the function to update editable status
+    pipeline_db.update_editable_status_for_all_nodes(cur)
+    conn.commit()
+
+    # Verify editable status for each node
+    editable_node1 = pipeline_db.is_node_editable(cur, node1)
+    assert editable_node1 is True, f"Expected node1 to be editable, got {editable_node1}"
+
+    editable_node2 =  pipeline_db.is_node_editable(cur, node2)
+    assert editable_node2 is False, f"Expected node2 to be non-editable, got {editable_node2}"
+
+    editable_node3 = pipeline_db.is_node_editable(cur, node3)
+    assert editable_node3 is True, f"Expected node3 to be editable, got {editable_node3}"
+
+    conn.close()
