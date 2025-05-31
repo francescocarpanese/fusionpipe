@@ -258,7 +258,63 @@ def duplicate_pipeline(cur, source_pipeline_id, new_pipeline_id):
 
     return new_pipeline_id
 
-# To be tested
+
+
+def dupicate_node_in_pipeline(cur, source_node_id, new_node_id):
+    # Duplicate the node in a pipeline without copying relations
+
+    # Duplicate nodes table
+    cur.execute('''
+        INSERT INTO nodes (node_id, status)
+        SELECT ?, status
+        FROM nodes
+        WHERE node_id = ?
+    ''', (new_node_id, source_node_id))
+
+    # Duplicate entries table
+    cur.execute('''
+        INSERT INTO entries (last_update, user, node_id, pipeline_id)
+        SELECT last_update, user, ?, pipeline_id
+        FROM entries
+        WHERE node_id = ?
+    ''', (new_node_id, source_node_id))
+
+    # Duplicate node_tags table
+    cur.execute('''
+        INSERT INTO node_tags (tag, node_id, pipeline_id)
+        SELECT tag, ?, pipeline_id
+        FROM node_tags
+        WHERE node_id = ?
+    ''', (new_node_id, source_node_id))
+
+    return new_node_id
+
+def copy_node_relations(cur, source_node_id, new_node_id):
+    # Copy child relations
+    cur.execute('''
+        INSERT INTO node_relation (child_id, parent_id)
+        SELECT ?, parent_id
+        FROM node_relation
+        WHERE child_id = ?
+    ''', (new_node_id, source_node_id))
+
+    # Copy parent relations
+    cur.execute('''
+        INSERT INTO node_relation (child_id, parent_id)
+        SELECT child_id, ?
+        FROM node_relation
+        WHERE parent_id = ?
+    ''', (new_node_id, source_node_id))
+
+    return new_node_id
+
+def duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id):
+    # Duplicate the node in a pipeline with copying relations
+    dupicate_node_in_pipeline(cur, source_node_id, new_node_id)
+    copy_node_relations(cur, source_node_id, new_node_id)
+    return new_node_id
+
+# TODO To be tested
 def get_rows_with_pipeline_id_in_node_tags(cur, pipeline_id):
     cur.execute('SELECT * FROM node_tags WHERE pipeline_id = ?', (pipeline_id,))
     return cur.fetchall()

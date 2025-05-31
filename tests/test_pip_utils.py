@@ -800,14 +800,6 @@ def test_get_rows_with_pipeline_id_in_pipelines(pip_settings):
 
 
 
-# @pytest.fixture
-# def setup_db():
-#     # Create an in-memory SQLite database for testing
-#     conn = sqlite3.connect(":memory:")
-#     init_db(conn)
-#     yield conn
-#     conn.close()
-
 def test_duplicate_pipeline(pip_settings):
     from fusionpipe.utils import pipeline_db
     from fusionpipe.utils.pipeline_db import add_pipeline, add_pipeline_description, add_node_to_entries, add_node_tag, duplicate_pipeline
@@ -898,5 +890,162 @@ def test_duplicate_pipeline_graph_comparison(pip_settings, dag_graph_dummy_1):
     # Ensure the pipeline IDs are different
     assert original_graph_loaded.graph['id'] != duplicated_graph_loaded.graph['id'], \
         "Pipeline IDs should be different between the original and duplicated graphs."
+
+    conn.close()
+
+def test_dupicate_node_in_pipeline_full_coverage(pip_settings):
+    from fusionpipe.utils import pipeline_db
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create original node and another node (for relation)
+    original_node_id = generate_node_id()
+    other_node_id = generate_node_id()
+    pipeline_db.add_node_to_nodes(cur, node_id=original_node_id)
+    pipeline_db.add_node_to_nodes(cur, node_id=other_node_id)
+
+    # Add a tag to the original node
+    tag = "test_tag"
+    pipeline_db.add_node_tag(cur, node_id=original_node_id, pipeline_id=None, tag=tag)
+
+    # Add a relation: original_node_id is child, other_node_id is parent
+    pipeline_db.add_node_relation(cur, child_id=original_node_id, parent_id=other_node_id)
+    # Add a relation: original_node_id is parent, other_node_id is child
+    pipeline_db.add_node_relation(cur, child_id=other_node_id, parent_id=original_node_id)
+
+    # Create a pipeline and add an entry connecting the pipeline to the node
+    pipeline_id = generate_pip_id()
+    pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    user = "test_user"
+    pipeline_db.add_node_to_entries(cur, node_id=original_node_id, pipeline_id=pipeline_id, user=user)
+    conn.commit()
+
+    # Duplicate the node
+    duplicated_node_id = f"{original_node_id}_copy"
+    pipeline_db.dupicate_node_in_pipeline(cur, original_node_id, duplicated_node_id)
+    conn.commit()
+
+    # Check nodes table
+    cur.execute("SELECT * FROM nodes WHERE node_id = ?", (duplicated_node_id,))
+    duplicated_node = cur.fetchone()
+    assert duplicated_node is not None, "Duplicated node was not created."
+
+    # Check node_tags table
+    cur.execute("SELECT * FROM node_tags WHERE node_id = ?", (duplicated_node_id,))
+    duplicated_tag = cur.fetchone()
+    assert duplicated_tag is not None, "Duplicated node tag was not created."
+    assert duplicated_tag[1] == tag, "Duplicated node tag does not match the original node's tag."
+
+    # Check entries table
+    cur.execute("SELECT * FROM entries WHERE node_id = ?", (duplicated_node_id,))
+    duplicated_entry = cur.fetchone()
+    assert duplicated_entry is not None, "Duplicated node entry was not created."
+    assert duplicated_entry[4] == pipeline_id, "Duplicated entry pipeline_id does not match original."
+
+
+    conn.close()
+
+
+
+def test_copy_node_relations(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id
+    from fusionpipe.utils import pipeline_db
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create nodes
+    source_node_id = generate_node_id()
+    parent1_id = generate_node_id()
+    parent2_id = generate_node_id()
+    child1_id = generate_node_id()
+    child2_id = generate_node_id()
+    new_node_id = generate_node_id()
+
+    # Add nodes to the database
+    for node_id in [source_node_id, parent1_id, parent2_id, child1_id, child2_id, new_node_id]:
+        pipeline_db.add_node_to_nodes(cur, node_id=node_id)
+
+    # Add parent relations (source_node_id is child of parent1 and parent2)
+    pipeline_db.add_node_relation(cur, child_id=source_node_id, parent_id=parent1_id)
+    pipeline_db.add_node_relation(cur, child_id=source_node_id, parent_id=parent2_id)
+
+    # Add child relations (child1 and child2 are children of source_node_id)
+    pipeline_db.add_node_relation(cur, child_id=child1_id, parent_id=source_node_id)
+    pipeline_db.add_node_relation(cur, child_id=child2_id, parent_id=source_node_id)
+    conn.commit()
+
+    # Copy relations from source_node_id to new_node_id
+    pipeline_db.copy_node_relations(cur, source_node_id, new_node_id)
+    conn.commit()
+
+    # Check parent relations for new_node_id (should match source_node_id's parents)
+    cur.execute("SELECT parent_id FROM node_relation WHERE child_id=?", (new_node_id,))
+    parent_rows = cur.fetchall()
+    parent_ids = {row[0] for row in parent_rows}
+    assert parent1_id in parent_ids and parent2_id in parent_ids, \
+        f"Parent relations not copied correctly: {parent_ids}"
+
+    # Check child relations for new_node_id (should match source_node_id's children)
+    cur.execute("SELECT child_id FROM node_relation WHERE parent_id=?", (new_node_id,))
+    child_rows = cur.fetchall()
+    child_ids = {row[0] for row in child_rows}
+    assert child1_id in child_ids and child2_id in child_ids, \
+        f"Child relations not copied correctly: {child_ids}"
+
+    conn.close()
+
+def test_duplicate_node_in_pipeline_with_relations(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id
+    from fusionpipe.utils import pipeline_db
+
+    # Add the function under test to the namespace for this test
+    def duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id):
+        pipeline_db.dupicate_node_in_pipeline(cur, source_node_id, new_node_id)
+        pipeline_db.copy_node_relations(cur, source_node_id, new_node_id)
+        return new_node_id
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create nodes
+    source_node_id = generate_node_id()
+    parent_id = generate_node_id()
+    child_id = generate_node_id()
+    new_node_id = f"{source_node_id}_copy"
+
+    # Add nodes to the database
+    for node_id in [source_node_id, parent_id, child_id]:
+        pipeline_db.add_node_to_nodes(cur, node_id=node_id)
+
+    # Add parent and child relations for the source node
+    pipeline_db.add_node_relation(cur, child_id=source_node_id, parent_id=parent_id)
+    pipeline_db.add_node_relation(cur, child_id=child_id, parent_id=source_node_id)
+    conn.commit()
+
+    # Duplicate node with relations
+    duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id)
+    conn.commit()
+
+    # Check that the new node exists
+    cur.execute("SELECT * FROM nodes WHERE node_id = ?", (new_node_id,))
+    assert cur.fetchone() is not None, "Duplicated node was not created."
+
+    # Check parent relations for new node
+    cur.execute("SELECT parent_id FROM node_relation WHERE child_id = ?", (new_node_id,))
+    parent_rows = cur.fetchall()
+    parent_ids = {row[0] for row in parent_rows}
+    assert parent_id in parent_ids, "Parent relation was not copied to duplicated node."
+
+    # Check child relations for new node
+    cur.execute("SELECT child_id FROM node_relation WHERE parent_id = ?", (new_node_id,))
+    child_rows = cur.fetchall()
+    child_ids = {row[0] for row in child_rows}
+    assert child_id in child_ids, "Child relation was not copied to duplicated node."
 
     conn.close()
