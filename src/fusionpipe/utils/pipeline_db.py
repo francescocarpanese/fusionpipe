@@ -100,6 +100,15 @@ def remove_node_from_nodes(cur, node_id):
 
 def add_node_to_pipeline(cur, node_id, pipeline_id, user=None):
     cur.execute('INSERT INTO node_pipeline_relation (node_id, pipeline_id, user) VALUES (?, ?, ?)', (node_id, pipeline_id, user))
+    
+    # Check if the node is present in more than one pipeline
+    cur.execute('SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id = ?', (node_id,))
+    count = cur.fetchone()[0]
+
+    # If the node is present in more than one pipeline, set editable to false
+    if count > 1:
+        cur.execute('UPDATE nodes SET editable = FALSE WHERE node_id = ?', (node_id,))
+    
     return cur.lastrowid
 
 def add_node_relation(cur, child_id, parent_id):
@@ -181,12 +190,17 @@ def remove_node_from_relations(cur, node_id):
     cur.execute('DELETE FROM node_relation WHERE child_id = ? OR parent_id = ?', (node_id, node_id))
     return cur.rowcount
 
-def remove_node_from_entries(cur, node_id):
+def remove_node_from_node_pipeline_relation(cur, node_id):
     cur.execute('DELETE FROM node_pipeline_relation WHERE node_id = ?', (node_id,))
+    # Check if the node is present in more than one pipeline
+    cur.execute('SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id = ?', (node_id,))
+    count = cur.fetchone()[0]
+    if count <= 1:
+        cur.execute('UPDATE nodes SET editable = TRUE WHERE node_id = ?', (node_id,))
     return cur.rowcount
 
 def remove_node_from_everywhere(cur, node_id):
-    remove_node_from_entries(cur, node_id)
+    remove_node_from_node_pipeline_relation(cur, node_id)
     remove_node_from_tags(cur, node_id)
     remove_node_from_relations(cur, node_id)
     remove_node_from_nodes(cur, node_id)
@@ -328,6 +342,14 @@ def replace_node_in_pipeline(cur, old_node_id, new_node_id, pipeline_id):
     remove_node_from_pipeline(cur, old_node_id, pipeline_id)
     return new_node_id
 
+def get_pipelines_with_node(cur, node_id):
+    cur.execute('SELECT pipeline_id FROM node_pipeline_relation WHERE node_id = ?', (node_id,))
+    return [row[0] for row in cur.fetchall()]
+
+def count_pipeline_with_node(cur, node_id):
+    cur.execute('SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id = ?', (node_id,))
+    row = cur.fetchone()
+    return row[0] if row else 0
 
 # TODO To be tested
 def get_rows_with_pipeline_id_in_node_tags(cur, pipeline_id):
@@ -337,6 +359,4 @@ def get_rows_with_pipeline_id_in_node_tags(cur, pipeline_id):
 def get_rows_with_pipeline_id_in_pipeline_description(cur, pipeline_id):
     cur.execute('SELECT * FROM pipeline_description WHERE pipeline_id = ?', (pipeline_id,))
     return cur.fetchall()
-
-
 

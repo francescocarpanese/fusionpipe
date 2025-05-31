@@ -641,7 +641,7 @@ def test_remove_node_from_entries(pip_settings):
     conn.commit()
 
     # Remove the node from node_pipeline_relation
-    rows_deleted = pipeline_db.remove_node_from_entries(cur, node_id=node_id)
+    rows_deleted = pipeline_db.remove_node_from_node_pipeline_relation(cur, node_id=node_id)
     conn.commit()
     assert rows_deleted == 1, "Entry was not removed from the database."
 
@@ -1155,5 +1155,69 @@ def test_replace_node_in_pipeline(pip_settings):
 
     # The function should return the new node id
     assert result_new_node_id == new_node_id, "Returned new_node_id does not match expected value."
+
+    conn.close()
+
+def test_get_pipelines_with_node(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+    from fusionpipe.utils import pipeline_db
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create a node and multiple pipelines
+    node_id = generate_node_id()
+    pipeline_ids = [generate_pip_id() for _ in range(3)]
+    pipeline_db.add_node_to_nodes(cur, node_id=node_id)
+    for pipeline_id in pipeline_ids:
+        pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag=f"pipeline_{pipeline_id}")
+        pipeline_db.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+    conn.commit()
+
+    # Call the function to get pipelines associated with the node
+    pipelines_with_node = pipeline_db.get_pipelines_with_node(cur, node_id)
+
+    # Verify the pipelines match the expected data
+    assert set(pipelines_with_node) == set(pipeline_ids), f"Expected pipelines {pipeline_ids}, got {pipelines_with_node}"
+
+    # Test with a node not associated with any pipeline
+    new_node_id = generate_node_id()
+    pipeline_db.add_node_to_nodes(cur, node_id=new_node_id)
+    conn.commit()
+    pipelines_with_new_node = pipeline_db.get_pipelines_with_node(cur, new_node_id)
+    assert pipelines_with_new_node == [], f"Expected no pipelines for node {new_node_id}, got {pipelines_with_new_node}"
+
+    conn.close()
+
+def test_count_pipeline_with_node(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+    from fusionpipe.utils import pipeline_db
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create a node and multiple pipelines
+    node_id = generate_node_id()
+    pipeline_ids = [generate_pip_id() for _ in range(3)]
+    pipeline_db.add_node_to_nodes(cur, node_id=node_id)
+    for pipeline_id in pipeline_ids:
+        pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag=f"pipeline_{pipeline_id}")
+        pipeline_db.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+    conn.commit()
+
+    # Call the function to count pipelines associated with the node
+    pipeline_count = pipeline_db.count_pipeline_with_node(cur, node_id)
+
+    # Verify the count matches the expected value
+    assert pipeline_count == len(pipeline_ids), f"Expected {len(pipeline_ids)} pipelines, got {pipeline_count}"
+
+    # Test with a node not associated with any pipeline
+    new_node_id = generate_node_id()
+    pipeline_db.add_node_to_nodes(cur, node_id=new_node_id)
+    conn.commit()
+    new_node_pipeline_count = pipeline_db.count_pipeline_with_node(cur, new_node_id)
+    assert new_node_pipeline_count == 0, f"Expected 0 pipelines for node {new_node_id}, got {new_node_pipeline_count}"
 
     conn.close()
