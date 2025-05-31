@@ -206,6 +206,9 @@ def test_remove_node_from_pipeline(pip_settings):
     pipeline_id = generate_pip_id()
     pipeline_db.add_node_to_nodes(cur, node_id=node_id)
     pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    # Add a tag to the node
+    tag = "test_tag"
+    pipeline_db.add_node_tag(cur, node_id=node_id, pipeline_id=pipeline_id, tag=tag)
 
     # Add entry to entries table
     user = "test_user"
@@ -213,9 +216,10 @@ def test_remove_node_from_pipeline(pip_settings):
     conn.commit()
 
     # Remove the entry
+    cur = conn.cursor()
     rows_deleted = remove_node_from_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
-    assert rows_deleted == 1, "Entry was not deleted from the database."
+    assert rows_deleted == 2, "Entry was not deleted from the database."
 
     # Check if the entry was actually removed
     cur.execute("SELECT * FROM entries WHERE node_id=? AND pipeline_id=?", (node_id, pipeline_id))

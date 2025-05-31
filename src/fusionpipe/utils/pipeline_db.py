@@ -93,10 +93,6 @@ def add_node_to_nodes(cur, node_id):
     cur.execute('INSERT INTO nodes (node_id) VALUES (?)', (node_id,))
     return cur.lastrowid
 
-def remove_node_from_pipeline(cur, node_id, pipeline_id):
-    cur.execute('DELETE FROM entries WHERE node_id = ? AND pipeline_id = ?', (node_id, pipeline_id))
-    return cur.rowcount
-
 def remove_node_from_nodes(cur, node_id):
     cur.execute('DELETE FROM nodes WHERE node_id = ?', (node_id,))
     return cur.rowcount
@@ -223,11 +219,13 @@ def get_rows_with_pipeline_id_in_pipelines(cur, pipeline_id):
 def remove_node_from_pipeline(cur, node_id, pipeline_id):
     # Remove node from entries
     cur.execute('DELETE FROM entries WHERE node_id = ? AND pipeline_id = ?', (node_id, pipeline_id))
+    rows_deleted_entries = cur.rowcount
     
     # Remove node from node_tags
     cur.execute('DELETE FROM node_tags WHERE node_id = ? AND pipeline_id = ?', (node_id, pipeline_id))
+    rows_deleted_tags = cur.rowcount
 
-    return cur.rowcount
+    return rows_deleted_entries + rows_deleted_tags
 
 
 def duplicate_pipeline(cur, source_pipeline_id, new_pipeline_id):
