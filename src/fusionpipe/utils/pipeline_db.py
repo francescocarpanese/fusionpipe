@@ -10,7 +10,7 @@ table_names = [
 ]
 
 def load_db(db_path='pipeline.db'):
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, check_same_thread=False)
     return conn
 
 def init_db(db_path='pipeline.db'):

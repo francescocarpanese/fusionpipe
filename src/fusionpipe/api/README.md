@@ -1,0 +1,1 @@
+uvicorn fusionpipe.api.main:app --reload
