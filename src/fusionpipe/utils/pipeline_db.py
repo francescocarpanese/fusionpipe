@@ -98,7 +98,7 @@ def remove_node_from_nodes(cur, node_id):
     cur.execute('DELETE FROM nodes WHERE node_id = ?', (node_id,))
     return cur.rowcount
 
-def add_node_to_entries(cur, node_id, pipeline_id, user=None):
+def add_node_to_pipeline(cur, node_id, pipeline_id, user=None):
     cur.execute('INSERT INTO node_pipeline_relation (node_id, pipeline_id, user) VALUES (?, ?, ?)', (node_id, pipeline_id, user))
     return cur.lastrowid
 

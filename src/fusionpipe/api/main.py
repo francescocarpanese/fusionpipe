@@ -39,7 +39,7 @@ def add_node(req: AddNodetoPipelineRequest, db_conn=Depends(get_db)):
     node_id = pip_utils.generate_node_id()
     try:
         pipeline_db.add_node_to_nodes(cur, node_id=node_id)
-        pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=req.pipeline_id)
+        pipeline_db.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=req.pipeline_id)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()

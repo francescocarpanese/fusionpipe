@@ -176,7 +176,7 @@ def test_add_node_to_entries(pip_settings):
 
     # Add entry to node_pipeline_relation table
     user = "test_user"
-    entry_id = pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
+    entry_id = pipeline_db.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
     conn.commit()
     conn.close()
 
@@ -212,7 +212,7 @@ def test_remove_node_from_pipeline(pip_settings):
 
     # Add entry to node_pipeline_relation table
     user = "test_user"
-    entry_id = pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
+    entry_id = pipeline_db.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
     conn.commit()
 
     # Remove the entry
@@ -414,7 +414,7 @@ def test_get_all_nodes_from_pip_id(pip_settings):
     pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     for node_id in node_ids:
         pipeline_db.add_node_to_nodes(cur, node_id=node_id)
-        pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+        pipeline_db.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
     conn.commit()
 
 
@@ -508,7 +508,7 @@ def test_get_nodes_without_pipeline(pip_settings):
     # Create a pipeline and associate one node with it
     pipeline_id = generate_pip_id()
     pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
-    pipeline_db.add_node_to_entries(cur, node_id=node_ids[0], pipeline_id=pipeline_id, user="test_user")
+    pipeline_db.add_node_to_pipeline(cur, node_id=node_ids[0], pipeline_id=pipeline_id, user="test_user")
     conn.commit()
 
     # Get nodes without a pipeline
@@ -596,7 +596,7 @@ def test_remove_node_from_everywhere(pip_settings):
     pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Add the node to node_pipeline_relation
-    pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+    pipeline_db.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
 
     # Add a tag to the node
     tag = "test_tag"
@@ -637,7 +637,7 @@ def test_remove_node_from_entries(pip_settings):
 
     # Add the node to node_pipeline_relation
     user = "test_user"
-    entry_id = pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
+    entry_id = pipeline_db.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
     conn.commit()
 
     # Remove the node from node_pipeline_relation
@@ -668,7 +668,7 @@ def test_get_rows_with_node_id_in_entries(pip_settings):
 
     # Add the node to node_pipeline_relation
     user = "test_user"
-    entry_id = pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
+    entry_id = pipeline_db.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
     conn.commit()
 
     # Get rows with the node ID in node_pipeline_relation
@@ -764,7 +764,7 @@ def test_get_rows_with_pipeline_id_in_entries(pip_settings):
     pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     for node_id in node_ids:
         pipeline_db.add_node_to_nodes(cur, node_id=node_id)
-        pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+        pipeline_db.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
     conn.commit()
 
     # Get rows with the pipeline ID in node_pipeline_relation
@@ -806,7 +806,7 @@ def test_get_rows_with_pipeline_id_in_pipelines(pip_settings):
 
 def test_duplicate_pipeline(pip_settings):
     from fusionpipe.utils import pipeline_db
-    from fusionpipe.utils.pipeline_db import add_pipeline, add_pipeline_description, add_node_to_entries, add_node_tag, duplicate_pipeline
+    from fusionpipe.utils.pipeline_db import add_pipeline, add_pipeline_description, add_node_to_pipeline, add_node_tag, duplicate_pipeline
 
     db_path = pip_settings["connection_db_filepath"]
     conn = pipeline_db.init_db(db_path)
@@ -818,8 +818,8 @@ def test_duplicate_pipeline(pip_settings):
     add_pipeline_description(cur, pipeline_id=source_pipeline_id, description="Test pipeline description")
 
     # Add nodes and node_pipeline_relation to the source pipeline
-    add_node_to_entries(cur, node_id="node1", pipeline_id=source_pipeline_id, user="user1")
-    add_node_to_entries(cur, node_id="node2", pipeline_id=source_pipeline_id, user="user2")
+    add_node_to_pipeline(cur, node_id="node1", pipeline_id=source_pipeline_id, user="user1")
+    add_node_to_pipeline(cur, node_id="node2", pipeline_id=source_pipeline_id, user="user2")
     add_node_tag(cur, node_id="node1", pipeline_id=source_pipeline_id, tag="tag1")
     add_node_tag(cur, node_id="node2", pipeline_id=source_pipeline_id, tag="tag2")
 
@@ -920,7 +920,7 @@ def test_dupicate_node_in_pipeline_full_coverage(pip_settings):
     pipeline_id = generate_pip_id()
     pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     user = "test_user"
-    pipeline_db.add_node_to_entries(cur, node_id=original_node_id, pipeline_id=pipeline_id, user=user)
+    pipeline_db.add_node_to_pipeline(cur, node_id=original_node_id, pipeline_id=pipeline_id, user=user)
     conn.commit()
 
     # Add a tag to the original node
@@ -1068,7 +1068,7 @@ def test_remove_node_from_pipeline_removes_tags_and_entries(pip_settings):
     pipeline_id = generate_pip_id()
     pipeline_db.add_node_to_nodes(cur, node_id=node_id)
     pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
-    pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+    pipeline_db.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
     pipeline_db.add_node_tag(cur, node_id=node_id, pipeline_id=pipeline_id, tag="test_tag")
     conn.commit()
 
@@ -1116,7 +1116,7 @@ def test_replace_node_in_pipeline(pip_settings):
     pipeline_db.add_node_relation(cur, child_id=child_id, parent_id=old_node_id)
 
     # Add entry and tag for old_node
-    pipeline_db.add_node_to_entries(cur, node_id=old_node_id, pipeline_id=pipeline_id, user=user)
+    pipeline_db.add_node_to_pipeline(cur, node_id=old_node_id, pipeline_id=pipeline_id, user=user)
     pipeline_db.add_node_tag(cur, node_id=old_node_id, pipeline_id=pipeline_id, tag=tag)
     conn.commit()
 

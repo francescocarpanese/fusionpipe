@@ -139,7 +139,7 @@ def graph_to_db(Gnx, cur):
         pipeline_db.add_node_tag(cur, node_id=node, pipeline_id=pip_id, tag=Gnx.nodes[node].get("tag", None))
         for parent in Gnx.predecessors(node):
             pipeline_db.add_node_relation(cur, child_id=node, parent_id=parent)
-        pipeline_db.add_node_to_entries(cur, node_id=node, pipeline_id=pip_id)
+        pipeline_db.add_node_to_pipeline(cur, node_id=node, pipeline_id=pip_id)
         pipeline_db.update_node_status(cur, node_id=node, status=Gnx.nodes[node].get("status", "null"))
 
 def db_to_graph_from_pip_id(cur, pip_id):
