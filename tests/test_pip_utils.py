@@ -1221,3 +1221,39 @@ def test_count_pipeline_with_node(pip_settings):
     assert new_node_pipeline_count == 0, f"Expected 0 pipelines for node {new_node_id}, got {new_node_pipeline_count}"
 
     conn.close()
+
+def test_is_node_editable(pip_settings):
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+    from fusionpipe.utils import pipeline_db
+
+    db_path = pip_settings["connection_db_filepath"]
+    conn = pipeline_db.init_db(db_path)
+    cur = conn.cursor()
+
+    # Create a node
+    node_id = generate_node_id()
+    pipeline_db.add_node_to_nodes(cur, node_id=node_id)
+
+    # Test case: Node does not belong to any pipeline
+    editable = pipeline_db.is_node_editable(cur, node_id)
+    assert editable is True, f"Expected node {node_id} to be editable when not associated with any pipeline."
+
+    # Test case: Node belongs to one pipeline
+    pipeline_id = generate_pip_id()
+    pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    pipeline_db.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+    conn.commit()
+
+    editable = pipeline_db.is_node_editable(cur, node_id)
+    assert editable is True, f"Expected node {node_id} to be editable when associated with one pipeline."
+
+    # Test case: Node belongs to more than one pipeline
+    another_pipeline_id = generate_pip_id()
+    pipeline_db.add_pipeline(cur, pipeline_id=another_pipeline_id, tag="another_test_pipeline")
+    pipeline_db.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=another_pipeline_id, user="test_user")
+    conn.commit()
+
+    editable = pipeline_db.is_node_editable(cur, node_id)
+    assert editable is False, f"Expected node {node_id} to be non-editable when associated with more than one pipeline."
+
+    conn.close()

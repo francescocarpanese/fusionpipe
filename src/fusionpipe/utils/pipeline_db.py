@@ -351,6 +351,11 @@ def count_pipeline_with_node(cur, node_id):
     row = cur.fetchone()
     return row[0] if row else 0
 
+def is_node_editable(cur, node_id):
+    cur.execute('SELECT editable FROM nodes WHERE node_id = ?', (node_id,))
+    row = cur.fetchone()
+    return bool(row[0])
+
 # TODO To be tested
 def get_rows_with_pipeline_id_in_node_tags(cur, pipeline_id):
     cur.execute('SELECT * FROM node_tags WHERE pipeline_id = ?', (pipeline_id,))
