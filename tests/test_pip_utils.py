@@ -174,7 +174,7 @@ def test_add_node_to_entries(pip_settings):
     pipeline_db.add_node_to_nodes(cur, node_id=node_id)
     pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
-    # Add entry to entries table
+    # Add entry to node_pipeline_relation table
     user = "test_user"
     entry_id = pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
     conn.commit()
@@ -183,7 +183,7 @@ def test_add_node_to_entries(pip_settings):
     # Check if the entry was added
     conn = pipeline_db.load_db(db_path)
     cur = conn.cursor()
-    cur.execute("SELECT node_id, pipeline_id, user FROM entries WHERE id=?", (entry_id,))
+    cur.execute("SELECT node_id, pipeline_id, user FROM node_pipeline_relation WHERE id=?", (entry_id,))
     result = cur.fetchone()
     assert result is not None, "Entry was not added to the database."
     assert result[0] == node_id, "Node ID in entry does not match."
@@ -210,7 +210,7 @@ def test_remove_node_from_pipeline(pip_settings):
     tag = "test_tag"
     pipeline_db.add_node_tag(cur, node_id=node_id, pipeline_id=pipeline_id, tag=tag)
 
-    # Add entry to entries table
+    # Add entry to node_pipeline_relation table
     user = "test_user"
     entry_id = pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
     conn.commit()
@@ -222,7 +222,7 @@ def test_remove_node_from_pipeline(pip_settings):
     assert rows_deleted == 2, "Entry was not deleted from the database."
 
     # Check if the entry was actually removed
-    cur.execute("SELECT * FROM entries WHERE node_id=? AND pipeline_id=?", (node_id, pipeline_id))
+    cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=? AND pipeline_id=?", (node_id, pipeline_id))
     result = cur.fetchone()
     conn.close()
     assert result is None, "Entry was not removed from the database."
@@ -595,7 +595,7 @@ def test_remove_node_from_everywhere(pip_settings):
     pipeline_db.add_node_to_nodes(cur, node_id=node_id)
     pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
-    # Add the node to entries
+    # Add the node to node_pipeline_relation
     pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
 
     # Add a tag to the node
@@ -614,7 +614,7 @@ def test_remove_node_from_everywhere(pip_settings):
     cur = conn.cursor()
 
     # Verify the node is removed from all relevant tables
-    assert pipeline_db.get_rows_with_node_id_in_entries(cur, node_id) == [], "Node was not removed from entries."
+    assert pipeline_db.get_rows_with_node_id_in_entries(cur, node_id) == [], "Node was not removed from node_pipeline_relation."
     assert pipeline_db.get_rows_node_id_in_nodes(cur, node_id) == [], "Node was not removed from nodes."
     assert pipeline_db.get_rows_with_node_id_in_node_tags(cur, node_id) == [], "Node was not removed from tags."
     assert pipeline_db.get_rows_with_node_id_relations(cur, node_id) == [], "Node was not removed from relations."
@@ -635,18 +635,18 @@ def test_remove_node_from_entries(pip_settings):
     pipeline_db.add_node_to_nodes(cur, node_id=node_id)
     pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
-    # Add the node to entries
+    # Add the node to node_pipeline_relation
     user = "test_user"
     entry_id = pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
     conn.commit()
 
-    # Remove the node from entries
+    # Remove the node from node_pipeline_relation
     rows_deleted = pipeline_db.remove_node_from_entries(cur, node_id=node_id)
     conn.commit()
     assert rows_deleted == 1, "Entry was not removed from the database."
 
     # Verify the entry is removed
-    cur.execute("SELECT * FROM entries WHERE node_id=? AND pipeline_id=?", (node_id, pipeline_id))
+    cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=? AND pipeline_id=?", (node_id, pipeline_id))
     result = cur.fetchone()
     conn.close()
     assert result is None, "Entry was not removed from the database."
@@ -666,12 +666,12 @@ def test_get_rows_with_node_id_in_entries(pip_settings):
     pipeline_db.add_node_to_nodes(cur, node_id=node_id)
     pipeline_db.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
-    # Add the node to entries
+    # Add the node to node_pipeline_relation
     user = "test_user"
     entry_id = pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
     conn.commit()
 
-    # Get rows with the node ID in entries
+    # Get rows with the node ID in node_pipeline_relation
     rows = pipeline_db.get_rows_with_node_id_in_entries(cur, node_id)
     assert len(rows) == 1, "Expected one entry with the node ID."
     assert rows[0][3] == node_id, "Node ID in entry does not match expected value."
@@ -767,7 +767,7 @@ def test_get_rows_with_pipeline_id_in_entries(pip_settings):
         pipeline_db.add_node_to_entries(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
     conn.commit()
 
-    # Get rows with the pipeline ID in entries
+    # Get rows with the pipeline ID in node_pipeline_relation
     rows = pipeline_db.get_rows_with_pipeline_id_in_entries(cur, pipeline_id)
     conn.close()
 
@@ -817,7 +817,7 @@ def test_duplicate_pipeline(pip_settings):
     add_pipeline(cur, pipeline_id=source_pipeline_id, tag="v1.0")
     add_pipeline_description(cur, pipeline_id=source_pipeline_id, description="Test pipeline description")
 
-    # Add nodes and entries to the source pipeline
+    # Add nodes and node_pipeline_relation to the source pipeline
     add_node_to_entries(cur, node_id="node1", pipeline_id=source_pipeline_id, user="user1")
     add_node_to_entries(cur, node_id="node2", pipeline_id=source_pipeline_id, user="user2")
     add_node_tag(cur, node_id="node1", pipeline_id=source_pipeline_id, tag="tag1")
@@ -837,12 +837,12 @@ def test_duplicate_pipeline(pip_settings):
     assert new_pipeline[0] == new_pipeline_id
     assert new_pipeline[1] == "v1.0"  # Tag should match the source pipeline
 
-    # Verify the entries table
-    cur.execute("SELECT * FROM entries WHERE pipeline_id = ?", (new_pipeline_id,))
-    entries = cur.fetchall()
-    assert len(entries) == 2, "Entries were not duplicated correctly."
-    assert entries[0][3] == "node1"
-    assert entries[1][3] == "node2"
+    # Verify the node_pipeline_relation table
+    cur.execute("SELECT * FROM node_pipeline_relation WHERE pipeline_id = ?", (new_pipeline_id,))
+    node_pipeline_relation = cur.fetchall()
+    assert len(node_pipeline_relation) == 2, "Entries were not duplicated correctly."
+    assert node_pipeline_relation[0][3] == "node1"
+    assert node_pipeline_relation[1][3] == "node2"
 
     # Verify the node_tags table
     cur.execute("SELECT * FROM node_tags WHERE pipeline_id = ?", (new_pipeline_id,))
@@ -943,8 +943,8 @@ def test_dupicate_node_in_pipeline_full_coverage(pip_settings):
     assert duplicated_tag is not None, "Duplicated node tag was not created."
     assert duplicated_tag[1] == tag, "Duplicated node tag does not match the original node's tag."
 
-    # Check entries table
-    cur.execute("SELECT * FROM entries WHERE node_id = ? AND pipeline_id = ?", (duplicated_node_id, pipeline_id,))
+    # Check node_pipeline_relation table
+    cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id = ? AND pipeline_id = ?", (duplicated_node_id, pipeline_id,))
     duplicated_entry = cur.fetchone()
     assert duplicated_entry is not None, "Duplicated node entry was not created."
     assert duplicated_entry[4] == pipeline_id, "Duplicated entry pipeline_id does not match original."
@@ -1076,15 +1076,15 @@ def test_remove_node_from_pipeline_removes_tags_and_entries(pip_settings):
     rows_deleted = pipeline_db.remove_node_from_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
-    # Check that the entry is removed from entries
-    cur.execute("SELECT * FROM entries WHERE node_id=? AND pipeline_id=?", (node_id, pipeline_id))
-    assert cur.fetchone() is None, "Entry was not removed from entries table."
+    # Check that the entry is removed from node_pipeline_relation
+    cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=? AND pipeline_id=?", (node_id, pipeline_id))
+    assert cur.fetchone() is None, "Entry was not removed from node_pipeline_relation table."
 
     # Check that the tag is removed from node_tags
     cur.execute("SELECT * FROM node_tags WHERE node_id=? AND pipeline_id=?", (node_id, pipeline_id))
     assert cur.fetchone() is None, "Tag was not removed from node_tags table."
 
-    # Check that rowcount is at least 2 (one for entries, one for node_tags)
+    # Check that rowcount is at least 2 (one for node_pipeline_relation, one for node_tags)
     assert rows_deleted >= 1, "Expected at least one row to be deleted."
 
     conn.close()
@@ -1097,7 +1097,7 @@ def test_replace_node_in_pipeline(pip_settings):
     conn = pipeline_db.init_db(db_path)
     cur = conn.cursor()
 
-    # Setup: create nodes, pipeline, relations, entries, and tags
+    # Setup: create nodes, pipeline, relations, node_pipeline_relation, and tags
     old_node_id = generate_node_id()
     new_node_id = f"{old_node_id}_repl"
     parent_id = generate_node_id()
@@ -1138,7 +1138,7 @@ def test_replace_node_in_pipeline(pip_settings):
     assert child_id in child_rows, "Child relation not copied to new node."
 
     # Check new node has entry and tag in the pipeline
-    cur.execute("SELECT * FROM entries WHERE node_id=? AND pipeline_id=?", (new_node_id, pipeline_id))
+    cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=? AND pipeline_id=?", (new_node_id, pipeline_id))
     assert cur.fetchone() is not None, "Entry for new node not created."
 
     cur.execute("SELECT * FROM node_tags WHERE node_id=? AND pipeline_id=?", (new_node_id, pipeline_id))
@@ -1146,8 +1146,8 @@ def test_replace_node_in_pipeline(pip_settings):
     assert tag_row is not None, "Tag for new node not created."
     assert tag_row[1] == tag, "Tag value for new node does not match."
 
-    # Check old node is removed from entries and tags for this pipeline
-    cur.execute("SELECT * FROM entries WHERE node_id=? AND pipeline_id=?", (old_node_id, pipeline_id))
+    # Check old node is removed from node_pipeline_relation and tags for this pipeline
+    cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=? AND pipeline_id=?", (old_node_id, pipeline_id))
     assert cur.fetchone() is None, "Old node entry was not removed from pipeline."
 
     cur.execute("SELECT * FROM node_tags WHERE node_id=? AND pipeline_id=?", (old_node_id, pipeline_id))

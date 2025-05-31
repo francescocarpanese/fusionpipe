@@ -4,7 +4,7 @@ table_names = [
     'pipelines',
     'nodes',
     'node_tags',
-    'entries',
+    'node_pipeline_relation',
     'node_relation',
     'pipeline_desciption'
 ]
@@ -33,7 +33,8 @@ def init_graph_db(conn):
     cur.execute('''
         CREATE TABLE IF NOT EXISTS nodes (
             node_id TEXT PRIMARY KEY,
-            status TEXT CHECK(status IN ('ready', 'running', 'completed', 'failed', 'staledata')) DEFAULT 'ready'
+            status TEXT CHECK(status IN ('ready', 'running', 'completed', 'failed', 'staledata')) DEFAULT 'ready',
+            editable BOOLEAN DEFAULT TRUE
         )
     ''')
 
@@ -50,7 +51,7 @@ def init_graph_db(conn):
     ''')
 
     cur.execute('''
-        CREATE TABLE IF NOT EXISTS entries (
+        CREATE TABLE IF NOT EXISTS node_pipeline_relation (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             last_update timestamp DEFAULT CURRENT_TIMESTAMP,
             user TEXT,
@@ -98,7 +99,7 @@ def remove_node_from_nodes(cur, node_id):
     return cur.rowcount
 
 def add_node_to_entries(cur, node_id, pipeline_id, user=None):
-    cur.execute('INSERT INTO entries (node_id, pipeline_id, user) VALUES (?, ?, ?)', (node_id, pipeline_id, user))
+    cur.execute('INSERT INTO node_pipeline_relation (node_id, pipeline_id, user) VALUES (?, ?, ?)', (node_id, pipeline_id, user))
     return cur.lastrowid
 
 def add_node_relation(cur, child_id, parent_id):
@@ -153,13 +154,13 @@ def check_pipeline_exists(cur, pipeline_id):
     return cur.fetchone() is not None
 
 def get_all_nodes_from_pip_id(cur, pipeline_id):
-    cur.execute('SELECT node_id FROM entries WHERE pipeline_id = ?', (pipeline_id,))
+    cur.execute('SELECT node_id FROM node_pipeline_relation WHERE pipeline_id = ?', (pipeline_id,))
     return [row[0] for row in cur.fetchall()]
 
 def get_nodes_without_pipeline(cur):
     cur.execute('''
         SELECT node_id FROM nodes
-        WHERE node_id NOT IN (SELECT node_id FROM entries)
+        WHERE node_id NOT IN (SELECT node_id FROM node_pipeline_relation)
     ''')
     return [row[0] for row in cur.fetchall()]
 
@@ -167,7 +168,7 @@ def clear_database(cur):
     cur.execute('DELETE FROM pipelines')
     cur.execute('DELETE FROM nodes')
     cur.execute('DELETE FROM node_tags')
-    cur.execute('DELETE FROM entries')
+    cur.execute('DELETE FROM node_pipeline_relation')
     cur.execute('DELETE FROM node_relation')
     cur.execute('DELETE FROM pipeline_desciption')
     return cur
@@ -181,7 +182,7 @@ def remove_node_from_relations(cur, node_id):
     return cur.rowcount
 
 def remove_node_from_entries(cur, node_id):
-    cur.execute('DELETE FROM entries WHERE node_id = ?', (node_id,))
+    cur.execute('DELETE FROM node_pipeline_relation WHERE node_id = ?', (node_id,))
     return cur.rowcount
 
 def remove_node_from_everywhere(cur, node_id):
@@ -192,7 +193,7 @@ def remove_node_from_everywhere(cur, node_id):
     return cur.rowcount
 
 def get_rows_with_node_id_in_entries(cur, node_id):
-    cur.execute('SELECT * FROM entries WHERE node_id = ?', (node_id,))
+    cur.execute('SELECT * FROM node_pipeline_relation WHERE node_id = ?', (node_id,))
     return cur.fetchall()
 
 def get_rows_node_id_in_nodes(cur, node_id):
@@ -209,7 +210,7 @@ def get_rows_with_node_id_in_node_tags(cur, node_id):
 
 
 def get_rows_with_pipeline_id_in_entries(cur, pipeline_id):
-    cur.execute('SELECT * FROM entries WHERE pipeline_id = ?', (pipeline_id,))
+    cur.execute('SELECT * FROM node_pipeline_relation WHERE pipeline_id = ?', (pipeline_id,))
     return cur.fetchall()
 
 def get_rows_with_pipeline_id_in_pipelines(cur, pipeline_id):
@@ -217,8 +218,8 @@ def get_rows_with_pipeline_id_in_pipelines(cur, pipeline_id):
     return cur.fetchall()
 
 def remove_node_from_pipeline(cur, node_id, pipeline_id):
-    # Remove node from entries
-    cur.execute('DELETE FROM entries WHERE node_id = ? AND pipeline_id = ?', (node_id, pipeline_id))
+    # Remove node from node_pipeline_relation
+    cur.execute('DELETE FROM node_pipeline_relation WHERE node_id = ? AND pipeline_id = ?', (node_id, pipeline_id))
     rows_deleted_entries = cur.rowcount
     
     # Remove node from node_tags
@@ -238,11 +239,11 @@ def duplicate_pipeline(cur, source_pipeline_id, new_pipeline_id):
         WHERE pipeline_id = ?
     ''', (new_pipeline_id, source_pipeline_id))
 
-    # Duplicate entries table
+    # Duplicate node_pipeline_relation table
     cur.execute('''
-        INSERT INTO entries (last_update, user, node_id, pipeline_id)
+        INSERT INTO node_pipeline_relation (last_update, user, node_id, pipeline_id)
         SELECT last_update, user, node_id, ?
-        FROM entries
+        FROM node_pipeline_relation
         WHERE pipeline_id = ?
     ''', (new_pipeline_id, source_pipeline_id))
 
@@ -277,11 +278,11 @@ def dupicate_node_in_pipeline(cur, source_node_id, new_node_id, pipeline_id):
         WHERE node_id = ?
     ''', (new_node_id, source_node_id))
 
-    # Duplicate entries table
+    # Duplicate node_pipeline_relation table
     cur.execute('''
-        INSERT INTO entries (last_update, user, node_id, pipeline_id)
+        INSERT INTO node_pipeline_relation (last_update, user, node_id, pipeline_id)
         SELECT last_update, user, ?, pipeline_id
-        FROM entries
+        FROM node_pipeline_relation
         WHERE node_id = ? AND pipeline_id = ?
     ''', (new_node_id, source_node_id, pipeline_id))
 
@@ -323,7 +324,7 @@ def duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id, 
 def replace_node_in_pipeline(cur, old_node_id, new_node_id, pipeline_id):
 
     duplicate_node_in_pipeline_with_relations(cur, old_node_id, new_node_id, pipeline_id)
-    # Remove old node from entries
+    # Remove old node from node_pipeline_relation
     remove_node_from_pipeline(cur, old_node_id, pipeline_id)
     return new_node_id
 
