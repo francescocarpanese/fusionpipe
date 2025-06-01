@@ -199,3 +199,17 @@ def test_dict_to_graph(dict_dummy_1, dag_dummy_1):
     # Check graph attributes
     for attr in ['pipeline_id', 'notes', 'tag', 'owner']:
         assert G.graph[attr] == dag_dummy_1.graph[attr]
+
+def test_visualize_pip_static_runs_without_error(monkeypatch, dag_dummy_1):
+    """
+    Test that visualize_pip_static runs without raising exceptions.
+    We patch plt.show to avoid opening a window during tests.
+    """
+
+    # Patch plt.show to a no-op
+    import matplotlib.pyplot as plt
+    from fusionpipe.utils.pip_utils import visualize_pip_static
+    monkeypatch.setattr(plt, "show", lambda: None)
+
+    # Should not raise
+    visualize_pip_static(dag_dummy_1)

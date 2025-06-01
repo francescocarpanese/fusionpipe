@@ -9,6 +9,7 @@ from fusionpipe.utils import db_utils
 
 from enum import Enum
 
+
 class NodeState(Enum):
     READY = "ready"       # Node is created but not yet processed
     RUNNING = "running"       # Node is currently being processed
@@ -212,9 +213,7 @@ def dict_to_graph(graph_dict):
 
     return G
 
-
-# To be tested.
-def visualize_pip(graph):
+def visualize_pip_static(graph):
     plt.figure(figsize=(10, 6))
     pos = nx.spring_layout(graph)
 
@@ -244,11 +243,41 @@ def visualize_pip(graph):
     plt.title(f"Pipeline: {graph.name}")
     plt.show()
 
-
-
 def generate_data_folder(base_path):
     os.makedirs(os.path.join(base_path, "nodes"), exist_ok=True)
     
     return {
         "nodes": os.path.join(base_path, "nodes"),
     }
+
+
+def visualize_pip_interactive(graph, output_file="pipeline_visualization.html"):
+    from pyvis.network import Network 
+    """
+    Visualize the pipeline graph interactively using pyvis.
+    """
+    # Create a new Network object
+    net = Network(height="750px", width="100%", directed=True)
+    
+    # Define color mapping based on node status
+    color_map = {
+        "ready": "gray",
+        "failed": "red",
+        "completed": "green",
+        "running": "blue",
+        "staledata": "yellow"
+    }
+
+    # Add nodes with attributes
+    for node in graph.nodes:
+        status = graph.nodes[node].get("status", "ready")
+        color = color_map.get(status, "gray")
+        title = " ".join([f"{key}: {value}" for key, value in graph.nodes[node].items()])
+        net.add_node(node, label=node, color=color, title=title)
+
+    # Add edges
+    for edge in graph.edges:
+        net.add_edge(edge[0], edge[1])
+
+    # Generate and save the interactive visualization
+    net.write_html(output_file)
