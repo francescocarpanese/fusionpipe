@@ -191,66 +191,45 @@ def db_to_graph_dict_from_pip_id(cur, pip_id):
     return graph_to_dict(graph)
 
 
-# def serialize_pipeline(settings, graph, pip_id = None, verbose=False):
-#     pipeline_data = graph_to_dict(graph)
-#     pipeline_id = pip_id if pip_id else generate_pip_id()
-#     path_pip_file = f"{settings['pipeline_folder']}/{pipeline_id}.json"
-#     with open(path_pip_file, 'w') as file:
-#         json.dump(pipeline_data, file, indent=2)
-#     if verbose:
-#         print(f"Pipeline {pipeline_id} saved successfully.")
+def dict_to_graph(graph_dict):
+    """
+    Convert a dictionary representation of a graph back to a NetworkX directed graph.
+    """
+    G = nx.DiGraph()
+    
+    # Set graph attributes
+    G.graph['pipeline_id'] = graph_dict.get('pipeline_id', None)
+    G.graph['notes'] = graph_dict.get('notes', None)
+    G.graph['tag'] = graph_dict.get('tag', None)
+    G.graph['owner'] = graph_dict.get('owner', None)
 
-# def duplicate_pip(settings, graph):
-#     new_pip_id = create_pipeline_file(settings)
-#     save_pipeline(settings, pip_id=new_pip_id, verbose=True)
+    # Add nodes and their attributes
+    for node_id, node_data in graph_dict['nodes'].items():
+        G.add_node(node_id, status=node_data.get('status', 'ready'), editable=node_data.get('editable', True),
+                   tag=node_data.get('tag', None), notes=node_data.get('notes', None))
+        for parent in node_data.get('parents', []):
+            G.add_edge(parent, node_id)
 
-def add_node(settings, graph, node_id, dependencies=None):
-    if not check_node_exist(settings, node_id):
-        print(f"Node {node_id} does not exists.")
-        return
-    if dependencies is None:
-        dependencies = []
-    graph.add_node(node_id)
-    for dep in dependencies:
-        graph.add_edge(dep, node_id)
-    return graph
-
-# def detach_node(graph, node_id):
-#     if node_id in graph:
-#         # Remove all edges connected to the node
-#         graph.remove_edges_from(list(graph.in_edges(node_id)) + list(graph.out_edges(node_id)))
-#         print(f"All edges of node {node_id} have been removed. The node is now independent.")
-#     else:
-#         print(f"Node {node_id} does not exist in the pipeline.")
-#     return graph
-
-# def remove_input_edges(graph, node_id, verbose=False):
-#     if node_id in graph:
-#         # Remove all incoming edges to the node
-#         graph.remove_edges_from(list(graph.in_edges(node_id)))
-#         print(f"All input edges of node {node_id} have been removed.")
-#     else:
-#         print(f"Node {node_id} does not exist in the pipeline.")
-#     return graph
+    return G
 
 
-
+# To be tested.
 def visualize_pip(graph):
     plt.figure(figsize=(10, 6))
     pos = nx.spring_layout(graph)
 
     # Define color mapping based on node status
     color_map = {
-        "null": "gray",
+        "ready": "gray",
         "failed": "red",
         "completed": "green",
         "running": "blue",
-        "stale": "yellow"
+        "staledata": "yellow"
     }
 
     # Get node colors based on their status
     node_colors = [
-        color_map.get(graph.nodes[node].get("status", "null"), "gray")
+        color_map.get(graph.nodes[node].get("status", "ready"), "gray")
         for node in graph.nodes
     ]
 
@@ -265,52 +244,6 @@ def visualize_pip(graph):
     plt.title(f"Pipeline: {graph.name}")
     plt.show()
 
-# def connect_node_to_parent(settings, graph, node_id, parent_node_id, verbose=False):
-#     if not check_node_exist(settings, node_id):
-#         print(f"Node {node_id} does not exist.")
-#         return
-#     if not check_node_exist(settings, parent_node_id):
-#         print(f"Parent node {parent_node_id} does not exist.")
-#         return
-#     graph.add_edge(node_id, parent_node_id)
-#     if verbose:
-#         print(f"Node {node_id} connected to parent node {parent_node_id}.")
-#     return graph
-
-# def load_pipeline_dict_from_file(settings, pip_id):
-#     pipeline_id = pip_id
-#     path_pip_file = f"{settings['pipeline_folder']}/{pipeline_id}.json"
-#     if os.path.exists(path_pip_file):
-#         with open(path_pip_file, 'r') as file:
-#             return json.load(file)
-#     else:
-#         raise FileNotFoundError(f"Pipeline file {path_pip_file} does not exist.")
-
-# def load_pipeline_from_file(settings, pip_id):
-#     pipeline_data = load_pipeline_dict_from_file(settings=settings, pip_id=pip_id)
-#     # Create a directed graph
-#     G = nx.DiGraph()
-#     G.name = pipeline_data['name']  # Set the graph name from the pipeline data
-#     for node in pipeline_data['nodes']:
-#         if not check_node_exist(settings, node['nid']):
-#             raise ValueError(f"Node {node['nid']} does not exist in the node folder.")
-#         G.add_node(node['nid'])  # Add node with attributes
-#         if 'parents' in node:
-#             for dep in node['parents']:
-#                 G.add_edge(dep, node['nid'])  # Add edges based on dependencies
-#     # Load the status of each node and add it as an attribute to the graph
-#     for node in G.nodes:
-#         node_status_file = f"{settings['node_folder']}/n_{node}/meta.json"
-#         if os.path.exists(node_status_file):
-#             with open(node_status_file, 'r') as file:
-#                 node_meta = json.load(file)
-#             status = node_meta.get('status', 'null')
-#         else:
-#             status = "null"  # Default status if .status file is missing
-#         if status not in NodeState._value2member_map_:
-#             raise ValueError(f"Invalid status '{status}' for node {node}. Must be one of {list(NodeState._value2member_map_.keys())}.")
-#         G.nodes[node]['status'] = status
-#     return G
 
 
 def generate_data_folder(base_path):
@@ -319,108 +252,3 @@ def generate_data_folder(base_path):
     return {
         "nodes": os.path.join(base_path, "nodes"),
     }
-
-
-# def save_pipeline(verbose=False):
-#     pipeline_data = self.graph_to_dict()
-#     pipeline_id = self.pip_id if self.pip_id else generate_id()
-#     path_pip_file = f"{self.settings['pipeline_folder']}/p_{pipeline_id}.json"
-#     with open(path_pip_file, 'w') as file:
-#         json.dump(pipeline_data, file, indent=2)
-#     if verbose:
-#         print(f"Pipeline {pipeline_id} saved successfully.")
-
-
-# # In memory object for 1 pipeline
-# class DAG:
-#     def __init__(self, settings, pip_id=None):
-#         self.settings = settings
-#         self.graph = nx.DiGraph()  # Initialize an empty directed graph
-#         self.pip_id = None  # Initialize pipeline ID
-#         if pip_id is not None:
-#             self.set_pip_id(pip_id)
-#             self.load_pipeline_from_file()
-
-#     def set_pip_id(self, pip_id):
-#         self.pip_id = pip_id
-
-#     def duplicate_pip(self,settings):
-#         new_pip_id = create_pipeline_file(settings)
-#         self.set_pip_id(new_pip_id)
-#         self.save_pipeline()
-
-#     def load_pipeline_dict(self):
-#         pipeline_id = self.pip_id
-#         path_pip_file = f"{self.settings['pipeline_folder']}/p_{pipeline_id}.json"
-#         if os.path.exists(path_pip_file):
-#             with open(path_pip_file, 'r') as file:
-#                 return json.load(file)
-#         else:
-#             raise FileNotFoundError(f"Pipeline file {path_pip_file} does not exist.")
-        
-#     def load_pipeline_from_file(self):
-#         pipeline_data = self.load_pipeline_dict()
-#         # Create a directed graph
-#         G = nx.DiGraph()
-#         G.name = pipeline_data['name']  # Set the graph name from the pipeline data
-#         for node in pipeline_data['nodes']:
-#             if not check_node_exist(self.settings, node['nid']):
-#                 raise ValueError(f"Node {node['nid']} does not exist in the node folder.")
-#             G.add_node(node['nid'])  # Add node with attributes
-#             if 'dependencies' in node:
-#                 for dep in node['dependencies']:
-#                     G.add_edge(dep, node['nid'])  # Add edges based on dependencies
-#         # Load the status of each node and add it as an attribute to the graph
-#         for node in G.nodes:
-#             node_status_file = f"{self.settings['node_folder']}/n_{node}/meta.json"
-#             if os.path.exists(node_status_file):
-#                 with open(node_status_file, 'r') as file:
-#                     node_meta = json.load(file)
-#                 status = node_meta.get('status', 'null')
-#             else:
-#                 status = "null"  # Default status if .status file is missing
-#             if status not in NodeState._value2member_map_:
-#                 raise ValueError(f"Invalid status '{status}' for node {node}. Must be one of {list(NodeState._value2member_map_.keys())}.")
-#             G.nodes[node]['status'] = status
-        
-#         self.graph = G
-
-
-
-
-
-# TODO. Still convenient for debuggiong to generate the file from the database
-# def create_pipeline_file(settings, pip_id, verbose=False):
-#     pth_pipeline_folder = settings["pipeline_folder"]
-    
-#     # Create the pipeline file path
-#     pipeline_file_path = f"{pth_pipeline_folder}/{pip_id}.json"
-
-#     pip_template = generate_pipeline_template(name=pip_id)
-
-#     # Write the pipeline template to a JSON file
-#     with open(pipeline_file_path, 'w') as f:
-#         import json
-#         json.dump(pip_template, f, indent=2)
-    
-#     return pip_id
-
-
-# def generate_pipeline_template(name=""):
-#     # Define a basic pipeline template
-#     pipeline_template = {
-#         "name": name,
-#         "nodes": [],
-#         }
-#     return pipeline_template
-
-
-
-
-# def generate_node_dic(node_id, dependencies=[]):
-#     # Define a basic node template
-#     node_dic = {
-#         "nid": node_id,
-#         "dependencies": dependencies,
-#     }
-#     return node_dic

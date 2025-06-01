@@ -36,11 +36,18 @@ def dag_dummy_1():
 
     # Add a 'status' attribute to each node using NodeState
     for node in G.nodes:
-        G.nodes[node]['status'] = NodeState.READY.value
         G.nodes[node]['editable'] = True
         G.nodes[node]['tag'] = 'test_tag'
         G.nodes[node]['notes'] = 'test notes'
-    
+        if node == "A":
+            G.nodes[node]['status'] = "ready"
+        elif node == "B":
+            G.nodes[node]['status'] = "running"
+        elif node == "C":
+            G.nodes[node]['status'] = "completed"
+        elif node == "D":
+            G.nodes[node]['status'] = "staledata"
+
     return G
 
 @pytest.fixture
@@ -53,9 +60,9 @@ def dict_dummy_1():
         "owner": "test_group",
         "nodes": {
             "A": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': []},
-            "B": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A']},
-            "C": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A']},
-            "D": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C']}
+            "B": {"status": "running", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A']},
+            "C": {"status": "completed", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A']},
+            "D": {"status": "staledata", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C']}
         }
     }
 
