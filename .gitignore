@@ -11,5 +11,6 @@ wheels/
 
 # Ignore binary data
 bin
+lib
 
 *.db
