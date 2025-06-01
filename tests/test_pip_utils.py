@@ -18,7 +18,7 @@ def tmp_database_path(tmp_base_dir):
 
 
 @pytest.fixture
-def dag_graph_dummy_1():
+def dag_dummy_1():
     import networkx as nx
     from fusionpipe.utils.pip_utils import NodeState 
     # Create a simple directed acyclic graph (DAG) for testing
@@ -28,15 +28,37 @@ def dag_graph_dummy_1():
         ("A", "C"),
         ("C", "D"),
     ])
-    G.graph['description'] = "A simple test DAG"
-    G.graph['id'] = "12345"
+    G.name = "12345"
+    G.graph['pipeline_id'] = G.name
+    G.graph['notes'] = "A simple test DAG"
     G.graph['tag'] = "test_tag"
+    G.graph['owner'] = "test_group"
 
     # Add a 'status' attribute to each node using NodeState
     for node in G.nodes:
         G.nodes[node]['status'] = NodeState.READY.value
-
+        G.nodes[node]['editable'] = True
+        G.nodes[node]['tag'] = 'test_tag'
+        G.nodes[node]['notes'] = 'test notes'
+    
     return G
+
+@pytest.fixture
+def dict_dummy_1():
+    # Create a simple dictionary for testing identical to dag_dummy_1
+    return {
+        "pipeline_id": "12345",
+        "notes": "A simple test DAG",
+        "tag": "test_tag",
+        "owner": "test_group",
+        "nodes": {
+            "A": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': []},
+            "B": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A']},
+            "C": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A']},
+            "D": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C']}
+        }
+    }
+
 
 @pytest.fixture
 def in_memory_db_conn():
@@ -60,6 +82,54 @@ def test_generate_data_folder(tmp_base_dir):
         assert os.path.exists(dir_path), f"Expected directory {dir_path} does not exist."
 
 
+def test_init_node_folder(tmp_base_dir):
+    # Test if the function creates the expected node folder structure
+    from fusionpipe.utils.pip_utils import init_node_folder
+    import os
+
+    node_id = "test_node"
+    base_path = tmp_base_dir
+    init_node_folder(base_path, node_id, verbose=True)
+
+    node_folder = os.path.join(base_path, node_id)
+    code_folder = os.path.join(node_folder, "code")
+    data_folder = os.path.join(node_folder, "data")
+    reports_folder = os.path.join(node_folder, "reports")
+
+    assert os.path.isdir(node_folder), "Node folder was not created."
+    assert os.path.isdir(code_folder), "Code subfolder was not created."
+    assert os.path.isdir(data_folder), "Data subfolder was not created."
+    assert os.path.isdir(reports_folder), "Reports subfolder was not created."
+
+
+def test_delete_node_folder_removes_existing_folder(tmp_base_dir):
+    # Test if the function deletes an existing node folder
+    from fusionpipe.utils.pip_utils import delete_node_folder
+    import os
+
+    node_id = "testnode"
+    node_folder_path = os.path.join(tmp_base_dir, f"n_{node_id}")
+    os.makedirs(node_folder_path, exist_ok=True)
+    # Ensure the folder exists before deletion
+    assert os.path.exists(node_folder_path)
+    delete_node_folder(tmp_base_dir, node_id, verbose=True)
+    # Folder should be deleted
+    assert not os.path.exists(node_folder_path)
+
+def test_delete_node_folder_nonexistent_folder(tmp_base_dir, capsys):
+    # Test if the function handles non-existent node folders gracefully
+    from fusionpipe.utils.pip_utils import delete_node_folder
+    import os
+    node_id = "nonexistentnode"
+    node_folder_path = os.path.join(tmp_base_dir, f"n_{node_id}")
+    # Ensure the folder does not exist
+    if os.path.exists(node_folder_path):
+        os.rmdir(node_folder_path)
+    delete_node_folder(tmp_base_dir, node_id, verbose=True)
+    # Should not raise, and should print a message
+    captured = capsys.readouterr()
+    assert f"Node folder does not exist" in captured.out
+
 
 def test_create_db(tmp_database_path):
     from fusionpipe.utils import db_utils
@@ -69,8 +139,19 @@ def test_create_db(tmp_database_path):
     assert os.path.exists(db_file_path), f"Connection database {db_file_path} was not created."
 
 
+def test_graph_to_dict(dag_dummy_1, dict_dummy_1):
+    from fusionpipe.utils.pip_utils import graph_to_dict
+    import networkx as nx
+
+    # Convert the graph to a dictionary
+    graph_dict = graph_to_dict(dag_dummy_1)
+
+    # Check if the converted dictionary matches the expected dictionary
+    assert graph_dict == dict_dummy_1, "Graph to dict conversion did not produce the expected result."
 
 
+
+# To be changes
 
 def test_graph_to_db(in_memory_db_conn, dag_graph_dummy_1):
     import networkx as nx

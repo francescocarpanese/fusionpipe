@@ -46,8 +46,7 @@ def init_node_folder(node_folder_path, node_id, verbose=False):
     if verbose:
         print(f"Node folder created at: {node_folder_path}")
 
-def delete_node_folder(settings, node_id, verbose=False):
-    node_folder_path = settings["node_folder"]
+def delete_node_folder(node_folder_path, node_id, verbose=False):
     
     # Construct the node folder path
     node_folder_path = f"{node_folder_path}/n_{node_id}"
@@ -62,64 +61,27 @@ def delete_node_folder(settings, node_id, verbose=False):
             print(f"Node folder does not exist: {node_folder_path}")
 
 
-
-
-# TODO. Still convenient for debuggiong to generate the file from the database
-# def create_pipeline_file(settings, pip_id, verbose=False):
-#     pth_pipeline_folder = settings["pipeline_folder"]
-    
-#     # Create the pipeline file path
-#     pipeline_file_path = f"{pth_pipeline_folder}/{pip_id}.json"
-
-#     pip_template = generate_pipeline_template(name=pip_id)
-
-#     # Write the pipeline template to a JSON file
-#     with open(pipeline_file_path, 'w') as f:
-#         import json
-#         json.dump(pip_template, f, indent=2)
-    
-#     return pip_id
-
-
-# def generate_pipeline_template(name=""):
-#     # Define a basic pipeline template
-#     pipeline_template = {
-#         "name": name,
-#         "nodes": [],
-#         }
-#     return pipeline_template
-
-
-
-def check_node_exist(settings, node_id):
-    node_folder_path = settings["node_folder"]
-    node_folder_path = f"{node_folder_path}/n_{node_id}"
-    
-    # Check if the node folder exists
-    return os.path.exists(node_folder_path)
-
-# def generate_node_dic(node_id, dependencies=[]):
-#     # Define a basic node template
-#     node_dic = {
-#         "nid": node_id,
-#         "dependencies": dependencies,
-#     }
-#     return node_dic
-
-
 def graph_to_dict(graph):
+    """
+    Convert a NetworkX directed graph to a dictionary format suitable for serialization.
+    """
+
     pipeline_data = {
-        'name': graph.name, # This is the tag that can be given to the pipeline
-        'nodes': []
+        'pipeline_id': graph.graph.get('pipeline_id'), # This is the tag that can be given to the pipeline
+        'nodes': {},
+        'notes': graph.graph.get('notes', None),  # Optional notes for the pipeline
+        'tag': graph.graph.get('tag', None),  # Optional tag for the pipeline
+        'owner': graph.graph.get('owner', None),  # Optional owner for the pipeline
     }
     for node in graph.nodes:
         parents = list(graph.predecessors(node))
-        pipeline_data['nodes'].append({
-            'nid': node,
+        pipeline_data['nodes'][node] = {
             'parents': parents,
             'status': graph.nodes[node].get('status', 'null'),  # Default status is 'null'
             'editable': graph.nodes[node].get('editable', True),  # Default editable is True
-        })
+            'tag': graph.nodes[node].get('tag', None),  # Optional tag for the node
+            'notes': graph.nodes[node].get('notes', None),  # Optional notes for the node
+        }
     return pipeline_data
 
 def graph_to_db(Gnx, cur):
@@ -363,3 +325,43 @@ def generate_data_folder(base_path):
 #             G.nodes[node]['status'] = status
         
 #         self.graph = G
+
+
+
+
+
+# TODO. Still convenient for debuggiong to generate the file from the database
+# def create_pipeline_file(settings, pip_id, verbose=False):
+#     pth_pipeline_folder = settings["pipeline_folder"]
+    
+#     # Create the pipeline file path
+#     pipeline_file_path = f"{pth_pipeline_folder}/{pip_id}.json"
+
+#     pip_template = generate_pipeline_template(name=pip_id)
+
+#     # Write the pipeline template to a JSON file
+#     with open(pipeline_file_path, 'w') as f:
+#         import json
+#         json.dump(pip_template, f, indent=2)
+    
+#     return pip_id
+
+
+# def generate_pipeline_template(name=""):
+#     # Define a basic pipeline template
+#     pipeline_template = {
+#         "name": name,
+#         "nodes": [],
+#         }
+#     return pipeline_template
+
+
+
+
+# def generate_node_dic(node_id, dependencies=[]):
+#     # Define a basic node template
+#     node_dic = {
+#         "nid": node_id,
+#         "dependencies": dependencies,
+#     }
+#     return node_dic

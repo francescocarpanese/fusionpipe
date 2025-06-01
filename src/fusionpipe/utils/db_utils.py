@@ -25,7 +25,8 @@ def init_db(conn):
         CREATE TABLE IF NOT EXISTS pipelines (
             pipeline_id TEXT PRIMARY KEY,
             tag TEXT DEFAULT NULL,
-            owner TEXT DEFAULT NULL
+            owner TEXT DEFAULT NULL,
+            notes TEXT DEFAULT NULL
         )
     ''')
 
@@ -33,7 +34,8 @@ def init_db(conn):
         CREATE TABLE IF NOT EXISTS nodes (
             node_id TEXT PRIMARY KEY,
             status TEXT CHECK(status IN ('ready', 'running', 'completed', 'failed', 'staledata')) DEFAULT 'ready',
-            editable BOOLEAN DEFAULT TRUE
+            editable BOOLEAN DEFAULT TRUE,
+            notes TEXT DEFAULT NULL
         )
     ''')
 
@@ -71,22 +73,13 @@ def init_db(conn):
             FOREIGN KEY (parent_id) REFERENCES nodes(id)
         )
     ''')
-
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS pipeline_description (
-            pipeline_id TEXT PRIMARY KEY,
-            description TEXT,
-            FOREIGN KEY (pipeline_id) REFERENCES pipelines(id)
-        )
-    ''')
     
-
     conn.commit()
     return cur
 
 
-def add_pipeline(cur, pipeline_id, tag=None):
-    cur.execute('INSERT INTO pipelines (pipeline_id, tag) VALUES (?, ?)', (pipeline_id, tag))
+def add_pipeline(cur, pipeline_id, tag=None, owner=None, notes=None):
+    cur.execute('INSERT INTO pipelines (pipeline_id, tag, owner, notes) VALUES (?, ?, ?, ?)', (pipeline_id, tag, owner, notes))
     return cur.lastrowid
 
 def add_node_to_nodes(cur, node_id):
@@ -134,14 +127,6 @@ def get_node_tag(cur, node_id, pipeline_id):
     cur.execute('SELECT tag FROM node_tags WHERE node_id = ? AND pipeline_id = ?', (node_id, pipeline_id))
     row = cur.fetchone()
     return row[0] if row else None
-
-def add_pipeline_description(cur, pipeline_id, description):
-    cur.execute('''
-        INSERT INTO pipeline_description (pipeline_id, description)
-        VALUES (?, ?)
-        ON CONFLICT(pipeline_id) DO UPDATE SET description=excluded.description
-    ''', (pipeline_id, description))
-    return cur.lastrowid
 
 def update_node_status(cur, node_id, status):
     cur.execute('UPDATE nodes SET status = ? WHERE node_id = ?', (status, node_id))
@@ -246,8 +231,8 @@ def duplicate_pipeline(cur, source_pipeline_id, new_pipeline_id):
 
     # Duplicate pipelines table
     cur.execute('''
-        INSERT INTO pipelines (pipeline_id, tag, owner)
-        SELECT ?, tag, owner
+        INSERT INTO pipelines (pipeline_id, tag, owner, notes)
+        SELECT ?, tag, owner, notes
         FROM pipelines
         WHERE pipeline_id = ?
     ''', (new_pipeline_id, source_pipeline_id))
@@ -268,16 +253,7 @@ def duplicate_pipeline(cur, source_pipeline_id, new_pipeline_id):
         WHERE pipeline_id = ?
     ''', (new_pipeline_id, source_pipeline_id))
 
-    # Duplicate pipeline_description table
-    cur.execute('''
-        INSERT INTO pipeline_description (pipeline_id, description)
-        SELECT ?, description
-        FROM pipeline_description
-        WHERE pipeline_id = ?
-    ''', (new_pipeline_id, source_pipeline_id))
-
     return new_pipeline_id
-
 
 
 def dupicate_node_in_pipeline(cur, source_node_id, new_node_id, pipeline_id):
@@ -285,8 +261,8 @@ def dupicate_node_in_pipeline(cur, source_node_id, new_node_id, pipeline_id):
 
     # Duplicate nodes table
     cur.execute('''
-        INSERT INTO nodes (node_id, status)
-        SELECT ?, status
+        INSERT INTO nodes (node_id, status, notes)
+        SELECT ?, status, notes
         FROM nodes
         WHERE node_id = ?
     ''', (new_node_id, source_node_id))
@@ -302,10 +278,8 @@ def dupicate_node_in_pipeline(cur, source_node_id, new_node_id, pipeline_id):
     # Duplicate node_tags table
     cur.execute('''
         INSERT INTO node_tags (tag, node_id, pipeline_id)
-        SELECT tag, ?, pipeline_id
-        FROM node_tags
-        WHERE node_id = ? AND pipeline_id = ?
-    ''', (new_node_id, source_node_id, pipeline_id))
+        VALUES (NULL, ?, ?)
+    ''', (new_node_id, pipeline_id))
 
     return new_node_id
 

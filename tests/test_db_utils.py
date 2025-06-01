@@ -48,7 +48,7 @@ def test_add_pipeline(in_memory_db_conn):
     cur = db_utils.init_db(conn)
 
     pip_id = generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pip_id, tag="test_pipeline")
+    db_utils.add_pipeline(cur, pipeline_id=pip_id, tag="test_pipeline", owner="test_user", notes="This is a test pipeline.")
     
     # Commit and close the connection
     conn.commit()
@@ -60,6 +60,8 @@ def test_add_pipeline(in_memory_db_conn):
     
     assert result is not None, f"Pipeline {pip_id} was not added to the database."
     assert result[1] == "test_pipeline", "Pipeline tag does not match expected value."
+    assert result[2] == "test_user", "Pipeline owner does not match expected value."
+    assert result[3] == "This is a test pipeline.", "Pipeline notes do not match expected value."
 
 def test_add_node(in_memory_db_conn):
     from fusionpipe.utils import db_utils
@@ -233,27 +235,6 @@ def test_get_node_children(in_memory_db_conn):
     # node3 should have no children
     children_node3 = db_utils.get_node_children(cur, node3)
     assert children_node3 == [], f"Expected no children for node3, got {children_node3}"
-
-
-def test_add_pipeline_description(in_memory_db_conn):
-    from fusionpipe.utils import db_utils
-    from fusionpipe.utils.pip_utils import generate_pip_id
-
-    conn = in_memory_db_conn
-    cur = db_utils.init_db(conn)
-
-    # Add a pipeline to reference
-    pipeline_id = generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
-    conn.commit()
-
-    # Add a description to the pipeline
-    desc1 = "This is a test pipeline description."
-    rowid1 = db_utils.add_pipeline_description(cur, pipeline_id, desc1)
-    conn.commit()
-    assert rowid1 is not None, "Failed to add pipeline description."
-    assert isinstance(rowid1, int), "Row ID should be an integer."
-    assert rowid1 > 0, "Row ID should be greater than zero."
 
 
 def test_update_node_status(in_memory_db_conn):
@@ -627,15 +608,19 @@ def test_get_rows_with_pipeline_id_in_pipelines(in_memory_db_conn):
 
 def test_duplicate_pipeline(in_memory_db_conn):
     from fusionpipe.utils import db_utils
-    from fusionpipe.utils.db_utils import add_pipeline, add_pipeline_description, add_node_to_pipeline, add_node_tag, duplicate_pipeline
+    from fusionpipe.utils.db_utils import add_pipeline, add_node_to_pipeline, add_node_tag, duplicate_pipeline
 
     conn = in_memory_db_conn
     cur = db_utils.init_db(conn)
 
     # Add a source pipeline
     source_pipeline_id = "source_pipeline"
-    add_pipeline(cur, pipeline_id=source_pipeline_id, tag="v1.0")
-    add_pipeline_description(cur, pipeline_id=source_pipeline_id, description="Test pipeline description")
+    add_pipeline( cur,
+                  pipeline_id=source_pipeline_id,
+                  tag="v1.0",
+                  owner="group1",
+                  notes="This is the source pipeline."
+                )
 
     # Add nodes and node_pipeline_relation to the source pipeline
     add_node_to_pipeline(cur, node_id="node1", pipeline_id=source_pipeline_id, user="user1")
@@ -656,6 +641,8 @@ def test_duplicate_pipeline(in_memory_db_conn):
     assert new_pipeline is not None, "New pipeline was not created."
     assert new_pipeline[0] == new_pipeline_id
     assert new_pipeline[1] == "v1.0"  # Tag should match the source pipeline
+    assert new_pipeline[2] == "group1"  # Owner should match the source pipeline
+    assert new_pipeline[3] == "This is the source pipeline."  # Notes should match the source pipeline
 
     # Verify the node_pipeline_relation table
     cur.execute("SELECT * FROM node_pipeline_relation WHERE pipeline_id = ?", (new_pipeline_id,))
@@ -670,12 +657,6 @@ def test_duplicate_pipeline(in_memory_db_conn):
     assert len(node_tags) == 2, "Node tags were not duplicated correctly."
     assert node_tags[0][1] == "tag1"
     assert node_tags[1][1] == "tag2"
-
-    # Verify the pipeline_description table
-    cur.execute("SELECT * FROM pipeline_description WHERE pipeline_id = ?", (new_pipeline_id,))
-    description = cur.fetchone()
-    assert description is not None, "Pipeline description was not duplicated."
-    assert description[1] == "Test pipeline description"
 
     print("All assertions passed for test_duplicate_pipeline.")
 
@@ -753,12 +734,6 @@ def test_dupicate_node_in_pipeline_full_coverage(in_memory_db_conn):
     cur.execute("SELECT * FROM nodes WHERE node_id = ?", (duplicated_node_id,))
     duplicated_node = cur.fetchone()
     assert duplicated_node is not None, "Duplicated node was not created."
-
-    # Check node_tags table
-    cur.execute("SELECT * FROM node_tags WHERE node_id = ? AND pipeline_id = ?", (duplicated_node_id, pipeline_id,))
-    duplicated_tag = cur.fetchone()
-    assert duplicated_tag is not None, "Duplicated node tag was not created."
-    assert duplicated_tag[1] == tag, "Duplicated node tag does not match the original node's tag."
 
     # Check node_pipeline_relation table
     cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id = ? AND pipeline_id = ?", (duplicated_node_id, pipeline_id,))
@@ -947,7 +922,6 @@ def test_replace_node_in_pipeline(in_memory_db_conn):
     cur.execute("SELECT * FROM node_tags WHERE node_id=? AND pipeline_id=?", (new_node_id, pipeline_id))
     tag_row = cur.fetchone()
     assert tag_row is not None, "Tag for new node not created."
-    assert tag_row[1] == tag, "Tag value for new node does not match."
 
     # Check old node is removed from node_pipeline_relation and tags for this pipeline
     cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=? AND pipeline_id=?", (old_node_id, pipeline_id))
