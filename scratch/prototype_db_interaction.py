@@ -2,7 +2,7 @@
 # Simple test to check the serialisation is done correctly
 
 import os
-from fusionpipe.utils import pipeline_db
+from fusionpipe.utils import db_utils
 from fusionpipe.utils.pip_utils import (
     NodeState,
     graph_to_db,
@@ -17,7 +17,7 @@ import networkx as nx
 db_path = "demo_pipeline.db"
 if os.path.exists(db_path):
     os.remove(db_path)
-conn = pipeline_db.init_db(db_path)
+conn = db_utils.init_db(db_path)
 cur = conn.cursor()
 
 # 1. Generate a simple DAG

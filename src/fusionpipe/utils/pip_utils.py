@@ -4,7 +4,7 @@ import os
 import networkx as nx
 import matplotlib.pyplot as plt
 import json
-from fusionpipe.utils import pipeline_db
+from fusionpipe.utils import db_utils
 
 
 from enum import Enum
@@ -129,44 +129,44 @@ def graph_to_db(Gnx, cur):
     # Add the pipeline to the database
     pip_id = Gnx.graph['id']
     graph_tag = Gnx.graph.get('tag', None)
-    pipeline_db.add_pipeline(cur, pipeline_id=pip_id, tag=graph_tag)
+    db_utils.add_pipeline(cur, pipeline_id=pip_id, tag=graph_tag)
 
     # Add nodes and their dependencies directly from the graph
     for node in Gnx.nodes:
-        pipeline_db.add_node_to_nodes(cur, node_id=node)
-        pipeline_db.add_node_tag(cur, node_id=node, pipeline_id=pip_id, tag=Gnx.nodes[node].get("tag", None))
+        db_utils.add_node_to_nodes(cur, node_id=node)
+        db_utils.add_node_tag(cur, node_id=node, pipeline_id=pip_id, tag=Gnx.nodes[node].get("tag", None))
         for parent in Gnx.predecessors(node):
-            pipeline_db.add_node_relation(cur, child_id=node, parent_id=parent)
-        pipeline_db.add_node_to_pipeline(cur, node_id=node, pipeline_id=pip_id)
-        pipeline_db.update_node_status(cur, node_id=node, status=Gnx.nodes[node].get("status", "null"))
+            db_utils.add_node_relation(cur, child_id=node, parent_id=parent)
+        db_utils.add_node_to_pipeline(cur, node_id=node, pipeline_id=pip_id)
+        db_utils.update_node_status(cur, node_id=node, status=Gnx.nodes[node].get("status", "null"))
 
 def db_to_graph_from_pip_id(cur, pip_id):
     # Load the pipeline from the database
-    if not pipeline_db.check_pipeline_exists(cur, pip_id):
+    if not db_utils.check_pipeline_exists(cur, pip_id):
         raise ValueError(f"Pipeline with ID {pip_id} does not exist in the database.")
  
     # Create a directed graph
     G = nx.DiGraph()
-    G.graph['tag'] = pipeline_db.get_pipeline_tag(cur, pipeline_id=pip_id)  # Set the graph tag from the pipeline data
+    G.graph['tag'] = db_utils.get_pipeline_tag(cur, pipeline_id=pip_id)  # Set the graph tag from the pipeline data
     G.graph['id'] = pip_id  # Set the graph ID from the pipeline data
 
     # Add nodes and their dependencies
-    for node_id in pipeline_db.get_all_nodes_from_pip_id(cur, pipeline_id=pip_id):
+    for node_id in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id=pip_id):
         G.add_node(node_id)  # Add node with attributes
         # Get the status of the node from the database and add as an attribute
-        status = pipeline_db.get_node_status(cur, node_id=node_id)
+        status = db_utils.get_node_status(cur, node_id=node_id)
         if status not in NodeState._value2member_map_:
             raise ValueError(f"Invalid status '{status}' for node {node_id}. Must be one of {list(NodeState._value2member_map_.keys())}.")
-        editable = pipeline_db.is_node_editable(cur, node_id=node_id)
+        editable = db_utils.is_node_editable(cur, node_id=node_id)
         G.nodes[node_id]['status'] = status
         G.nodes[node_id]['editable'] = editable
 
         # Add edges based on parent relationships
-        for parent_id in pipeline_db.get_node_parents(cur, node_id=node_id):
+        for parent_id in db_utils.get_node_parents(cur, node_id=node_id):
             G.add_edge(parent_id, node_id)
     
         # Add node tag if it exists
-        tag = pipeline_db.get_node_tag(cur, node_id=node_id, pipeline_id=pip_id)
+        tag = db_utils.get_node_tag(cur, node_id=node_id, pipeline_id=pip_id)
         if tag:
             G.nodes[node_id]['tag'] = tag
 
