@@ -13,13 +13,12 @@ def load_db(db_path='pipeline.db'):
     conn = sqlite3.connect(db_path, check_same_thread=False)
     return conn
 
-def init_db(db_path='pipeline.db'):
-    conn = sqlite3.connect(db_path)
-    cur = init_graph_db(conn)
-    conn.commit()
+def create_db(db_path='pipeline.db'):
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    init_db(conn)
     return conn
 
-def init_graph_db(conn):
+def init_db(conn):
     cur = conn.cursor()
 
     cur.execute('''

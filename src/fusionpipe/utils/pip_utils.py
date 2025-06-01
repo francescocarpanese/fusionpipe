@@ -30,13 +30,10 @@ def generate_node_id():
 def generate_pip_id():
     return "p_" + generate_id()
 
-def init_node_folder(settings, node_id, verbose=False):
-    # Create folder structure for new node
-
-    pth_node_folder = settings["node_folder"]
+def init_node_folder(node_folder_path, node_id, verbose=False):
     
     # Create the node folder path
-    node_folder_path = f"{pth_node_folder}/{node_id}"
+    node_folder_path = f"{node_folder_path}/{node_id}"
     
     # Create the main node folder
     os.makedirs(node_folder_path, exist_ok=True)
@@ -50,10 +47,10 @@ def init_node_folder(settings, node_id, verbose=False):
         print(f"Node folder created at: {node_folder_path}")
 
 def delete_node_folder(settings, node_id, verbose=False):
-    pth_node_folder = settings["node_folder"]
+    node_folder_path = settings["node_folder"]
     
     # Construct the node folder path
-    node_folder_path = f"{pth_node_folder}/n_{node_id}"
+    node_folder_path = f"{node_folder_path}/n_{node_id}"
     
     # Remove the node folder and its contents
     if os.path.exists(node_folder_path):
@@ -95,8 +92,8 @@ def delete_node_folder(settings, node_id, verbose=False):
 
 
 def check_node_exist(settings, node_id):
-    pth_node_folder = settings["node_folder"]
-    node_folder_path = f"{pth_node_folder}/n_{node_id}"
+    node_folder_path = settings["node_folder"]
+    node_folder_path = f"{node_folder_path}/n_{node_id}"
     
     # Check if the node folder exists
     return os.path.exists(node_folder_path)

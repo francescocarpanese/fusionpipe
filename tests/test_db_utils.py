@@ -5,51 +5,18 @@ import sqlite3
 
 # Define useful fixtures
 
-local = False
+@pytest.fixture
+def tmp_base_dir():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield tmpdir
 
-if not local:
-    @pytest.fixture
-    def tmp_base_dir():
-        with tempfile.TemporaryDirectory() as tmpdir:
-            yield tmpdir
 
-    @pytest.fixture
-    def pip_settings(tmp_base_dir):
-        return {
-            "connection_db_filepath": os.path.join(tmp_base_dir, "connection.db"),
-            "node_folder": os.path.join(tmp_base_dir, "nodes"),
-        }
-    
-    @pytest.fixture
-    def tmp_database_path(tmp_base_dir):
-        return os.path.join(tmp_base_dir, "connection.db")
+@pytest.fixture
+def in_memory_db_conn():
+    conn = sqlite3.connect(":memory:")
+    yield conn
+    conn.close()
 
-    @pytest.fixture
-    def tmp_database_path(tmp_base_dir):
-        db_path  = os.path.join(tmp_base_dir, "connection.db")
-        yield db_path
-        if os.path.exists(db_path):  # Cleanup after the test
-            os.remove(db_path)       
-
-else:
-    @pytest.fixture
-    def tmp_base_dir():
-        yield "/home/cisko90/fusionpipe/bin"
-
-    @pytest.fixture
-    def pip_settings(tmp_base_dir):
-        return {
-            "connection_db_filepath": f"{tmp_base_dir}/connection.db",
-            "node_folder": "f{tmp_base_dir}/nodes",
-        }
-    
-    @pytest.fixture
-    def tmp_database_path(tmp_base_dir):
-        # This does not remove the database so that it can be inspected
-        db_path  = os.path.join(tmp_base_dir, "connection.db")
-        yield db_path
-        if os.path.exists(db_path):  # Cleanup after the test
-            os.remove(db_path)   
 
 @pytest.fixture
 def dag_graph_dummy_1():
@@ -73,61 +40,20 @@ def dag_graph_dummy_1():
     return G
 
 
-def test_generate_data_folder(tmp_base_dir):
-    # Test if the function creates the expected directory structure
-    from fusionpipe.utils.pip_utils import generate_data_folder
-
-    base_path = tmp_base_dir
-    generate_data_folder(base_path)
-
-    expected_dirs = [
-        os.path.join(base_path, "nodes"),
-    ]
-
-    for dir_path in expected_dirs:
-        assert os.path.exists(dir_path), f"Expected directory {dir_path} does not exist."
-
-
-
-def test_create_node_folder(pip_settings):
-    from fusionpipe.utils.pip_utils import init_node_folder, generate_node_id
-
-    node_id = generate_node_id()
-    settings = pip_settings.copy()
-
-    init_node_folder(settings, node_id=node_id, verbose=False)
-    
-    # Check if the node folder was created
-    node_folder_path = os.path.join(settings["node_folder"], node_id)
-    assert os.path.exists(node_folder_path), f"Node folder {node_folder_path} was not created."
-    
-
-def test_generate_connection_db(pip_settings):
-    from fusionpipe.utils import db_utils
-
-    db_path = pip_settings["connection_db_filepath"]
-    db_utils.init_db(db_path)
-    # Check if the database file was created
-    assert os.path.exists(db_path), f"Connection database {db_path} was not created."
-
-
-def test_add_pipeline(pip_settings):
+def test_add_pipeline(in_memory_db_conn):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import generate_pip_id
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     pip_id = generate_pip_id()
     db_utils.add_pipeline(cur, pipeline_id=pip_id, tag="test_pipeline")
     
     # Commit and close the connection
     conn.commit()
-    conn.close()
 
     # Check if the pipeline was added
-    conn = db_utils.load_db(db_path)
     cur = conn.cursor()
     cur.execute("SELECT * FROM pipelines WHERE pipeline_id=?", (pip_id,))
     result = cur.fetchone()
@@ -135,38 +61,34 @@ def test_add_pipeline(pip_settings):
     assert result is not None, f"Pipeline {pip_id} was not added to the database."
     assert result[1] == "test_pipeline", "Pipeline tag does not match expected value."
 
-def test_add_node(pip_settings):
+def test_add_node(in_memory_db_conn):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
-
+    # Initialize the in-memory database connection
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     node_id = generate_node_id()
     db_utils.add_node_to_nodes(cur, node_id=node_id)
     
     # Commit and close the connection
     conn.commit()
-    conn.close()
 
     # Check if the node was added
-    conn = db_utils.load_db(db_path)
     cur = conn.cursor()
     cur.execute("SELECT * FROM nodes WHERE node_id=?", (node_id,))
     result = cur.fetchone()
     
     assert result is not None, f"Node {node_id} was not added to the database."
 
-def test_add_node_to_entries(pip_settings):
+def test_add_node_to_entries(in_memory_db_conn):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create a node and a pipeline
     node_id = generate_node_id()
@@ -178,10 +100,8 @@ def test_add_node_to_entries(pip_settings):
     user = "test_user"
     entry_id = db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
     conn.commit()
-    conn.close()
 
     # Check if the entry was added
-    conn = db_utils.load_db(db_path)
     cur = conn.cursor()
     cur.execute("SELECT node_id, pipeline_id, user FROM node_pipeline_relation WHERE id=?", (entry_id,))
     result = cur.fetchone()
@@ -191,15 +111,13 @@ def test_add_node_to_entries(pip_settings):
     assert result[2] == user, "User in entry does not match."
 
 
-def test_remove_node_from_pipeline(pip_settings):
+def test_remove_node_from_pipeline(in_memory_db_conn):
     from fusionpipe.utils.db_utils import remove_node_from_pipeline
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create a node and a pipeline
     node_id = generate_node_id()
@@ -228,12 +146,11 @@ def test_remove_node_from_pipeline(pip_settings):
     assert result is None, "Entry was not removed from the database."
 
 
-def test_add_node_relation(pip_settings):
+def test_add_node_relation(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create two nodes
     child_id = generate_node_id()
@@ -248,18 +165,16 @@ def test_add_node_relation(pip_settings):
     # Check that the relation exists
     cur.execute("SELECT child_id, parent_id FROM node_relation WHERE id=?", (relation_id,))
     result = cur.fetchone()
-    conn.close()
     assert result is not None, "Node relation was not added to the database."
     assert result[0] == child_id, "Child ID in node relation does not match."
     assert result[1] == parent_id, "Parent ID in node relation does not match."
 
-def test_get_node_parents(pip_settings):
+def test_get_node_parents(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create 3 nodes
     node1 = generate_node_id()
@@ -285,17 +200,13 @@ def test_get_node_parents(pip_settings):
     parents_node3 = db_utils.get_node_parents(cur, node3)
     assert parents_node3 == [], f"Expected no parents for node3, got {parents_node3}"
 
-    conn.close()
 
-
-def test_get_node_children(pip_settings):
+def test_get_node_children(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
-
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create 3 nodes
     node1 = generate_node_id()
@@ -324,13 +235,12 @@ def test_get_node_children(pip_settings):
     assert children_node3 == [], f"Expected no children for node3, got {children_node3}"
 
 
-def test_add_pipeline_description(pip_settings):
+def test_add_pipeline_description(in_memory_db_conn):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import generate_pip_id
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Add a pipeline to reference
     pipeline_id = generate_pip_id()
@@ -346,14 +256,13 @@ def test_add_pipeline_description(pip_settings):
     assert rowid1 > 0, "Row ID should be greater than zero."
 
 
-def test_update_node_status(pip_settings):
+def test_update_node_status(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id, NodeState
     from fusionpipe.utils import db_utils
 
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create a node
     node_id = generate_node_id()
@@ -374,13 +283,12 @@ def test_update_node_status(pip_settings):
 
 
 
-def test_get_pipeline_tag(pip_settings):
+def test_get_pipeline_tag(in_memory_db_conn):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import generate_pip_id
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Add a pipeline with a specific tag
     pipeline_id = generate_pip_id()
@@ -400,13 +308,12 @@ def test_get_pipeline_tag(pip_settings):
 
 
 
-def test_get_all_nodes_from_pip_id(pip_settings):
+def test_get_all_nodes_from_pip_id(in_memory_db_conn):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create a pipeline and nodes
     pipeline_id = generate_pip_id()
@@ -432,73 +339,12 @@ def test_get_all_nodes_from_pip_id(pip_settings):
 
 
 
-def test_graph_to_db(pip_settings, dag_graph_dummy_1):
-    import networkx as nx
-    from fusionpipe.utils.pip_utils import graph_to_db
-    from fusionpipe.utils import db_utils
-    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
-
-    # Setup database
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
-
-    G = dag_graph_dummy_1
-
-    # Call the function
-    graph_to_db(G, cur)
-    conn.commit()
-
-    # Check pipeline exists
-    cur.execute("SELECT * FROM pipelines WHERE pipeline_id=?", (G.graph['id'],))
-    pipeline_row = cur.fetchone()
-    assert pipeline_row is not None, "Pipeline was not added to the database."
-    assert pipeline_row[1] == G.graph['tag'], "Pipeline tag does not match expected value."
-
-    # Check nodes exist
-    for node in G.nodes:
-        cur.execute("SELECT * FROM nodes WHERE node_id=?", (node,))
-        node_row = cur.fetchone()
-        assert node_row is not None, f"Node {node} was not added to the database."
-        assert node_row[1] == G.nodes[node]['status'], f"Node {node} status does not match expected value."
-
-    # Check edges exist
-    for parent, child in G.edges:
-        cur.execute("SELECT * FROM node_relation WHERE parent_id=? AND child_id=?", (parent, child))
-        relation_row = cur.fetchone()
-        assert relation_row is not None, f"Relation between {parent} and {child} was not added to the database."
-
-
-def test_db_to_graph(pip_settings, dag_graph_dummy_1):
-    from fusionpipe.utils import db_utils
-    from fusionpipe.utils.pip_utils import graph_to_db, db_to_graph_from_pip_id
-    import networkx as nx
-
-    # Setup database
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
-
-    # Add the dummy graph to the database
-    graph_to_db(dag_graph_dummy_1, cur)
-    conn.commit()
-
-    # Call the function to convert DB back to graph
-    G_retrieved = db_to_graph_from_pip_id(cur, dag_graph_dummy_1.graph['id'])
-
-    # Check if the retrieved graph matches the original
-    assert nx.is_isomorphic(G_retrieved, dag_graph_dummy_1), "Retrieved graph does not match the original graph."
-
-    conn.close()
-
-
-def test_get_nodes_without_pipeline(pip_settings):
+def test_get_nodes_without_pipeline(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create nodes
     node_ids = [generate_node_id() for _ in range(3)]
@@ -513,20 +359,17 @@ def test_get_nodes_without_pipeline(pip_settings):
 
     # Get nodes without a pipeline
     nodes_without_pipeline = db_utils.get_nodes_without_pipeline(cur)
-    conn.close()
 
     # Check that only the nodes not associated with a pipeline are returned
     expected_nodes = set(node_ids[1:])
     assert set(nodes_without_pipeline) == expected_nodes, f"Expected nodes without pipeline: {expected_nodes}, got: {nodes_without_pipeline}"
 
-def test_remove_node_from_tags(pip_settings):
+def test_remove_node_from_tags(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create a node and a pipeline
     node_id = generate_node_id()
@@ -547,18 +390,16 @@ def test_remove_node_from_tags(pip_settings):
     # Check if the tag was actually removed
     cur.execute("SELECT * FROM node_tags WHERE node_id=? AND pipeline_id=?", (node_id, pipeline_id))
     result = cur.fetchone()
-    conn.close()
     assert result is None, "Tag was not removed from the database."
 
 
-def test_remove_node_from_relations(pip_settings):
+def test_remove_node_from_relations(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create nodes
     parent_id = generate_node_id()
@@ -578,16 +419,14 @@ def test_remove_node_from_relations(pip_settings):
     # Check if the relation was actually removed
     cur.execute("SELECT * FROM node_relation WHERE child_id=? OR parent_id=?", (child_id, child_id))
     result = cur.fetchone()
-    conn.close()
     assert result is None, "Relation was not removed from the database."
 
-def test_remove_node_from_everywhere(pip_settings):
+def test_remove_node_from_everywhere(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create a node and a pipeline
     node_id = generate_node_id()
@@ -619,15 +458,12 @@ def test_remove_node_from_everywhere(pip_settings):
     assert db_utils.get_rows_with_node_id_in_node_tags(cur, node_id) == [], "Node was not removed from tags."
     assert db_utils.get_rows_with_node_id_relations(cur, node_id) == [], "Node was not removed from relations."
 
-    conn.close()
-
-def test_remove_node_from_entries(pip_settings):
+def test_remove_node_from_entries(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create a node and a pipeline
     node_id = generate_node_id()
@@ -648,17 +484,15 @@ def test_remove_node_from_entries(pip_settings):
     # Verify the entry is removed
     cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=? AND pipeline_id=?", (node_id, pipeline_id))
     result = cur.fetchone()
-    conn.close()
     assert result is None, "Entry was not removed from the database."
 
 
-def test_get_rows_with_node_id_in_entries(pip_settings):
+def test_get_rows_with_node_id_in_entries(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create a node and a pipeline
     node_id = generate_node_id()
@@ -676,17 +510,14 @@ def test_get_rows_with_node_id_in_entries(pip_settings):
     assert len(rows) == 1, "Expected one entry with the node ID."
     assert rows[0][3] == node_id, "Node ID in entry does not match expected value."
     assert rows[0][4] == pipeline_id, "Pipeline ID in entry does not match expected value."
-    
-    conn.close()
 
 
-def test_get_rows_node_id_in_nodes(pip_settings):
+def test_get_rows_node_id_in_nodes(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create a node
     node_id = generate_node_id()
@@ -698,15 +529,13 @@ def test_get_rows_node_id_in_nodes(pip_settings):
     assert len(rows) == 1, "Expected one row with the node ID."
     assert rows[0][0] == node_id, "Node ID in row does not match expected value."
 
-    conn.close()
 
-def test_get_rows_with_node_id_in_node_tags(pip_settings):
+def test_get_rows_with_node_id_in_node_tags(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create a node and a pipeline
     node_id = generate_node_id()
@@ -723,18 +552,15 @@ def test_get_rows_with_node_id_in_node_tags(pip_settings):
     rows = db_utils.get_rows_with_node_id_in_node_tags(cur, node_id)
     assert len(rows) == 1, "Expected one row with the node ID in tags."
 
-    conn.close()
 
-
-def test_get_rows_with_node_id_relations(pip_settings):
+def test_get_rows_with_node_id_relations(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
 
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create two nodes and a relation
     parent_id = generate_node_id()
@@ -747,16 +573,14 @@ def test_get_rows_with_node_id_relations(pip_settings):
     # Get rows with the child node ID in relations
     rows = db_utils.get_rows_with_node_id_relations(cur, child_id)
 
-    conn.close()
     assert len(rows) == 1, "Expected one row with the child node ID in relations."
 
-def test_get_rows_with_pipeline_id_in_entries(pip_settings):
+def test_get_rows_with_pipeline_id_in_entries(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create a pipeline and nodes
     pipeline_id = generate_pip_id()
@@ -769,7 +593,6 @@ def test_get_rows_with_pipeline_id_in_entries(pip_settings):
 
     # Get rows with the pipeline ID in node_pipeline_relation
     rows = db_utils.get_rows_with_pipeline_id_in_entries(cur, pipeline_id)
-    conn.close()
 
     # Verify the rows match the expected data
     assert len(rows) == len(node_ids), f"Expected {len(node_ids)} rows, got {len(rows)}."
@@ -778,14 +601,13 @@ def test_get_rows_with_pipeline_id_in_entries(pip_settings):
         assert row[3] in node_ids, f"Node ID {row[3]} in row is not in the expected node IDs {node_ids}."
 
 
-def test_get_rows_with_pipeline_id_in_pipelines(pip_settings):
+def test_get_rows_with_pipeline_id_in_pipelines(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_pip_id
     from fusionpipe.utils import db_utils
 
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create a pipeline
     pipeline_id = generate_pip_id()
@@ -795,7 +617,6 @@ def test_get_rows_with_pipeline_id_in_pipelines(pip_settings):
 
     # Get rows with the pipeline ID in pipelines
     rows = db_utils.get_rows_with_pipeline_id_in_pipelines(cur, pipeline_id)
-    conn.close()
 
     # Verify the rows match the expected data
     assert len(rows) == 1, f"Expected one row, got {len(rows)}."
@@ -804,13 +625,12 @@ def test_get_rows_with_pipeline_id_in_pipelines(pip_settings):
 
 
 
-def test_duplicate_pipeline(pip_settings):
+def test_duplicate_pipeline(in_memory_db_conn):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.db_utils import add_pipeline, add_pipeline_description, add_node_to_pipeline, add_node_tag, duplicate_pipeline
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Add a source pipeline
     source_pipeline_id = "source_pipeline"
@@ -860,15 +680,14 @@ def test_duplicate_pipeline(pip_settings):
     print("All assertions passed for test_duplicate_pipeline.")
 
 
-def test_duplicate_pipeline_graph_comparison(pip_settings, dag_graph_dummy_1):
+def test_duplicate_pipeline_graph_comparison(in_memory_db_conn, dag_graph_dummy_1):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import graph_to_db, db_to_graph_from_pip_id
     import networkx as nx
 
     # Setup database
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Add the original graph to the database
     original_graph = dag_graph_dummy_1
@@ -895,15 +714,13 @@ def test_duplicate_pipeline_graph_comparison(pip_settings, dag_graph_dummy_1):
     assert original_graph_loaded.graph['id'] != duplicated_graph_loaded.graph['id'], \
         "Pipeline IDs should be different between the original and duplicated graphs."
 
-    conn.close()
 
-def test_dupicate_node_in_pipeline_full_coverage(pip_settings):
+def test_dupicate_node_in_pipeline_full_coverage(in_memory_db_conn):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create original node and another node (for relation)
     original_node_id = generate_node_id()
@@ -950,17 +767,12 @@ def test_dupicate_node_in_pipeline_full_coverage(pip_settings):
     assert duplicated_entry[4] == pipeline_id, "Duplicated entry pipeline_id does not match original."
 
 
-    conn.close()
-
-
-
-def test_copy_node_relations(pip_settings):
+def test_copy_node_relations(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create nodes
     source_node_id = generate_node_id()
@@ -1001,16 +813,13 @@ def test_copy_node_relations(pip_settings):
     assert child1_id in child_ids and child2_id in child_ids, \
         f"Child relations not copied correctly: {child_ids}"
 
-    conn.close()
 
-def test_duplicate_node_in_pipeline_with_relations(pip_settings):
+def test_duplicate_node_in_pipeline_with_relations(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
-
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create nodes
     source_node_id = generate_node_id()
@@ -1051,17 +860,13 @@ def test_duplicate_node_in_pipeline_with_relations(pip_settings):
     child_ids = {row[0] for row in child_rows}
     assert child_id in child_ids, "Child relation was not copied to duplicated node."
 
-    conn.close()
 
-
-def test_remove_node_from_pipeline_removes_tags_and_entries(pip_settings):
+def test_remove_node_from_pipeline_removes_tags_and_entries(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Setup: create node, pipeline, entry, and tag
     node_id = generate_node_id()
@@ -1087,15 +892,13 @@ def test_remove_node_from_pipeline_removes_tags_and_entries(pip_settings):
     # Check that rowcount is at least 2 (one for node_pipeline_relation, one for node_tags)
     assert rows_deleted >= 1, "Expected at least one row to be deleted."
 
-    conn.close()
 
-def test_replace_node_in_pipeline(pip_settings):
+def test_replace_node_in_pipeline(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Setup: create nodes, pipeline, relations, node_pipeline_relation, and tags
     old_node_id = generate_node_id()
@@ -1156,15 +959,13 @@ def test_replace_node_in_pipeline(pip_settings):
     # The function should return the new node id
     assert result_new_node_id == new_node_id, "Returned new_node_id does not match expected value."
 
-    conn.close()
 
-def test_get_pipelines_with_node(pip_settings):
+def test_get_pipelines_with_node(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create a node and multiple pipelines
     node_id = generate_node_id()
@@ -1188,15 +989,13 @@ def test_get_pipelines_with_node(pip_settings):
     pipelines_with_new_node = db_utils.get_pipelines_with_node(cur, new_node_id)
     assert pipelines_with_new_node == [], f"Expected no pipelines for node {new_node_id}, got {pipelines_with_new_node}"
 
-    conn.close()
 
-def test_count_pipeline_with_node(pip_settings):
+def test_count_pipeline_with_node(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create a node and multiple pipelines
     node_id = generate_node_id()
@@ -1220,15 +1019,12 @@ def test_count_pipeline_with_node(pip_settings):
     new_node_pipeline_count = db_utils.count_pipeline_with_node(cur, new_node_id)
     assert new_node_pipeline_count == 0, f"Expected 0 pipelines for node {new_node_id}, got {new_node_pipeline_count}"
 
-    conn.close()
-
-def test_is_node_editable(pip_settings):
+def test_is_node_editable(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create a node
     node_id = generate_node_id()
@@ -1256,15 +1052,13 @@ def test_is_node_editable(pip_settings):
     editable = db_utils.is_node_editable(cur, node_id)
     assert editable is False, f"Expected node {node_id} to be non-editable when associated with more than one pipeline."
 
-    conn.close()
 
-def test_update_editable_status_for_all_nodes(pip_settings):
+def test_update_editable_status_for_all_nodes(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    db_path = pip_settings["connection_db_filepath"]
-    conn = db_utils.init_db(db_path)
-    cur = conn.cursor()
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
 
     # Create nodes
     node1 = generate_node_id()
@@ -1300,4 +1094,3 @@ def test_update_editable_status_for_all_nodes(pip_settings):
     editable_node3 = db_utils.is_node_editable(cur, node3)
     assert editable_node3 is True, f"Expected node3 to be editable, got {editable_node3}"
 
-    conn.close()

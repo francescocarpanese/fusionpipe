@@ -7,7 +7,7 @@ from fusionpipe.utils.pip_utils import generate_pip_id, generate_node_id
 # Test call
 path_to_db = "/misc/carpanes/fusionpipe/scratch/pipeline.db"
 conn = db_utils.load_db(path_to_db)
-cur = db_utils.init_graph_db(conn)
+cur = db_utils.init_db(conn)
 
 pip_id = generate_pip_id()
 node_id = generate_node_id()
