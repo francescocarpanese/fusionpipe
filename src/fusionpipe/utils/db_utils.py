@@ -82,8 +82,9 @@ def add_pipeline(cur, pipeline_id, tag=None, owner=None, notes=None):
     cur.execute('INSERT INTO pipelines (pipeline_id, tag, owner, notes) VALUES (?, ?, ?, ?)', (pipeline_id, tag, owner, notes))
     return cur.lastrowid
 
-def add_node_to_nodes(cur, node_id):
-    cur.execute('INSERT INTO nodes (node_id) VALUES (?)', (node_id,))
+def add_node_to_nodes(cur, node_id, status='ready', editable=True, notes=None):
+    cur.execute('INSERT INTO nodes (node_id, status, editable, notes) VALUES (?, ?, ?, ?)', 
+                (node_id, status, editable, notes))
     return cur.lastrowid
 
 def remove_node_from_nodes(cur, node_id):
@@ -356,6 +357,20 @@ def update_editable_status_for_all_nodes(cur):
     else:
         print("All nodes are editable.")
 
+def get_pipeline_notes(cur, pipeline_id):
+    cur.execute('SELECT notes FROM pipelines WHERE pipeline_id = ?', (pipeline_id,))
+    row = cur.fetchone()
+    return row[0] if row else None
+
+def get_pipeline_owner(cur, pipeline_id):
+    cur.execute('SELECT owner FROM pipelines WHERE pipeline_id = ?', (pipeline_id,))
+    row = cur.fetchone()
+    return row[0] if row else None
+
+def get_node_notes(cur, node_id):
+    cur.execute('SELECT notes FROM nodes WHERE node_id = ?', (node_id,))
+    row = cur.fetchone()
+    return row[0] if row else None
 
 # TODO To be tested
 def get_rows_with_pipeline_id_in_node_tags(cur, pipeline_id):

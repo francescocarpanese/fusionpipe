@@ -84,20 +84,70 @@ def graph_to_dict(graph):
         }
     return pipeline_data
 
+def graph_dict_to_json(graph_dict, file_path, verbose=False):
+    """
+    Serialize a graph dictionary to a JSON file.
+    """
+    with open(file_path, 'w') as f:
+        json.dump(graph_dict, f, indent=2)
+
+    if verbose:
+        print(f"Graph data saved to {file_path}")
+
+def graph_dict_to_db(graph_dict, cur):
+    # Insert pipeline using graph_dict fields
+    pipeline_id = graph_dict["pipeline_id"]
+    tag = graph_dict["tag"]
+    owner = graph_dict["owner"]
+    notes = graph_dict["notes"]
+
+    if not db_utils.check_pipeline_exists(cur, pipeline_id):
+        # If the pipeline does not exist, create it
+        db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag=tag, owner=owner, notes=notes)
+
+
+        # Insert nodes using graph_dict fields
+        for node_id, node_data in graph_dict["nodes"].items():
+            status = node_data["status"]
+            editable = int(node_data["editable"])
+            node_notes = node_data["notes"]
+            node_tag = node_data["tag"]
+
+            db_utils.add_node_to_nodes(cur, node_id=node_id, status=status, editable=editable, notes=node_notes)
+            db_utils.add_node_tag(cur, node_id=node_id, pipeline_id=pipeline_id, tag=node_tag)
+            db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+
+
+        # Insert node relations (edges) using parents field
+        for child_id, node_data in graph_dict["nodes"].items():
+            for parent_id in node_data.get("parents", []):
+                db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
+        return cur
+
 def graph_to_db(Gnx, cur):
     # Add the pipeline to the database
-    pip_id = Gnx.graph['id']
+    pip_id = Gnx.graph['pipeline_id']
     graph_tag = Gnx.graph.get('tag', None)
-    db_utils.add_pipeline(cur, pipeline_id=pip_id, tag=graph_tag)
+    owner = Gnx.graph.get('owner', None)
+    notes = Gnx.graph.get('notes', None)
+    db_utils.add_pipeline(cur, pipeline_id=pip_id, tag=graph_tag, owner=owner, notes=notes)
 
     # Add nodes and their dependencies directly from the graph
     for node in Gnx.nodes:
-        db_utils.add_node_to_nodes(cur, node_id=node)
-        db_utils.add_node_tag(cur, node_id=node, pipeline_id=pip_id, tag=Gnx.nodes[node].get("tag", None))
+        node_id = node
+        status = Gnx.nodes[node].get('status', 'ready')  # Default status is 'ready'
+        editable = Gnx.nodes[node].get('editable', True)  # Default editable is True
+        node_notes = Gnx.nodes[node].get('notes', "")  # Optional notes for the node
+        node_tag = Gnx.nodes[node].get('tag', None)  # Optional tag for the node
+
+        # Add the node to the database
+        db_utils.add_node_to_nodes(cur, node_id=node_id, status=status, editable=editable, notes=node_notes)
+        db_utils.add_node_tag(cur, node_id=node_id, pipeline_id=pip_id, tag=node_tag)
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pip_id)
+
+        # Add parent-child relationships
         for parent in Gnx.predecessors(node):
-            db_utils.add_node_relation(cur, child_id=node, parent_id=parent)
-        db_utils.add_node_to_pipeline(cur, node_id=node, pipeline_id=pip_id)
-        db_utils.update_node_status(cur, node_id=node, status=Gnx.nodes[node].get("status", "null"))
+            db_utils.add_node_relation(cur, child_id=node_id, parent_id=parent)
 
 def db_to_graph_from_pip_id(cur, pip_id):
     # Load the pipeline from the database
@@ -106,8 +156,10 @@ def db_to_graph_from_pip_id(cur, pip_id):
  
     # Create a directed graph
     G = nx.DiGraph()
+    G.graph['pipeline_id'] = pip_id  # Set the graph ID from the pipeline data
+    G.graph['notes'] = db_utils.get_pipeline_notes(cur, pipeline_id=pip_id)  # Optional notes for the pipeline
     G.graph['tag'] = db_utils.get_pipeline_tag(cur, pipeline_id=pip_id)  # Set the graph tag from the pipeline data
-    G.graph['id'] = pip_id  # Set the graph ID from the pipeline data
+    G.graph['owner'] = db_utils.get_pipeline_owner(cur, pipeline_id=pip_id)  # Optional owner for the pipeline
 
     # Add nodes and their dependencies
     for node_id in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id=pip_id):
@@ -119,6 +171,7 @@ def db_to_graph_from_pip_id(cur, pip_id):
         editable = db_utils.is_node_editable(cur, node_id=node_id)
         G.nodes[node_id]['status'] = status
         G.nodes[node_id]['editable'] = editable
+        G.nodes[node_id]['notes'] = db_utils.get_node_notes(cur, node_id=node_id)
 
         # Add edges based on parent relationships
         for parent_id in db_utils.get_node_parents(cur, node_id=node_id):
@@ -128,18 +181,24 @@ def db_to_graph_from_pip_id(cur, pip_id):
         tag = db_utils.get_node_tag(cur, node_id=node_id, pipeline_id=pip_id)
         if tag:
             G.nodes[node_id]['tag'] = tag
+        else:
+            G.nodes[node_id]['tag'] = ""
 
     return G
 
+def db_to_graph_dict_from_pip_id(cur, pip_id):
+    graph = db_to_graph_from_pip_id(cur, pip_id)
+    return graph_to_dict(graph)
 
-def serialize_pipeline(settings, graph, pip_id = None, verbose=False):
-    pipeline_data = graph_to_dict(graph)
-    pipeline_id = pip_id if pip_id else generate_pip_id()
-    path_pip_file = f"{settings['pipeline_folder']}/{pipeline_id}.json"
-    with open(path_pip_file, 'w') as file:
-        json.dump(pipeline_data, file, indent=2)
-    if verbose:
-        print(f"Pipeline {pipeline_id} saved successfully.")
+
+# def serialize_pipeline(settings, graph, pip_id = None, verbose=False):
+#     pipeline_data = graph_to_dict(graph)
+#     pipeline_id = pip_id if pip_id else generate_pip_id()
+#     path_pip_file = f"{settings['pipeline_folder']}/{pipeline_id}.json"
+#     with open(path_pip_file, 'w') as file:
+#         json.dump(pipeline_data, file, indent=2)
+#     if verbose:
+#         print(f"Pipeline {pipeline_id} saved successfully.")
 
 # def duplicate_pip(settings, graph):
 #     new_pip_id = create_pipeline_file(settings)

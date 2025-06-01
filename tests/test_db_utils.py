@@ -3,42 +3,6 @@ import tempfile
 import os
 import sqlite3
 
-# Define useful fixtures
-
-@pytest.fixture
-def tmp_base_dir():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        yield tmpdir
-
-
-@pytest.fixture
-def in_memory_db_conn():
-    conn = sqlite3.connect(":memory:")
-    yield conn
-    conn.close()
-
-
-@pytest.fixture
-def dag_graph_dummy_1():
-    import networkx as nx
-    from fusionpipe.utils.pip_utils import NodeState 
-    # Create a simple directed acyclic graph (DAG) for testing
-    G = nx.DiGraph()
-    G.add_edges_from([
-        ("A", "B"),
-        ("A", "C"),
-        ("C", "D"),
-    ])
-    G.graph['description'] = "A simple test DAG"
-    G.graph['id'] = "12345"
-    G.graph['tag'] = "test_tag"
-
-    # Add a 'status' attribute to each node using NodeState
-    for node in G.nodes:
-        G.nodes[node]['status'] = NodeState.READY.value
-
-    return G
-
 
 def test_add_pipeline(in_memory_db_conn):
     from fusionpipe.utils import db_utils
@@ -661,7 +625,7 @@ def test_duplicate_pipeline(in_memory_db_conn):
     print("All assertions passed for test_duplicate_pipeline.")
 
 
-def test_duplicate_pipeline_graph_comparison(in_memory_db_conn, dag_graph_dummy_1):
+def test_duplicate_pipeline_graph_comparison(in_memory_db_conn, dag_dummy_1):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import graph_to_db, db_to_graph_from_pip_id
     import networkx as nx
@@ -671,12 +635,12 @@ def test_duplicate_pipeline_graph_comparison(in_memory_db_conn, dag_graph_dummy_
     cur = db_utils.init_db(conn)
 
     # Add the original graph to the database
-    original_graph = dag_graph_dummy_1
+    original_graph = dag_dummy_1
     graph_to_db(original_graph, cur)
     conn.commit()
 
     # Duplicate the pipeline
-    original_pipeline_id = original_graph.graph['id']
+    original_pipeline_id = original_graph.graph['pipeline_id']
     new_pipeline_id = "duplicated_pipeline"
     db_utils.duplicate_pipeline(cur, original_pipeline_id, new_pipeline_id)
     conn.commit()
@@ -692,7 +656,7 @@ def test_duplicate_pipeline_graph_comparison(in_memory_db_conn, dag_graph_dummy_
     ), "Duplicated graph does not match the original graph structure and attributes."
 
     # Ensure the pipeline IDs are different
-    assert original_graph_loaded.graph['id'] != duplicated_graph_loaded.graph['id'], \
+    assert original_graph_loaded.graph['pipeline_id'] != duplicated_graph_loaded.graph['pipeline_id'], \
         "Pipeline IDs should be different between the original and duplicated graphs."
 
 
@@ -1068,3 +1032,87 @@ def test_update_editable_status_for_all_nodes(in_memory_db_conn):
     editable_node3 = db_utils.is_node_editable(cur, node3)
     assert editable_node3 is True, f"Expected node3 to be editable, got {editable_node3}"
 
+
+def test_get_pipeline_notes_existing_and_nonexistent(in_memory_db_conn):
+    from fusionpipe.utils.pip_utils import generate_pip_id
+    from fusionpipe.utils import db_utils
+
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+
+    # Add a pipeline with notes
+    pipeline_id = generate_pip_id()
+    notes = "This is a test note."
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline", notes=notes)
+    conn.commit()
+
+    # Test: get notes for existing pipeline
+    fetched_notes = db_utils.get_pipeline_notes(cur, pipeline_id)
+    assert fetched_notes == notes, f"Expected notes '{notes}', got '{fetched_notes}'"
+
+    # Test: get notes for pipeline with no notes
+    pipeline_id_no_notes = generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id_no_notes, tag="no_notes_pipeline")
+    conn.commit()
+    fetched_notes_none = db_utils.get_pipeline_notes(cur, pipeline_id_no_notes)
+    assert fetched_notes_none is None, "Expected None for pipeline with no notes"
+
+    # Test: get notes for non-existent pipeline
+    non_existent_id = "nonexistent_id"
+    assert db_utils.get_pipeline_notes(cur, non_existent_id) is None
+
+def test_get_pipeline_owner_existing_and_nonexistent(in_memory_db_conn):
+    from fusionpipe.utils.pip_utils import generate_pip_id
+    from fusionpipe.utils import db_utils
+
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+
+    # Add a pipeline with an owner
+    pipeline_id = generate_pip_id()
+    owner = "test_owner"
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline", owner=owner)
+    conn.commit()
+
+    # Test: get owner for existing pipeline
+    fetched_owner = db_utils.get_pipeline_owner(cur, pipeline_id)
+    assert fetched_owner == owner, f"Expected owner '{owner}', got '{fetched_owner}'"
+
+    # Test: get owner for pipeline with no owner
+    pipeline_id_no_owner = generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id_no_owner, tag="no_owner_pipeline")
+    conn.commit()
+    fetched_owner_none = db_utils.get_pipeline_owner(cur, pipeline_id_no_owner)
+    assert fetched_owner_none is None, "Expected None for pipeline with no owner"
+
+    # Test: get owner for non-existent pipeline
+    non_existent_id = "nonexistent_id"
+    assert db_utils.get_pipeline_owner(cur, non_existent_id) is None
+
+def test_get_node_notes_existing_and_nonexistent(in_memory_db_conn):
+    from fusionpipe.utils.pip_utils import generate_node_id
+    from fusionpipe.utils import db_utils
+
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+
+    # Add a node with notes
+    node_id = generate_node_id()
+    notes = "This is a test node note."
+    cur.execute("INSERT INTO nodes (node_id, notes) VALUES (?, ?)", (node_id, notes))
+    conn.commit()
+
+    # Test: get notes for existing node
+    fetched_notes = db_utils.get_node_notes(cur, node_id)
+    assert fetched_notes == notes, f"Expected notes '{notes}', got '{fetched_notes}'"
+
+    # Test: get notes for node with no notes
+    node_id_no_notes = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id_no_notes)
+    conn.commit()
+    fetched_notes_none = db_utils.get_node_notes(cur, node_id_no_notes)
+    assert fetched_notes_none is None, "Expected None for node with no notes"
+
+    # Test: get notes for non-existent node
+    non_existent_id = "nonexistent_node"
+    assert db_utils.get_node_notes(cur, non_existent_id) is None

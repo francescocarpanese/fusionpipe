@@ -4,69 +4,6 @@ import os
 import sqlite3
 
 
-@pytest.fixture
-def tmp_base_dir():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        yield tmpdir
-
-@pytest.fixture
-def tmp_database_path(tmp_base_dir):
-    db_path = os.path.join(tmp_base_dir, "connection.db")
-    yield db_path
-    if os.path.exists(db_path):  # Cleanup after the test
-        os.remove(db_path)
-
-
-@pytest.fixture
-def dag_dummy_1():
-    import networkx as nx
-    from fusionpipe.utils.pip_utils import NodeState 
-    # Create a simple directed acyclic graph (DAG) for testing
-    G = nx.DiGraph()
-    G.add_edges_from([
-        ("A", "B"),
-        ("A", "C"),
-        ("C", "D"),
-    ])
-    G.name = "12345"
-    G.graph['pipeline_id'] = G.name
-    G.graph['notes'] = "A simple test DAG"
-    G.graph['tag'] = "test_tag"
-    G.graph['owner'] = "test_group"
-
-    # Add a 'status' attribute to each node using NodeState
-    for node in G.nodes:
-        G.nodes[node]['status'] = NodeState.READY.value
-        G.nodes[node]['editable'] = True
-        G.nodes[node]['tag'] = 'test_tag'
-        G.nodes[node]['notes'] = 'test notes'
-    
-    return G
-
-@pytest.fixture
-def dict_dummy_1():
-    # Create a simple dictionary for testing identical to dag_dummy_1
-    return {
-        "pipeline_id": "12345",
-        "notes": "A simple test DAG",
-        "tag": "test_tag",
-        "owner": "test_group",
-        "nodes": {
-            "A": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': []},
-            "B": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A']},
-            "C": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A']},
-            "D": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C']}
-        }
-    }
-
-
-@pytest.fixture
-def in_memory_db_conn():
-    conn = sqlite3.connect(":memory:")
-    yield conn
-    conn.close()
-
-
 def test_generate_data_folder(tmp_base_dir):
     # Test if the function creates the expected directory structure
     from fusionpipe.utils.pip_utils import generate_data_folder
@@ -149,63 +86,146 @@ def test_graph_to_dict(dag_dummy_1, dict_dummy_1):
     # Check if the converted dictionary matches the expected dictionary
     assert graph_dict == dict_dummy_1, "Graph to dict conversion did not produce the expected result."
 
+def test_graph_dict_to_json(tmp_base_dir, dict_dummy_1):
+    from fusionpipe.utils.pip_utils import graph_dict_to_json
+    import json
+
+    # Prepare file path
+    file_path = os.path.join(tmp_base_dir, "test_pipeline.json")
+    # Write the dictionary to JSON
+    graph_dict_to_json(dict_dummy_1, file_path, verbose=True)
+
+    # Check file exists
+    assert os.path.exists(file_path), "JSON file was not created."
+
+    # Check file content matches the dictionary
+    with open(file_path, "r") as f:
+        loaded = json.load(f)
+    assert loaded == dict_dummy_1, "JSON file content does not match the original dictionary."
 
 
-# To be changes
-
-def test_graph_to_db(in_memory_db_conn, dag_graph_dummy_1):
-    import networkx as nx
-    from fusionpipe.utils.pip_utils import graph_to_db
-    from fusionpipe.utils import db_utils
-    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
-
-    # Setup database
-    conn = in_memory_db_conn
-    cur = db_utils.init_db(conn)
-
-    G = dag_graph_dummy_1
-
-    # Call the function
-    graph_to_db(G, cur)
-    conn.commit()
-
-    # Check pipeline exists
-    cur.execute("SELECT * FROM pipelines WHERE pipeline_id=?", (G.graph['id'],))
-    pipeline_row = cur.fetchone()
-    assert pipeline_row is not None, "Pipeline was not added to the database."
-    assert pipeline_row[1] == G.graph['tag'], "Pipeline tag does not match expected value."
-
-    # Check nodes exist
-    for node in G.nodes:
-        cur.execute("SELECT * FROM nodes WHERE node_id=?", (node,))
-        node_row = cur.fetchone()
-        assert node_row is not None, f"Node {node} was not added to the database."
-        assert node_row[1] == G.nodes[node]['status'], f"Node {node} status does not match expected value."
-
-    # Check edges exist
-    for parent, child in G.edges:
-        cur.execute("SELECT * FROM node_relation WHERE parent_id=? AND child_id=?", (parent, child))
-        relation_row = cur.fetchone()
-        assert relation_row is not None, f"Relation between {parent} and {child} was not added to the database."
-
-
-def test_db_to_graph(in_memory_db_conn, dag_graph_dummy_1):
-    from fusionpipe.utils import db_utils
+def test_graph_to_db_and_db_to_graph_roundtrip(in_memory_db_conn, dag_dummy_1):
+    """
+    Test that a graph can be written to the database and then read back,
+    and that the structure and attributes are preserved.
+    """
     from fusionpipe.utils.pip_utils import graph_to_db, db_to_graph_from_pip_id
+    from fusionpipe.utils import db_utils
     import networkx as nx
 
     # Setup database
     conn = in_memory_db_conn
     cur = db_utils.init_db(conn)
 
-    # Add the dummy graph to the database
-    graph_to_db(dag_graph_dummy_1, cur)
+    # Write the dummy graph to the database
+    graph_to_db(dag_dummy_1, cur)
     conn.commit()
 
-    # Call the function to convert DB back to graph
-    G_retrieved = db_to_graph_from_pip_id(cur, dag_graph_dummy_1.graph['id'])
+    # Read the graph back from the database
+    G_loaded = db_to_graph_from_pip_id(cur, dag_dummy_1.graph['pipeline_id'])
 
-    # Check if the retrieved graph matches the original
-    assert nx.is_isomorphic(G_retrieved, dag_graph_dummy_1), "Retrieved graph does not match the original graph."
+    # Use networkx's is_isomorphic to compare structure and attributes
+    def node_match(n1, n2):
+        # Compare relevant node attributes
+        for attr in ['status', 'editable', 'tag', 'notes']:
+            if n1.get(attr) != n2.get(attr):
+                return False
+        return True
 
-    conn.close()
+    def edge_match(e1, e2):
+        # No edge attributes to compare, just return True
+        return True
+
+    assert nx.is_isomorphic(
+        G_loaded, dag_dummy_1,
+        node_match=node_match,
+        edge_match=edge_match
+    ), "Loaded graph is not isomorphic to the original graph with respect to structure and node attributes."
+
+    # Check graph attributes
+    for attr in ['pipeline_id', 'notes', 'tag', 'owner']:
+        assert G_loaded.graph[attr] == dag_dummy_1.graph[attr]
+
+
+def test_graph_dict_to_db_and_db_to_graph_dict_roundtrip(in_memory_db_conn, dict_dummy_1):
+    """
+    Test that a graph dictionary can be written to the database and then read back as a dictionary,
+    and that the structure and attributes are preserved.
+    """
+    from fusionpipe.utils.pip_utils import graph_dict_to_db, db_to_graph_dict_from_pip_id
+    from fusionpipe.utils import db_utils
+
+    # Setup database
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+
+    # Write the dummy graph dict to the database
+    graph_dict_to_db(dict_dummy_1, cur)
+    conn.commit()
+
+    # Read the graph dict back from the database
+    loaded_dict = db_to_graph_dict_from_pip_id(cur, dict_dummy_1["pipeline_id"])
+
+    # Check if the loaded dictionary matches the original
+    assert loaded_dict == dict_dummy_1, "Loaded graph dict does not match the original graph dict."
+
+
+# To be changed
+
+
+# def test_graph_to_db(in_memory_db_conn, dag_graph_dummy_1):
+#     import networkx as nx
+#     from fusionpipe.utils.pip_utils import graph_to_db
+#     from fusionpipe.utils import db_utils
+#     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+
+#     # Setup database
+#     conn = in_memory_db_conn
+#     cur = db_utils.init_db(conn)
+
+#     G = dag_graph_dummy_1
+
+#     # Call the function
+#     graph_to_db(G, cur)
+#     conn.commit()
+
+#     # Check pipeline exists
+#     cur.execute("SELECT * FROM pipelines WHERE pipeline_id=?", (G.graph['id'],))
+#     pipeline_row = cur.fetchone()
+#     assert pipeline_row is not None, "Pipeline was not added to the database."
+#     assert pipeline_row[1] == G.graph['tag'], "Pipeline tag does not match expected value."
+
+#     # Check nodes exist
+#     for node in G.nodes:
+#         cur.execute("SELECT * FROM nodes WHERE node_id=?", (node,))
+#         node_row = cur.fetchone()
+#         assert node_row is not None, f"Node {node} was not added to the database."
+#         assert node_row[1] == G.nodes[node]['status'], f"Node {node} status does not match expected value."
+
+#     # Check edges exist
+#     for parent, child in G.edges:
+#         cur.execute("SELECT * FROM node_relation WHERE parent_id=? AND child_id=?", (parent, child))
+#         relation_row = cur.fetchone()
+#         assert relation_row is not None, f"Relation between {parent} and {child} was not added to the database."
+
+
+# def test_db_to_graph(in_memory_db_conn, dag_graph_dummy_1):
+#     from fusionpipe.utils import db_utils
+#     from fusionpipe.utils.pip_utils import graph_to_db, db_to_graph_from_pip_id
+#     import networkx as nx
+
+#     # Setup database
+#     conn = in_memory_db_conn
+#     cur = db_utils.init_db(conn)
+
+#     # Add the dummy graph to the database
+#     graph_to_db(dag_graph_dummy_1, cur)
+#     conn.commit()
+
+#     # Call the function to convert DB back to graph
+#     G_retrieved = db_to_graph_from_pip_id(cur, dag_graph_dummy_1.graph['id'])
+
+#     # Check if the retrieved graph matches the original
+#     assert nx.is_isomorphic(G_retrieved, dag_graph_dummy_1), "Retrieved graph does not match the original graph."
+
+#     conn.close()
