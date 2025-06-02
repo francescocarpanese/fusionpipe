@@ -1,58 +1,31 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import Optional
-from fusionpipe.utils import db_utils, pip_utils
-import os
-from contextlib import asynccontextmanager
+from fusionpipe.utils import db_utils
+import yaml
+import argparse
+import uvicorn
+from fusionpipe.api.routes import pipeline_handle
+from pathlib import Path
 
 app = FastAPI()
+app.include_router(pipeline_handle.router)
 
-DB_PATH = "/home/cisko90/fusionpipe/bin/connection.db"
+if __name__ == "__main__":
 
-def get_db():
-    conn = db_utils.load_db(DB_PATH)
-    try:
-        yield conn
-    finally:
-        conn.close()
+    parser = argparse.ArgumentParser(description="Run the FusionPipe FastAPI server.")
 
-class AddNodetoPipelineRequest(BaseModel):
-    pipeline_id: str
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        help="Host to run the server on.",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port to run the server on.",
+    )
+    args = parser.parse_args()
 
-@app.post("/create_pipeline")
-def create_pipeline(db_conn=Depends(get_db)):
-    cur = db_conn.cursor()
-    pipeline_id = pip_utils.generate_pip_id()
-    try:
-        db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag=None)
-        db_conn.commit()
-    except Exception as e:
-        db_conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    return {"pipeline_id": pipeline_id, "message": "Pipeline created"}
-
-@app.post("/add_node")
-def add_node(req: AddNodetoPipelineRequest, db_conn=Depends(get_db)):
-    cur = db_conn.cursor()
-    if not db_utils.check_pipeline_exists(cur, req.pipeline_id):
-        raise HTTPException(status_code=404, detail="Pipeline not found")
-    node_id = pip_utils.generate_node_id()
-    try:
-        db_utils.add_node_to_nodes(cur, node_id=node_id)
-        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=req.pipeline_id)
-        db_conn.commit()
-    except Exception as e:
-        db_conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    return {"node_id": node_id, "message": "Node added to pipeline"}
-
-# Optional: Enable CORS for local frontend dev
-from fastapi.middleware.cors import CORSMiddleware
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Adjust for production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    uvicorn.run("fusionpipe.api.main:app", host=args.host, port=args.port, reload=True)

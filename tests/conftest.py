@@ -16,7 +16,6 @@ def tmp_database_path(tmp_base_dir):
     if os.path.exists(db_path):  # Cleanup after the test
         os.remove(db_path)
 
-
 @pytest.fixture
 def dag_dummy_1():
     import networkx as nx
