@@ -38,3 +38,14 @@ def get_pip_ids(db_conn=Depends(get_db)):
         pip_ids = []
     
     return {"pip_ids": pip_ids}
+
+@router.get("/get_pipeline/{pipeline_id}")
+def get_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    try:
+        # Fetch the pipeline and convert it to a dictionary
+        pipeline_dict = pip_utils.db_to_graph_dict_from_pip_id(cur, pipeline_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    return pipeline_dict
