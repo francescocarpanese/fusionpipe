@@ -14,7 +14,6 @@ def get_db():
     finally:
         db.close()
 
-
 @router.post("/create_pipeline")
 def create_pipeline(db_conn=Depends(get_db)):
     cur = db_conn.cursor()
@@ -27,17 +26,15 @@ def create_pipeline(db_conn=Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
     return {"pipeline_id": pipeline_id, "message": "Pipeline created"}
 
-# @router.post("/add_node")
-# def add_node(req: AddNodetoPipelineRequest, db_conn=Depends(get_db)):
-#     cur = db_conn.cursor()
-#     if not db_utils.check_pipeline_exists(cur, req.pipeline_id):
-#         raise HTTPException(status_code=404, detail="Pipeline not found")
-#     node_id = pip_utils.generate_node_id()
-#     try:
-#         db_utils.add_node_to_nodes(cur, node_id=node_id)
-#         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=req.pipeline_id)
-#         db_conn.commit()
-#     except Exception as e:
-#         db_conn.rollback()
-#         raise HTTPException(status_code=500, detail=str(e))
-#     return {"node_id": node_id, "message": "Node added to pipeline"}
+@router.get("/get_all_pipeline_ids")
+def get_pip_ids(db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    try:
+        pip_ids = db_utils.get_all_pipeline_ids(cur)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    if not pip_ids:
+        pip_ids = []
+    
+    return {"pip_ids": pip_ids}
