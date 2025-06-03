@@ -60,41 +60,7 @@
     edges = layoutedElements.edges;
   }
 
-  async function loadPipeline() {
-    try {
-      const response = await fetch("/tmp/pipeline.json");
-      if (!response.ok) {
-        throw new Error(`Failed to load pipeline: ${response.statusText}`);
-      }
 
-      const pipeline = await response.json();
-
-      const rawNodes = Object.entries(pipeline.nodes).map(([id, node]) => ({
-        id,
-        data: {
-          label: `${id}\n ${node.tag}`,
-          editable: node.editable,
-        },
-        position: { x: Math.random() * 400, y: Math.random() * 400 },
-        style: `background: ${getNodeColor(node.status)}`,
-      }));
-
-      const rawEdges = Object.entries(pipeline.nodes)
-        .flatMap(([id, node]) =>
-          node.parents.map((parentId) => ({
-            id: `${parentId}-${id}`,
-            source: parentId,
-            target: id,
-          }))
-        );
-
-      const layoutedElements = getLayoutedElements(rawNodes, rawEdges);
-      nodes = layoutedElements.nodes;
-      edges = layoutedElements.edges;
-    } catch (error) {
-      console.error("Error loading pipeline:", error);
-    }
-  }
   function getNodeColor(status: string): string {
     switch (status) {
       case "ready":
@@ -213,7 +179,6 @@
   }
 
 
-  $: loadPipeline();
   $: fetchPipelines();
 </script>
 
@@ -241,7 +206,6 @@
   <div style="position: absolute; top: 0; left: 0; width: 100%; background-color: #f4f4f4; padding: 10px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); z-index: 10;">
     <button onclick={addNode} style="margin-right: 10px;"> Add Node </button>
     <button onclick={deleteNode} style="margin-right: 10px;"> Delete Node </button>
-    <button onclick={loadPipeline} style="margin-right: 10px;"> Reload Pipeline </button>
     <button onclick={() => onLayout('TB')} style="margin-right: 10px;"> Vertical Layout </button>
     <button onclick={() => onLayout('LR')} style="margin-right: 10px;"> Horizontal Layout </button>
     <SvelteSelect
