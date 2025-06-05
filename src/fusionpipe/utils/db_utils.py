@@ -221,6 +221,7 @@ def get_rows_with_pipeline_id_in_pipelines(cur, pipeline_id):
     return cur.fetchall()
 
 def remove_node_from_pipeline(cur, node_id, pipeline_id):
+
     # Remove node from node_pipeline_relation
     cur.execute('DELETE FROM node_pipeline_relation WHERE node_id = ? AND pipeline_id = ?', (node_id, pipeline_id))
     rows_deleted_entries = cur.rowcount
@@ -228,6 +229,12 @@ def remove_node_from_pipeline(cur, node_id, pipeline_id):
     # Remove node from node_tags
     cur.execute('DELETE FROM node_tags WHERE node_id = ? AND pipeline_id = ?', (node_id, pipeline_id))
     rows_deleted_tags = cur.rowcount
+
+    # Check if the node is editable before removing from node_relation
+    if is_node_editable(cur, node_id):
+        # If node is editable is means that this is the only occurance of the node in all pipelines
+        # hence you can brake relation
+        remove_node_from_relations(cur, node_id)
 
     return rows_deleted_entries + rows_deleted_tags
 
