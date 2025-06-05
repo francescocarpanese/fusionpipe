@@ -2,6 +2,7 @@ from fusionpipe.utils.db_utils import create_db
 from fusionpipe.utils.db_utils import add_pipeline
 
 path_to_db = "/home/cisko90/fusionpipe/bin/nodes/connection.db"
+path_to_db = r"C:\Users\franc\Documents\fusionpipe\bin\connection.db"
 
 # Create a simple database
 conn = create_db(path_to_db)
@@ -19,7 +20,7 @@ print(f"Pipeline '{pipeline_id}' added to the database.")
 conn.close()
 
 from fusionpipe.utils.db_utils import add_node_to_nodes
-from fusionpipe.utils.db_utils import add_node_to_pipeline
+from fusionpipe.utils.db_utils import add_node_to_pipeline, add_node_relation
 
 # Add some nodes to the database
 conn = create_db(path_to_db)
@@ -33,6 +34,8 @@ nodes = [
 
 for node in nodes:
     add_node_to_nodes(cur, node_id=node["node_id"], status=node["status"], editable=node["editable"], notes=node["notes"])
+
+add_node_relation(cur, child_id="node1", parent_id="node2")
 
 conn.commit()
 print("Nodes added to the database.")
