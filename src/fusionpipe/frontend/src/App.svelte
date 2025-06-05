@@ -113,9 +113,16 @@
   }
 
   async function addNode() {
-    const pipelineId = "p_20250531160440_1886"; // Replace with the actual pipeline ID
     try {
-      const response = await fetch("http://localhost:8000/add_node", {
+
+      const pipelineId = typeof selectedPipeline === "string" ? selectedPipeline : selectedPipeline.value;
+  
+      if (!selectedPipeline) {
+      console.error("No pipeline selected");
+      return;
+    }
+
+      const response = await fetch(`http://localhost:8000/create_node_in_pipeline/${pipelineId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -127,28 +134,50 @@
         throw new Error(`Failed to add node: ${response.statusText}`);
       }
 
-      const data = await response.json();
-      const newNode: Node = {
-        id: data.node_id,
-        data: { label: `Node ${data.node_id}` },
-        position: { x: Math.random() * 400, y: Math.random() * 400 },
-      };
-      nodes = [...nodes, newNode];
+      loadSelectedPipeline();
     } catch (error) {
       console.error("Error adding node:", error);
     }
   }
 
   function deleteNode() {
+    const pipelineId = typeof selectedPipeline === "string" ? selectedPipeline : selectedPipeline.value;
+    if (!selectedPipeline) {
+      console.error("No pipeline selected");
+      return;
+    }
+
     const selectedNodeIds = nodes
       .filter((node) => node.selected)
       .map((node) => node.id);
-    nodes = nodes.filter((node) => !selectedNodeIds.includes(node.id));
-    edges = edges.filter(
-      (edge) =>
-        !selectedNodeIds.includes(edge.source) &&
-        !selectedNodeIds.includes(edge.target),
-    );
+
+    
+    selectedNodeIds.forEach(async (nodeId) => {
+      try {
+      const response = await fetch(`http://localhost:8000/delete_node_from_pipeline/${pipelineId}/${nodeId}`, {
+        method: "DELETE",
+        headers: {
+        "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete node ${nodeId}: ${response.statusText}`);
+      }
+      } catch (error) {
+      console.error(`Error deleting node ${nodeId}:`, error);
+      }
+    });
+
+    loadSelectedPipeline();
+
+    // nodes = nodes.filter((node) => !selectedNodeIds.includes(node.id));
+
+    // edges = edges.filter(
+    //   (edge) =>
+    //     !selectedNodeIds.includes(edge.source) &&
+    //     !selectedNodeIds.includes(edge.target),
+    // );
   }
 
 
@@ -205,8 +234,10 @@
         );
 
       const layoutedElements = getLayoutedElements(rawNodes, rawEdges);
-      nodes = layoutedElements.nodes;
-      edges = layoutedElements.edges;
+      // Reassign the arrays to trigger reactivity
+      nodes = [...layoutedElements.nodes];
+      edges = [...layoutedElements.edges];
+
     } catch (error) {
       console.error("Error loading selected pipeline:", error);
     }
