@@ -314,6 +314,10 @@ def copy_node_relations(cur, source_node_id, new_node_id):
 
     return new_node_id
 
+def remove_pipeline(cur, pipeline_id):
+    # Finally, remove the pipeline itself
+    cur.execute('DELETE FROM pipelines WHERE pipeline_id = ?', (pipeline_id,))
+
 def duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id, pipeline_id):
     # Duplicate the node in a pipeline with copying relations
     dupicate_node_in_pipeline(cur, source_node_id, new_node_id, pipeline_id)

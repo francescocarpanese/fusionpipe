@@ -210,6 +210,35 @@
   }
 
 
+  async function deleteSelectedPipeline() {
+    if (!selectedPipeline) {
+      alert("No pipeline selected");
+      return;
+    }
+    const pipelineId = typeof selectedPipeline === "string" ? selectedPipeline : selectedPipeline.value;
+    const confirmed = confirm(`Are you sure you want to delete pipeline "${pipelineId}"? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`http://localhost:8000/delete_pipeline/${pipelineId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to delete pipeline: ${response.statusText}`);
+      }
+      await fetchPipelines();
+      selectedPipeline = "";
+      nodes = [];
+      edges = [];
+    } catch (error) {
+      console.error("Error deleting pipeline:", error);
+      alert("Failed to delete pipeline.");
+    }
+  }
+
 
 
   async function loadPipeline(pipelineId: string) {
@@ -302,6 +331,7 @@
     />
     <button onclick={loadSelectedPipeline} style="margin-right: 10px;"> Load pipeline </button>
     <button onclick={createPipeline} style="margin-right: 10px;"> Create pipeline </button>
+    <button onclick={deleteSelectedPipeline} style="margin-right: 10px;"> Delete pipeline </button>
 
     
   </div>

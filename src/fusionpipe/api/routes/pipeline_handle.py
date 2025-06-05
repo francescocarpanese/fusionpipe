@@ -95,3 +95,14 @@ async def connect_nodes_in_pipeline(payload: dict, db_conn=Depends(get_db)):
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Connected node {source} to node {target}"}
+
+@router.delete("/delete_pipeline/{pipeline_id}")
+def delete_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    try:
+        db_utils.remove_pipeline(cur, pipeline_id=pipeline_id)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Pipeline {pipeline_id} deleted successfully"}

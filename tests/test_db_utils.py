@@ -1116,3 +1116,39 @@ def test_get_node_notes_existing_and_nonexistent(in_memory_db_conn):
     # Test: get notes for non-existent node
     non_existent_id = "nonexistent_node"
     assert db_utils.get_node_notes(cur, non_existent_id) is None
+
+
+def test_remove_pipeline_removes_pipeline_and_leaves_related_data(in_memory_db_conn):
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+    from fusionpipe.utils import db_utils
+    
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+
+    # Create a pipeline and related data
+    pipeline_id = generate_pip_id()
+    node_id = generate_node_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline", owner="owner", notes="notes")
+    db_utils.add_node_to_nodes(cur, node_id=node_id)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+    db_utils.add_node_tag(cur, node_id=node_id, pipeline_id=pipeline_id, tag="tag1")
+    conn.commit()
+
+    # Remove the pipeline
+    db_utils.remove_pipeline(cur, pipeline_id)
+    conn.commit()
+
+    # Check that the pipeline is removed
+    cur.execute("SELECT * FROM pipelines WHERE pipeline_id=?", (pipeline_id,))
+    assert cur.fetchone() is None, "Pipeline was not removed from pipelines table."
+
+    # Check that related data is NOT automatically removed (no ON DELETE CASCADE)
+    cur.execute("SELECT * FROM node_pipeline_relation WHERE pipeline_id=?", (pipeline_id,))
+    assert cur.fetchone() is not None, "node_pipeline_relation entry was unexpectedly removed."
+
+    cur.execute("SELECT * FROM node_tags WHERE pipeline_id=?", (pipeline_id,))
+    assert cur.fetchone() is not None, "node_tags entry was unexpectedly removed."
+
+    # Node should still exist
+    cur.execute("SELECT * FROM nodes WHERE node_id=?", (node_id,))
+    assert cur.fetchone() is not None, "Node was unexpectedly removed."
