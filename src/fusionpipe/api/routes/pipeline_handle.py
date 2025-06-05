@@ -1,6 +1,8 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 import os
+from fastapi.responses import JSONResponse
+
 
 from fusionpipe.utils import db_utils, pip_utils
 
@@ -48,7 +50,10 @@ def get_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-    return pipeline_dict
+    return JSONResponse(
+        content=pipeline_dict,
+        headers={"Cache-Control": "no-store"}
+    )
 
 @router.post("/create_node_in_pipeline/{pipeline_id}")
 def add_node_to_pipeline(pipeline_id: str, db_conn=Depends(get_db)):

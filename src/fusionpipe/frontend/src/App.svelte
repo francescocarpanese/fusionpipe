@@ -106,7 +106,7 @@
     }
   }
 
-  function deleteNode() {
+  async function deleteNode() {
     const pipelineId = typeof selectedPipeline === "string" ? selectedPipeline : selectedPipeline.value;
     if (!selectedPipeline) {
       console.error("No pipeline selected");
@@ -118,24 +118,25 @@
       .map((node) => node.id);
 
     
-    selectedNodeIds.forEach(async (nodeId) => {
-      try {
-      const response = await fetch(`http://localhost:8000/delete_node_from_pipeline/${pipelineId}/${nodeId}`, {
-        method: "DELETE",
-        headers: {
-        "Content-Type": "application/json",
-        },
-      });
+      await Promise.all(selectedNodeIds.map(async (nodeId) => {
+        try {
+          const response = await fetch(`http://localhost:8000/delete_node_from_pipeline/${pipelineId}/${nodeId}`, {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
 
-      if (!response.ok) {
-        throw new Error(`Failed to delete node ${nodeId}: ${response.statusText}`);
-      }
-      } catch (error) {
-      console.error(`Error deleting node ${nodeId}:`, error);
-      }
-    });
+          if (!response.ok) {
+            throw new Error(`Failed to delete node ${nodeId}: ${response.statusText}`);
+          }
+        } catch (error) {
+          console.error(`Error deleting node ${nodeId}:`, error);
+        }
+      }));
 
-    loadSelectedPipeline();
+
+    await loadPipeline(pipelineId);
 
     // nodes = nodes.filter((node) => !selectedNodeIds.includes(node.id));
 
@@ -164,16 +165,12 @@
     }
   }
 
-  async function loadSelectedPipeline() {
-    const pipelineId = typeof selectedPipeline === "string" ? selectedPipeline : selectedPipeline.value;
-
-    if (!selectedPipeline) {
-      console.error("No pipeline selected");
-      return;
-    }
+  async function loadPipeline(pipelineId: string) {
 
     try {
-      const response = await fetch(`http://localhost:8000/get_pipeline/${pipelineId}`);
+      const response = await fetch(`http://localhost:8000/get_pipeline/${pipelineId}`, {
+        cache: "no-store"
+      });
       if (!response.ok) {
         throw new Error(`Failed to load selected pipeline: ${response.statusText}`);
       }
@@ -207,6 +204,17 @@
     } catch (error) {
       console.error("Error loading selected pipeline:", error);
     }
+  }
+
+
+
+  async function loadSelectedPipeline() {
+    const pipelineId = typeof selectedPipeline === "string" ? selectedPipeline : selectedPipeline.value;
+    if (!selectedPipeline) {
+      console.error("No pipeline selected");
+      return;
+    }
+    await loadPipeline(pipelineId);
   }
 
 
