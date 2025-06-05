@@ -138,14 +138,6 @@
 
 
     await loadPipeline(pipelineId);
-
-    // nodes = nodes.filter((node) => !selectedNodeIds.includes(node.id));
-
-    // edges = edges.filter(
-    //   (edge) =>
-    //     !selectedNodeIds.includes(edge.source) &&
-    //     !selectedNodeIds.includes(edge.target),
-    // );
   }
 
 
@@ -194,6 +186,31 @@
     }
 
   }
+
+
+  async function createPipeline() {
+    try {
+      const response = await fetch("http://localhost:8000/create_pipeline", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to create pipeline: ${response.statusText}`);
+      }
+      const data = await response.json();
+      const newPipelineId = data.pipeline_id || data.id || data.pip_id;
+      await fetchPipelines();
+      selectedPipeline = newPipelineId;
+      await loadPipeline(newPipelineId);
+    } catch (error) {
+      console.error("Error creating pipeline:", error);
+    }
+  }
+
+
+
 
   async function loadPipeline(pipelineId: string) {
 
@@ -284,6 +301,8 @@
       maxItems={5}
     />
     <button onclick={loadSelectedPipeline} style="margin-right: 10px;"> Load pipeline </button>
+    <button onclick={createPipeline} style="margin-right: 10px;"> Create pipeline </button>
+
     
   </div>
 
