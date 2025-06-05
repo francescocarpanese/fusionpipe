@@ -9,6 +9,7 @@
     Panel,
     type Node,
     type Edge,
+    type OnConnect,
   } from "@xyflow/svelte";
 
   import "@xyflow/svelte/dist/style.css";
@@ -165,6 +166,35 @@
     }
   }
 
+  async function handleConnect(event) {
+    const source = event.source;
+    const target = event.target;
+    console.log(`Connected nodes: ${source} → ${target}`);
+
+    // API call to connect the nodes
+    const pipelineId = typeof selectedPipeline === "string" ? selectedPipeline : selectedPipeline.value;
+    if (!selectedPipeline) {
+      console.error("No pipeline selected");
+      return;
+    }
+    try {
+      const response = await fetch(`http://localhost:8000/connect_nodes`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ source, target }),
+      });
+      if (!response.ok) {
+      throw new Error(`Failed to connect nodes: ${response.statusText}`);
+      }
+      await loadPipeline(pipelineId);
+    } catch (error) {
+      console.error("Error connecting nodes:", error);
+    }
+
+  }
+
   async function loadPipeline(pipelineId: string) {
 
     try {
@@ -257,7 +287,7 @@
     
   </div>
 
-  <SvelteFlow bind:nodes bind:edges fitView>
+  <SvelteFlow bind:nodes bind:edges fitView onconnect={handleConnect}>
     <Panel position="center-left">
       Example of pipeline id information box
     </Panel>

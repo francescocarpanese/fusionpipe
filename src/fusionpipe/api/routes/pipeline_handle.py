@@ -80,3 +80,18 @@ def delete_node_from_pipeline(pipeline_id: str, node_id: str, db_conn=Depends(ge
         raise HTTPException(status_code=500, detail=str(e))
     
     return {"message": f"Node {node_id} deleted from pipeline {pipeline_id}"}
+
+@router.post("/connect_nodes")
+async def connect_nodes_in_pipeline(payload: dict, db_conn=Depends(get_db)):
+    source = payload.get("source")
+    target = payload.get("target")
+    if not source or not target:
+        raise HTTPException(status_code=400, detail="Missing source or target node id")
+    cur = db_conn.cursor()
+    try:
+        db_utils.add_node_relation(cur, parent_id=source, child_id=target)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Connected node {source} to node {target}"}
