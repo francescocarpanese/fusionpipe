@@ -238,8 +238,44 @@ def remove_node_from_pipeline(cur, node_id, pipeline_id):
 
     return rows_deleted_entries + rows_deleted_tags
 
+def duplicate_pipeline_in_pipelines(cur, source_pipeline_id, new_pipeline_id):
+    # Duplicate the pipeline in pipelines table
+    cur.execute('''
+        INSERT INTO pipelines (pipeline_id, tag, owner, notes)
+        SELECT ?, tag, owner, notes
+        FROM pipelines
+        WHERE pipeline_id = ?
+    ''', (new_pipeline_id, source_pipeline_id))
+
+    return new_pipeline_id
+
+def duplicate_node_pipeline_relation(cur, source_pipeline_id, node_id, new_pipeline_id):
+    # Given a source pipeline, and a node_id, insert a new row with new_pipeline_id
+    # This is used when branching a pipeline. A new pipeline is created with a subgraph of the original one.
+    # Then only the node_pipeline_relation is updated to releate a node to the new pipeline.
+    cur.execute('''
+        INSERT INTO node_pipeline_relation (last_update, user, node_id, pipeline_id)
+        SELECT last_update, user, node_id, ?
+        FROM node_pipeline_relation
+        WHERE pipeline_id = ? AND node_id = ?
+    ''', (new_pipeline_id, source_pipeline_id, node_id))
+
+    return new_pipeline_id
+
+def duplicate_node_in_node_tags(cur, source_node_id, new_node_id, pipeline_id):
+    # Duplicate the node in node_tags table
+    cur.execute('''
+        INSERT INTO node_tags (tag, node_id, pipeline_id)
+        SELECT tag, ?, pipeline_id
+        FROM node_tags
+        WHERE node_id = ? AND pipeline_id = ?
+    ''', (new_node_id, source_node_id, pipeline_id))
+
+    return new_node_id
+
 
 def duplicate_pipeline(cur, source_pipeline_id, new_pipeline_id):
+    # Duplicate the pipeline means creating a new pipeline with a new ID and duplicate all entry which referes to that
 
     # Duplicate pipelines table
     cur.execute('''
@@ -325,7 +361,6 @@ def duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id, 
     return new_node_id
 
 def replace_node_in_pipeline(cur, old_node_id, new_node_id, pipeline_id):
-
     duplicate_node_in_pipeline_with_relations(cur, old_node_id, new_node_id, pipeline_id)
     # Remove old node from node_pipeline_relation
     remove_node_from_pipeline(cur, old_node_id, pipeline_id)

@@ -2,7 +2,8 @@ from fusionpipe.utils.db_utils import create_db
 from fusionpipe.utils.db_utils import add_pipeline
 
 path_to_db = "/home/cisko90/fusionpipe/bin/nodes/connection.db"
-path_to_db = r"C:\Users\franc\Documents\fusionpipe\bin\connection.db"
+#path_to_db = r"C:\Users\franc\Documents\fusionpipe\bin\connection.db"
+path_to_db = "/misc/carpanes/fusionpipe/bin/pipeline.db"
 
 # Create a simple database
 conn = create_db(path_to_db)
@@ -29,7 +30,7 @@ cur = conn.cursor()
 nodes = [
     {"node_id": "node1", "status": "ready", "editable": True, "notes": "First node"},
     {"node_id": "node2", "status": "ready", "editable": True, "notes": "Second node"},
-    {"node_id": "node3", "status": "ready", "editable": True, "notes": "Third node"}
+    {"node_id": "node3", "status": "ready", "editable": False, "notes": "Third node"}
 ]
 
 for node in nodes:

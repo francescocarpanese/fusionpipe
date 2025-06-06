@@ -213,3 +213,61 @@ def test_visualize_pip_static_runs_without_error(monkeypatch, dag_dummy_1):
 
     # Should not raise
     visualize_pip_static(dag_dummy_1)
+
+from conftest import PARANT_NODE_LIST
+@pytest.mark.parametrize("parent_node", PARANT_NODE_LIST)
+def test_iterate_pipeline_from_node(in_memory_db_conn, dag_dummy_1, parent_node):
+    """
+    Test that iterate_pipeline_from_node creates a new pipeline where all nodes are preserved,
+    except that descendants of the selected node are replaced with new node IDs.
+    """
+    from fusionpipe.utils.pip_utils import iterate_pipeline_from_node, db_to_graph_from_pip_id
+    from fusionpipe.utils import db_utils
+    import networkx as nx
+
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+
+    # Add the original graph to the database
+    original_graph = dag_dummy_1
+
+    from fusionpipe.utils.pip_utils import graph_to_db
+
+    graph_to_db(original_graph, cur)
+    conn.commit()
+
+    # Get all pipeline IDs before
+    pipeline_ids_before = set(db_utils.get_all_pipeline_ids(cur))
+
+    # Run iterate_pipeline_from_node
+    iterate_pipeline_from_node(cur, original_graph.graph['pipeline_id'], parent_node)
+    conn.commit()
+
+    # Get all pipeline IDs after
+    pipeline_ids_after = set(db_utils.get_all_pipeline_ids(cur))
+    new_pipeline_ids = pipeline_ids_after - pipeline_ids_before
+    assert len(new_pipeline_ids) == 1, "A new pipeline should be created."
+    new_pip_id = next(iter(new_pipeline_ids))
+
+    # Load the new pipeline as a graph
+    new_graph = db_to_graph_from_pip_id(cur, new_pip_id)
+
+    # Get descendants of the parent_node in the original graph
+    descendants = set(nx.descendants(original_graph, parent_node))
+    original_nodes = set(original_graph.nodes)
+    new_nodes = set(new_graph.nodes)
+
+    # The new graph should have the same number of nodes as the original
+    assert len(new_nodes) == len(original_nodes), "New pipeline should have the same number of nodes as the original."
+
+    # Nodes not in descendants should be preserved (same IDs)
+    for node in original_nodes - descendants:
+        assert node in new_nodes, f"Node {node} should be preserved in the new pipeline."
+
+    # Descendant nodes should be replaced with new IDs (not present in original)
+    replaced_nodes = new_nodes - (original_nodes - descendants)
+    for node in replaced_nodes:
+        assert node not in original_nodes, "Descendant node IDs should be replaced with new IDs in the new pipeline."
+
+    # The set of replaced nodes should be the same size as descendants
+    assert len(replaced_nodes) == len(descendants), "Each descendant should be replaced by a new node ID."

@@ -27,6 +27,7 @@ def dag_dummy_1():
         ("A", "C"),
         ("C", "D"),
     ])
+    G.add_node("E")  # Add a node with no edges
     G.name = "12345"
     G.graph['pipeline_id'] = G.name
     G.graph['notes'] = "A simple test DAG"
@@ -46,7 +47,8 @@ def dag_dummy_1():
             G.nodes[node]['status'] = "completed"
         elif node == "D":
             G.nodes[node]['status'] = "staledata"
-
+        elif node == "E":
+            G.nodes[node]['status'] = "staledata"            
     return G
 
 @pytest.fixture
@@ -61,7 +63,8 @@ def dict_dummy_1():
             "A": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': []},
             "B": {"status": "running", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A']},
             "C": {"status": "completed", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A']},
-            "D": {"status": "staledata", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C']}
+            "D": {"status": "staledata", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C']},
+            "E": {"status": "staledata", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': []}
         }
     }
 
@@ -70,3 +73,5 @@ def in_memory_db_conn():
     conn = sqlite3.connect(":memory:")
     yield conn
     conn.close()
+
+PARANT_NODE_LIST =  ["A", "B", "C", "D", "E"]

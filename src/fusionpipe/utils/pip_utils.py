@@ -5,6 +5,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import json
 from fusionpipe.utils import db_utils
+import copy
 
 
 from enum import Enum
@@ -126,12 +127,19 @@ def graph_dict_to_db(graph_dict, cur):
         return cur
 
 def graph_to_db(Gnx, cur):
+    """
+    - This function can be used to add a graph to the database.
+    - This will also work to add a subgraph to an existing pipeline.
+    """
     # Add the pipeline to the database
     pip_id = Gnx.graph['pipeline_id']
     graph_tag = Gnx.graph.get('tag', None)
     owner = Gnx.graph.get('owner', None)
     notes = Gnx.graph.get('notes', None)
-    db_utils.add_pipeline(cur, pipeline_id=pip_id, tag=graph_tag, owner=owner, notes=notes)
+
+    # Check if the pipeline already exists, if not, add it
+    if not db_utils.check_pipeline_exists(cur, pip_id):
+        db_utils.add_pipeline(cur, pipeline_id=pip_id, tag=graph_tag, owner=owner, notes=notes)
 
     # Add nodes and their dependencies directly from the graph
     for node in Gnx.nodes:
@@ -281,3 +289,48 @@ def visualize_pip_interactive(graph, output_file="pipeline_visualization.html"):
 
     # Generate and save the interactive visualization
     net.write_html(output_file)
+
+
+def iterate_pipeline_from_node(cur, pipeline_id, node_id):
+    """
+    Iterate a pipeline from a node means
+    - Copy the pipeline.
+    - All nodes are preserved, except the children of the a specified node, which are replaced with new one
+    """
+    from fusionpipe.utils import db_utils
+    from fusionpipe.utils.pip_utils import db_to_graph_from_pip_id, generate_pip_id, graph_to_db
+
+    # Get the original graph from the database
+    original_graph = db_to_graph_from_pip_id(cur, pipeline_id)
+    
+    # Generate a new pipeline ID and tag
+    new_pip_id = generate_pip_id()
+
+    # Duplicate pipeline
+    db_utils.duplicate_pipeline(cur, source_pipeline_id=pipeline_id, new_pipeline_id=new_pip_id)
+
+    # Get subgraph with only childrens of the node
+    subgraph = nx.descendants(original_graph, node_id)
+
+    # Make the subgraph an independent graph
+    subgraph = original_graph.subgraph(subgraph).copy()
+
+    # Update the subgraph to the new pipeline ID
+    subgraph.graph['pipeline_id'] = new_pip_id
+
+    # Get list of childrens
+    childres = list(subgraph.nodes)
+
+    # Loop through all the nodes in the subgraph, generate a new node node_id and rename
+    for child in childres:
+        # Generate a new node ID
+        new_node_id = generate_node_id()
+        # Rename the node in the subgraph
+        subgraph = nx.relabel_nodes(subgraph, {child: new_node_id})
+
+    # Add subgraph to database, in the same pipeline
+    graph_to_db(subgraph, cur)
+
+    # Remove all the children node with original node_id from the new pipeline
+    for child in childres:
+        db_utils.remove_node_from_pipeline(cur, node_id=child, pipeline_id=new_pip_id)
