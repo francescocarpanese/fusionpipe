@@ -14,9 +14,14 @@
 
   import "@xyflow/svelte/dist/style.css";
   import SvelteSelect from "svelte-select";
+  import TextUpdaterNode from './TextUpdaterNode.svelte';
+  import CustomNode from './CustomNode.svelte';
 
   let nodes: Node[] = [];
   let edges: Edge[] = [];
+  let nodeTypes = {
+    custom: CustomNode,
+  };
 
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
@@ -255,6 +260,7 @@
 
       const rawNodes = Object.entries(pipeline.nodes).map(([id, node]) => ({
         id,
+        type: 'custom',
         data: {
           label: `${id}\n ${node.tag}`,
           editable: node.editable,
@@ -336,7 +342,7 @@
     
   </div>
 
-  <SvelteFlow bind:nodes bind:edges fitView onconnect={handleConnect}>
+  <SvelteFlow bind:nodes bind:edges fitView onconnect={handleConnect} {nodeTypes}>
     <Panel position="center-left">
       Example of pipeline id information box
     </Panel>
