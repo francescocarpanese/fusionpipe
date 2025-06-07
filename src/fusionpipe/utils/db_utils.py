@@ -155,6 +155,14 @@ def get_all_nodes_from_pip_id(cur, pipeline_id):
     cur.execute('SELECT node_id FROM node_pipeline_relation WHERE pipeline_id = ?', (pipeline_id,))
     return [row[0] for row in cur.fetchall()]
 
+def get_all_nodes_from_nodes(cur):
+    cur.execute('SELECT node_id FROM nodes')
+    return [row[0] for row in cur.fetchall()]
+
+def check_if_node_exists(cur, node_id):
+    cur.execute('SELECT 1 FROM nodes WHERE node_id = ?', (node_id,))
+    return cur.fetchone() is not None
+
 def get_nodes_without_pipeline(cur):
     cur.execute('''
         SELECT node_id FROM nodes
@@ -226,17 +234,7 @@ def remove_node_from_pipeline(cur, node_id, pipeline_id):
     cur.execute('DELETE FROM node_pipeline_relation WHERE node_id = ? AND pipeline_id = ?', (node_id, pipeline_id))
     rows_deleted_entries = cur.rowcount
     
-    # Remove node from node_tags
-    cur.execute('DELETE FROM node_tags WHERE node_id = ? AND pipeline_id = ?', (node_id, pipeline_id))
-    rows_deleted_tags = cur.rowcount
-
-    # Check if the node is editable before removing from node_relation
-    if is_node_editable(cur, node_id):
-        # If node is editable is means that this is the only occurance of the node in all pipelines
-        # hence you can brake relation
-        remove_node_from_relations(cur, node_id)
-
-    return rows_deleted_entries + rows_deleted_tags
+    return rows_deleted_entries
 
 def duplicate_pipeline_in_pipelines(cur, source_pipeline_id, new_pipeline_id):
     # Duplicate the pipeline in pipelines table
@@ -351,7 +349,7 @@ def copy_node_relations(cur, source_node_id, new_node_id):
     return new_node_id
 
 def remove_pipeline(cur, pipeline_id):
-    # Finally, remove the pipeline itself
+    # Remove the pieline from pipeline tables
     cur.execute('DELETE FROM pipelines WHERE pipeline_id = ?', (pipeline_id,))
 
 def duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id, pipeline_id):
@@ -434,3 +432,19 @@ def get_rows_with_pipeline_id_in_pipeline_description(cur, pipeline_id):
 def get_all_pipeline_ids(cur):
     cur.execute('SELECT pipeline_id FROM pipelines')
     return [row[0] for row in cur.fetchall()]
+
+def sanitize_node_relation(cur, pipeline_id):
+    # Get all nodes in the pipeline
+    cur.execute('SELECT node_id FROM node_pipeline_relation WHERE pipeline_id = ?', (pipeline_id,))
+    pipeline_nodes = {row[0] for row in cur.fetchall()}
+
+    # Get all node relations
+    cur.execute('SELECT id, child_id, parent_id FROM node_relation')
+    relations = cur.fetchall()
+
+    # Remove relations for nodes that are not in the pipeline
+    for relation_id, child_id, parent_id in relations:
+        if child_id in pipeline_nodes and parent_id not in pipeline_nodes:
+            cur.execute('DELETE FROM node_relation WHERE id = ?', (relation_id,))
+        elif parent_id in pipeline_nodes and child_id not in pipeline_nodes:
+            cur.execute('DELETE FROM node_relation WHERE id = ?', (relation_id,))

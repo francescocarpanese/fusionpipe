@@ -106,3 +106,15 @@ def delete_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Pipeline {pipeline_id} deleted successfully"}
+
+@router.get("/iterate_pipeline/{pipeline_id}/{start_node_id}")
+def iterate_pipeline(pipeline_id: str, start_node_id: str, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    try:
+        # Fetch the pipeline graph starting from the given node
+        new_pipeline = pip_utils.iterate_pipeline_from_node(cur, pipeline_id, start_node_id)
+        db_conn.commit()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    return {"pipeline_id": pipeline_id, "start_node_id": start_node_id, "new_pipeline": new_pipeline}

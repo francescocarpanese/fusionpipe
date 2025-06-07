@@ -74,4 +74,4 @@ def in_memory_db_conn():
     yield conn
     conn.close()
 
-PARANT_NODE_LIST =  ["A", "B", "C", "D", "E"]
+PARENT_NODE_LIST =  ["A", "B", "C", "D", "E"]

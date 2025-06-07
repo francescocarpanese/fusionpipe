@@ -38,13 +38,6 @@ for node in nodes:
 
 add_node_relation(cur, child_id="node1", parent_id="node2")
 
-conn.commit()
-print("Nodes added to the database.")
-conn.close()
-
-# Add nodes to the pipeline
-conn = create_db(path_to_db)
-cur = conn.cursor()
 
 pipeline_id = "simple_pipeline"
 node_ids = ["node1", "node2", "node3"]

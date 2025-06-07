@@ -1,6 +1,7 @@
 <script lang="ts">
     import { Handle, Position, type NodeProps } from '@xyflow/svelte';
     let { data }: NodeProps = $props();
+    let selected
 </script>
 
 
@@ -13,10 +14,10 @@
     <Handle type="source" position={Position.Bottom} />
 </div>
 
-<style>
+<!-- <style>
     .custom-node {
         display: flex;
         align-items: center;
         gap: 8px;
     }
-</style>
+</style> -->

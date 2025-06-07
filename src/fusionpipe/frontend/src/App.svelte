@@ -245,6 +245,46 @@
   }
 
 
+  async function iteratePipelineFromNode() {
+    const pipelineId = typeof selectedPipeline === "string" ? selectedPipeline : selectedPipeline.value;
+    if (!selectedPipeline) {
+      console.error("No pipeline selected");
+      return;
+    }
+
+    const selectedNode = nodes.find((node) => node.selected);
+    if (!selectedNode) {
+      console.error("No node selected");
+      return;
+    }
+
+    const startNodeId = selectedNode.id;
+
+    try {
+      const response = await fetch(`http://localhost:8000/iterate_pipeline/${pipelineId}/${startNodeId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to iterate pipeline: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log("Pipeline iteration result:", data);
+
+      await fetchPipelines();
+      await loadPipeline(data.new_pipeline);
+      alert(`Pipeline iteration completed.\nStart Node: ${startNodeId}\nSource Pipeline: ${pipelineId}\nNew Pipeline ID: ${data.new_pipeline}`);
+
+    } catch (error) {
+      console.error("Error iterating pipeline:", error);
+      alert("Failed to iterate pipeline.");
+    }
+  }
+
 
   async function loadPipeline(pipelineId: string) {
 
@@ -334,10 +374,11 @@
       bind:value={selectedPipeline}
       placeholder="Search or select a pipeline..."
       maxItems={5}
+      on:select={loadSelectedPipeline}
     />
-    <button onclick={loadSelectedPipeline} style="margin-right: 10px;"> Load pipeline </button>
     <button onclick={createPipeline} style="margin-right: 10px;"> Create pipeline </button>
     <button onclick={deleteSelectedPipeline} style="margin-right: 10px;"> Delete pipeline </button>
+    <button onclick={iteratePipelineFromNode} style="margin-right: 10px;"> Iterate Pipeline from node </button>
 
     
   </div>

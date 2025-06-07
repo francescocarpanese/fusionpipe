@@ -149,14 +149,22 @@ def graph_to_db(Gnx, cur):
         node_notes = Gnx.nodes[node].get('notes', "")  # Optional notes for the node
         node_tag = Gnx.nodes[node].get('tag', None)  # Optional tag for the node
 
+
+        db_utils.get_all_nodes_from_nodes(cur)
+        db_utils.get_node_parents(cur, node_id=node_id)
+
+
         # Add the node to the database
-        db_utils.add_node_to_nodes(cur, node_id=node_id, status=status, editable=editable, notes=node_notes)
+        if not db_utils.check_if_node_exists(cur, node):
+            db_utils.add_node_to_nodes(cur, node_id=node_id, status=status, editable=editable, notes=node_notes)
+            # If node already existed, parants cannot have change. Children can and will be added later
+            for parent in Gnx.predecessors(node):
+                db_utils.add_node_relation(cur, child_id=node_id, parent_id=parent)
+
         db_utils.add_node_tag(cur, node_id=node_id, pipeline_id=pip_id, tag=node_tag)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pip_id)
 
-        # Add parent-child relationships
-        for parent in Gnx.predecessors(node):
-            db_utils.add_node_relation(cur, child_id=node_id, parent_id=parent)
+
 
 def db_to_graph_from_pip_id(cur, pip_id):
     # Load the pipeline from the database
@@ -293,44 +301,54 @@ def visualize_pip_interactive(graph, output_file="pipeline_visualization.html"):
 
 def iterate_pipeline_from_node(cur, pipeline_id, node_id):
     """
-    Iterate a pipeline from a node means
+    Iterate a pipeline from a node means:
     - Copy the pipeline.
-    - All nodes are preserved, except the children of the a specified node, which are replaced with new one
+    - All nodes are preserved, except the specified node and all its descendants,
+      for which new nodes are created (with new IDs).
     """
     from fusionpipe.utils import db_utils
-    from fusionpipe.utils.pip_utils import db_to_graph_from_pip_id, generate_pip_id, graph_to_db
-
     # Get the original graph from the database
     original_graph = db_to_graph_from_pip_id(cur, pipeline_id)
     
     # Generate a new pipeline ID and tag
     new_pip_id = generate_pip_id()
 
-    # Duplicate pipeline
-    db_utils.duplicate_pipeline(cur, source_pipeline_id=pipeline_id, new_pipeline_id=new_pip_id)
+    # Find all descendants of the specified node (children, grandchildren, etc.)
+    descendants = nx.descendants(original_graph, node_id)
 
-    # Get subgraph with only childrens of the node
-    subgraph = nx.descendants(original_graph, node_id)
+    # Include the node itself
+    nodes_to_replace = set(descendants) | {node_id}
 
-    # Make the subgraph an independent graph
-    subgraph = original_graph.subgraph(subgraph).copy()
+    # Map old node IDs to new node IDs for replaced nodes
+    id_map = {old_id: generate_node_id() for old_id in nodes_to_replace}
 
-    # Update the subgraph to the new pipeline ID
-    subgraph.graph['pipeline_id'] = new_pip_id
+    # Create a new graph for the new pipeline
+    new_graph = nx.DiGraph()
+    new_graph.graph.update(original_graph.graph)
+    new_graph.graph['pipeline_id'] = new_pip_id
 
-    # Get list of childrens
-    childres = list(subgraph.nodes)
+    # Add nodes: copy all nodes, but for nodes_to_replace use new IDs
+    for n in original_graph.nodes:
+        if n in nodes_to_replace:
+            new_id = id_map[n]
+            attrs = original_graph.nodes[n].copy()
+            new_graph.add_node(new_id, **attrs)
+        else:
+            attrs = original_graph.nodes[n].copy()
+            new_graph.add_node(n, **attrs)
 
-    # Loop through all the nodes in the subgraph, generate a new node node_id and rename
-    for child in childres:
-        # Generate a new node ID
-        new_node_id = generate_node_id()
-        # Rename the node in the subgraph
-        subgraph = nx.relabel_nodes(subgraph, {child: new_node_id})
+    # Add edges: remap edges for replaced nodes
+    for u, v in original_graph.edges:
+        u_new = id_map[u] if u in nodes_to_replace else u
+        v_new = id_map[v] if v in nodes_to_replace else v
+        new_graph.add_edge(u_new, v_new)
 
-    # Add subgraph to database, in the same pipeline
-    graph_to_db(subgraph, cur)
+    # Add the new graph to the database
+    graph_to_db(new_graph, cur)
 
-    # Remove all the children node with original node_id from the new pipeline
-    for child in childres:
-        db_utils.remove_node_from_pipeline(cur, node_id=child, pipeline_id=new_pip_id)
+    # # Remove the original nodes (with old IDs) from the new pipeline
+    # for old_id in nodes_to_replace:
+    #     db_utils.remove_node_from_pipeline(cur, node_id=old_id, pipeline_id=new_pip_id)
+
+    # Sanitize the node connection
+    #db_utils.sanitize_node_relation(cur, new_pip_id)
