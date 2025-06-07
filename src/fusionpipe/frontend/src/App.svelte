@@ -21,6 +21,9 @@
   import { Drawer, Button, CloseButton } from "flowbite-svelte";
   import { InfoCircleSolid, ArrowRightOutline } from "flowbite-svelte-icons";
   import { sineIn } from "svelte/easing"
+  import { Dropdown, DropdownItem, DropdownDivider, Navbar, NavBrand, NavHamburger, NavUl, NavLi } from "flowbite-svelte";
+  import { ChevronDownOutline } from "flowbite-svelte-icons";
+
 
   // Variables and state definitions
   let nodes = $state([]);
@@ -28,7 +31,8 @@
   let selectedPipeline = $state(null);
   const nodeWidth = 172;
   const nodeHeight = 36;
-  let hidden1 = $state(true);
+  let isHiddenPipelinePanel = $state(true);
+  let isHiddenNodePanel = $state(true);
   let pipelines = $state([]);
 
 
@@ -344,7 +348,7 @@
         id,
         type: 'custom',
         data: {
-          label: `node_id:${id}\nnode_tag:${node.tag}`,
+          label: `${node.tag}`,
           editable: node.editable
         },
         position: {
@@ -388,36 +392,61 @@
 
 
 <div style:height="100vh">
-  <div style="position: absolute; top: 0; left: 0; width: 100%; background-color: #f4f4f4; padding: 10px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); z-index: 10;">
-    <button onclick={addNode} style="margin-right: 10px;"> Add Node </button>
-    <button onclick={deleteNode} style="margin-right: 10px;"> Delete Node </button>
-    <button onclick={deleteEdge} style="margin-right: 10px;"> Delete Edge </button>
-    <button onclick={() => onLayout('TB')} style="margin-right: 10px;"> Vertical Layout </button>
-    <button onclick={() => onLayout('LR')} style="margin-right: 10px;"> Horizontal Layout </button>
-    <SvelteSelect
-      items={pipelines}
-      bind:value={selectedPipeline}
-      placeholder="Search or select a pipeline..."
-      maxItems={5}
-      on:select={loadSelectedPipeline}
-    />
-    <button onclick={createPipeline} style="margin-right: 10px;"> Create pipeline </button>
-    <button onclick={deleteSelectedPipeline} style="margin-right: 10px;"> Delete pipeline </button>
-    <button onclick={branchPipelineFromNode} style="margin-right: 10px;"> Branch Pipeline from node </button>
-    <Button>Default</Button>
-    <Button onclick={() => (hidden1 = false)}>Show drawer</Button>
-    <Button onclick={addNode}> Add Node </Button>
+  <Navbar>
+    <NavUl class="ms-3 pt-1">
+      <NavLi class="cursor-pointer">
+        Pipeline Interaction<ChevronDownOutline class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white" />
+      </NavLi>
+      <Dropdown simple>
+        <DropdownItem>
+          <SvelteSelect
+            items={pipelines}
+            bind:value={selectedPipeline}
+            placeholder="Select a pipeline..."
+            maxItems={5}
+            on:select={loadSelectedPipeline}
+          />
+        </DropdownItem>
+        <DropdownItem onclick={() => (isHiddenPipelinePanel = false)}>Open selected pipeline panel</DropdownItem>
+        <DropdownItem onclick={createPipeline}>Create Pipeline</DropdownItem>
+        <DropdownItem onclick={branchPipelineFromNode}>Branch Pipeline from selected node</DropdownItem>
+        <DropdownItem onclick={deleteSelectedPipeline}>Delete Pipeline</DropdownItem>
+      </Dropdown>
+      <NavLi class="cursor-pointer">
+        Node interaction<ChevronDownOutline class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white" />
+      </NavLi>
+      <Dropdown simple>
+        <DropdownItem onclick={() => (isHiddenNodePanel = false)}>Open selected node panel</DropdownItem>
+        <DropdownItem onclick={addNode}>Create node</DropdownItem>
+        <DropdownItem class="text-gray-400 cursor-not-allowed">Copy selected nodes</DropdownItem>
+        <DropdownItem onclick={deleteNode}>Delete selected nodes</DropdownItem>
+        <DropdownItem onclick={deleteEdge}>Delete selected edge</DropdownItem>
+      </Dropdown>
+      <NavLi class="cursor-pointer">
+        Actions<ChevronDownOutline class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white" />
+      </NavLi>
+      <Dropdown simple>
+        <DropdownItem class="text-gray-400 cursor-not-allowed">Run pipeline</DropdownItem>
+        <DropdownItem class="text-gray-400 cursor-not-allowed">Run up to selected node</DropdownItem>
+        <DropdownItem class="text-gray-400 cursor-not-allowed">Open run panel</DropdownItem>
+      </Dropdown> 
+      <NavLi class="cursor-pointer">
+        Layout<ChevronDownOutline class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white" />
+      </NavLi>
+      <Dropdown simple>
+        <DropdownItem>Vertical</DropdownItem>
+        <DropdownItem>Horizontal</DropdownItem>
+        <DropdownItem class="text-gray-400 cursor-not-allowed">Auto reshape</DropdownItem>        
+      </Dropdown>      
+    </NavUl>
+  </Navbar>
 
-
-  </div>
-
-
-  <Drawer bind:hidden={hidden1} id="sidebar1" aria-controls="sidebar1" aria-labelledby="sidebar1">
+  <Drawer bind:hidden={isHiddenNodePanel} id="sidebar1" aria-controls="sidebar1" aria-labelledby="sidebar1">
     <div class="flex items-center justify-between">
       <h5 id="drawer-label" class="mb-4 inline-flex items-center text-base font-semibold text-gray-500 dark:text-gray-400">
         <InfoCircleSolid class="me-2.5 h-5 w-5" />Info
       </h5>
-      <CloseButton onclick={() => (hidden1 = true)} class="mb-4 dark:text-white" />
+      <CloseButton onclick={() => (isHiddenNodePanel = false)} class="mb-4 dark:text-white" />
     </div>
     <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">
       Supercharge your hiring by taking advantage of our <a href="/" class="text-primary-600 dark:text-primary-500 underline hover:no-underline">limited-time sale</a>
@@ -428,13 +457,9 @@
       <Button href="/" class="px-4">Get access <ArrowRightOutline class="ms-2 h-5 w-5" /></Button>
     </div>
   </Drawer>
+
   
-
   <SvelteFlow bind:nodes bind:edges fitView onconnect={handleConnect} {nodeTypes}>
-    <Panel position="center-left">
-      Example of pipeline id information box
-    </Panel>
-
     <Controls />
     <Background />
     <MiniMap />
