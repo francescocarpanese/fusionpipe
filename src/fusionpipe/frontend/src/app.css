@@ -45,6 +45,28 @@
 }
 
 
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.main-content {
+  flex: 1 1 0;
+  min-height: 0; /* Important for children with overflow */
+  overflow: hidden; /* Prevents unwanted scrollbars */
+}
+
+.main-content :global(.svelte-flow) {
+  height: 100%;
+}
+
 .svelte-flow {
   --xy-background-color: #f7f9fb;
   /* Custom Variables */
@@ -69,6 +91,7 @@
 
   --xy-resize-background-color-default: #9e86ed;
 }
+
 
 .svelte-flow__node {
   box-shadow: var(--xy-node-boxshadow-default);
