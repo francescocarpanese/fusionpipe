@@ -73,7 +73,7 @@ def add_node_to_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
 def delete_node_from_pipeline(pipeline_id: str, node_id: str, db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     try:
-        pip_utils.delete_node_from_pipeline_with_blocked_logic(cur, node_id=node_id, pipeline_id=pipeline_id)
+        pip_utils.delete_node_from_pipeline_with_editable_logic(cur, node_id=node_id, pipeline_id=pipeline_id)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()

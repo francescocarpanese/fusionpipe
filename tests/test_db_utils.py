@@ -1124,7 +1124,7 @@ def test_sanitize_node_relation(in_memory_db_conn):
     db_utils.add_node_relation(cur, child_id=node4, parent_id=node3)
     # node5 -> node6 (not in pipeline, not editable, should be remain)
     db_utils.add_node_relation(cur, child_id=node6, parent_id=node5)
-    # node5 -> node7 (parents are blocked and not in pipeline)
+    # node5 -> node7 (parents are not editable and not in pipeline)
     db_utils.add_node_relation(cur, child_id=node7, parent_id=node5)
 
     conn.commit()

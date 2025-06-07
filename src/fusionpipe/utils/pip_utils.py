@@ -349,7 +349,7 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
     return new_pip_id
 
 
-def delete_node_from_pipeline_with_blocked_logic(cur,pipeline_id, node_id):
+def delete_node_from_pipeline_with_editable_logic(cur,pipeline_id, node_id):
     # Check if the node is editable
     if db_utils.is_node_editable(cur, node_id=node_id):
         # If not editable, delete the node directly
