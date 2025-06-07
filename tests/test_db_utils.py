@@ -78,32 +78,66 @@ def test_add_node_to_entries(in_memory_db_conn):
 
 
 def test_remove_node_from_pipeline(in_memory_db_conn):
-    from fusionpipe.utils.db_utils import remove_node_from_pipeline
+    from fusionpipe.utils.db_utils import remove_node_from_pipeline, get_rows_with_node_id_in_entries, get_rows_node_id_in_nodes, is_node_editable
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
     conn = in_memory_db_conn
     cur = db_utils.init_db(conn)
 
-    # Create a node and a pipeline
+    # Create a node and two pipelines
     node_id = generate_node_id()
-    pipeline_id = generate_pip_id()
+    pipeline_id1 = generate_pip_id()
+    pipeline_id2 = generate_pip_id()
     db_utils.add_node_to_nodes(cur, node_id=node_id)
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id1, tag="test_pipeline_1")
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id2, tag="test_pipeline_2")
     # Add a tag to the node
     tag = "test_tag"
-    db_utils.add_node_tag(cur, node_id=node_id, pipeline_id=pipeline_id, tag=tag)
+    db_utils.add_node_tag(cur, node_id=node_id, pipeline_id=pipeline_id1, tag=tag)
+    db_utils.add_node_tag(cur, node_id=node_id, pipeline_id=pipeline_id2, tag=tag)
 
-    # Add entry to node_pipeline_relation table
+    # Add entry to node_pipeline_relation table for both pipelines
     user = "test_user"
-    entry_id = db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
+    entry_id1 = db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id1, user=user)
+    entry_id2 = db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id2, user=user)
     conn.commit()
 
-    # Remove the entry
+    # Remove the entry from the first pipeline
     cur = conn.cursor()
-    rows_deleted = remove_node_from_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    rows_deleted = remove_node_from_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id1)
     conn.commit()
-    assert rows_deleted == 1, "Entry was not deleted from the database."
+
+    # The node should still exist in the nodes table
+    assert db_utils.get_rows_node_id_in_nodes(cur, node_id), "Node was unexpectedly removed from nodes table."
+
+    # The node should still have an entry in node_pipeline_relation for the second pipeline
+    cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=? AND pipeline_id=?", (node_id, pipeline_id2))
+    assert cur.fetchone() is not None, "Node entry for second pipeline was removed unexpectedly."
+
+    # The node should still have tags for the second pipeline
+    cur.execute("SELECT * FROM node_tags WHERE node_id=? AND pipeline_id=?", (node_id, pipeline_id2))
+    assert cur.fetchone() is not None, "Node tag for second pipeline was removed unexpectedly."
+
+    # The node should be editable only if it is present in one or zero pipelines
+    editable = is_node_editable(cur, node_id)
+    cur.execute("SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id=?", (node_id,))
+    count = cur.fetchone()[0]
+    if count <= 1:
+        assert editable is True, "Node should be editable when present in one or zero pipelines."
+    else:
+        assert editable is False, "Node should not be editable when present in more than one pipeline."
+
+    # Now remove from the second pipeline as well
+    rows_deleted2 = remove_node_from_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id2)
+    conn.commit()
+
+    # Node should still exist in nodes table
+    assert db_utils.get_rows_node_id_in_nodes(cur, node_id), "Node was unexpectedly removed from nodes table after removing from all pipelines."
+
+    # Node should now be editable (since it's not in any pipeline)
+    editable = is_node_editable(cur, node_id)
+    assert editable is True, "Node should be editable when not present in any pipeline."
 
 
 
@@ -796,70 +830,6 @@ def test_duplicate_node_in_pipeline_with_relations(in_memory_db_conn):
 
 
 
-
-def test_replace_node_in_pipeline(in_memory_db_conn):
-    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
-    from fusionpipe.utils import db_utils
-
-    conn = in_memory_db_conn
-    cur = db_utils.init_db(conn)
-
-    # Setup: create nodes, pipeline, relations, node_pipeline_relation, and tags
-    old_node_id = generate_node_id()
-    new_node_id = f"{old_node_id}_repl"
-    parent_id = generate_node_id()
-    child_id = generate_node_id()
-    pipeline_id = generate_pip_id()
-    user = "test_user"
-    tag = "test_tag"
-
-    # Add nodes and pipeline
-    for node in [old_node_id, parent_id, child_id]:
-        db_utils.add_node_to_nodes(cur, node_id=node)
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
-
-    # Add relations: parent -> old_node -> child
-    db_utils.add_node_relation(cur, child_id=old_node_id, parent_id=parent_id)
-    db_utils.add_node_relation(cur, child_id=child_id, parent_id=old_node_id)
-
-    # Add entry and tag for old_node
-    db_utils.add_node_to_pipeline(cur, node_id=old_node_id, pipeline_id=pipeline_id, user=user)
-    db_utils.add_node_tag(cur, node_id=old_node_id, pipeline_id=pipeline_id, tag=tag)
-    conn.commit()
-
-    # Call the function under test
-    result_new_node_id = db_utils.replace_node_in_pipeline(cur, old_node_id, new_node_id, pipeline_id)
-    conn.commit()
-
-    # Check new node exists
-    cur.execute("SELECT * FROM nodes WHERE node_id=?", (new_node_id,))
-    assert cur.fetchone() is not None, "New node was not created."
-
-    # Check new node has correct parent and child relations
-    cur.execute("SELECT parent_id FROM node_relation WHERE child_id=?", (new_node_id,))
-    parent_rows = [row[0] for row in cur.fetchall()]
-    assert parent_id in parent_rows, "Parent relation not copied to new node."
-
-    cur.execute("SELECT child_id FROM node_relation WHERE parent_id=?", (new_node_id,))
-    child_rows = [row[0] for row in cur.fetchall()]
-    assert child_id in child_rows, "Child relation not copied to new node."
-
-    # Check new node has entry and tag in the pipeline
-    cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=? AND pipeline_id=?", (new_node_id, pipeline_id))
-    assert cur.fetchone() is not None, "Entry for new node not created."
-
-    cur.execute("SELECT * FROM node_tags WHERE node_id=? AND pipeline_id=?", (new_node_id, pipeline_id))
-    tag_row = cur.fetchone()
-    assert tag_row is not None, "Tag for new node not created."
-
-    # Check old node is removed from node_pipeline_relation and tags for this pipeline
-    cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=? AND pipeline_id=?", (old_node_id, pipeline_id))
-    assert cur.fetchone() is None, "Old node entry was not removed from pipeline."
-
-    # The function should return the new node id
-    assert result_new_node_id == new_node_id, "Returned new_node_id does not match expected value."
-
-
 def test_get_pipelines_with_node(in_memory_db_conn):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
@@ -1123,29 +1093,40 @@ def test_sanitize_node_relation(in_memory_db_conn):
     cur = db_utils.init_db(conn)
 
     # Create nodes and pipeline
-    node1 = generate_node_id()
-    node2 = generate_node_id()
-    node3 = generate_node_id()
-    node4 = generate_node_id()
+    node1 = 'n1'
+    node2 = 'n2'
+    node3 = 'n3'
+    node4 = 'n4'
+    node5 = 'n5'  # This node will not be editable
+    node6 = 'n6'  # This node will not be editable
+    node7 = 'n7'  # This node will be a child of node6
     pipeline_id = generate_pip_id()
     db_utils.add_node_to_nodes(cur, node_id=node1)
     db_utils.add_node_to_nodes(cur, node_id=node2)
     db_utils.add_node_to_nodes(cur, node_id=node3)
     db_utils.add_node_to_nodes(cur, node_id=node4)
+    db_utils.add_node_to_nodes(cur, node_id=node5, editable=False)  # Not editable
+    db_utils.add_node_to_nodes(cur, node_id=node6, editable=False)  # Not editable
+    db_utils.add_node_to_nodes(cur, node_id=node7)
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     db_utils.add_node_to_pipeline(cur, node_id=node1, pipeline_id=pipeline_id, user="user")
     db_utils.add_node_to_pipeline(cur, node_id=node2, pipeline_id=pipeline_id, user="user")
-    # node3 and node4 are not in the pipeline
+    db_utils.add_node_to_pipeline(cur, node_id=node7, pipeline_id=pipeline_id, user="user")
+    # node 1,2,3,7 are in the pipeline
+    # node3, node4, node5, node6 are not in the pipeline
+    # node5 and node6 are not editable
+    # node6 is parent of node 7
 
     # Add relations:
     # node1 -> node2 (both in pipeline, should remain)
     db_utils.add_node_relation(cur, child_id=node2, parent_id=node1)
-    # node1 -> node3 (parent in pipeline, child not, should be removed)
-    db_utils.add_node_relation(cur, child_id=node3, parent_id=node1)
-    # node4 -> node2 (child in pipeline, parent not, should be removed)
-    db_utils.add_node_relation(cur, child_id=node2, parent_id=node4)
     # node3 -> node4 (neither in pipeline, should remain untouched)
     db_utils.add_node_relation(cur, child_id=node4, parent_id=node3)
+    # node5 -> node6 (not in pipeline, not editable, should be remain)
+    db_utils.add_node_relation(cur, child_id=node6, parent_id=node5)
+    # node5 -> node7 (parents are blocked and not in pipeline)
+    db_utils.add_node_relation(cur, child_id=node7, parent_id=node5)
+
     conn.commit()
 
     # Sanitize relations
@@ -1156,6 +1137,6 @@ def test_sanitize_node_relation(in_memory_db_conn):
     cur.execute("SELECT child_id, parent_id FROM node_relation")
     relations = set(tuple(row) for row in cur.fetchall())
     assert (node2, node1) in relations, "Expected relation (node2, node1) to remain"
-    assert (node3, node1) not in relations, "Relation (node3, node1) should have been removed"
-    assert (node2, node4) not in relations, "Relation (node2, node4) should have been removed"
     assert (node4, node3) in relations, "Relation (node4, node3) should remain (unrelated to pipeline)"
+    assert (node6, node5) in relations, "Relation (node5, node6) should remain (not in pipeline)"
+    assert (node7, node5) not in relations, "Relation (node7, node6) should be removed (parent nodes are not in the pipeline)"

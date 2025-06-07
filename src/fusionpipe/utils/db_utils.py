@@ -189,11 +189,6 @@ def remove_node_from_relations(cur, node_id):
 
 def remove_node_from_node_pipeline_relation(cur, node_id):
     cur.execute('DELETE FROM node_pipeline_relation WHERE node_id = ?', (node_id,))
-    # Check if the node is present in more than one pipeline
-    cur.execute('SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id = ?', (node_id,))
-    count = cur.fetchone()[0]
-    if count <= 1:
-        cur.execute('UPDATE nodes SET editable = TRUE WHERE node_id = ?', (node_id,))
     return cur.rowcount
 
 def remove_node_from_everywhere(cur, node_id):
@@ -229,12 +224,14 @@ def get_rows_with_pipeline_id_in_pipelines(cur, pipeline_id):
     return cur.fetchall()
 
 def remove_node_from_pipeline(cur, node_id, pipeline_id):
-
-    # Remove node from node_pipeline_relation
-    cur.execute('DELETE FROM node_pipeline_relation WHERE node_id = ? AND pipeline_id = ?', (node_id, pipeline_id))
-    rows_deleted_entries = cur.rowcount
-    
-    return rows_deleted_entries
+    cur.execute('DELETE FROM node_pipeline_relation WHERE node_id = ? AND pipeline_id = ?', (node_id,pipeline_id))
+    # Make node editable if present in only 1 pipeline.
+    cur.execute('SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id = ?', (node_id,))
+    count = cur.fetchone()[0]
+    if count <= 1:
+        cur.execute('UPDATE nodes SET editable = TRUE WHERE node_id = ?', (node_id,))
+    sanitize_node_relation(cur, pipeline_id)
+    return cur.rowcount    
 
 def duplicate_pipeline_in_pipelines(cur, source_pipeline_id, new_pipeline_id):
     # Duplicate the pipeline in pipelines table
@@ -358,12 +355,6 @@ def duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id, 
     copy_node_relations(cur, source_node_id, new_node_id)
     return new_node_id
 
-def replace_node_in_pipeline(cur, old_node_id, new_node_id, pipeline_id):
-    duplicate_node_in_pipeline_with_relations(cur, old_node_id, new_node_id, pipeline_id)
-    # Remove old node from node_pipeline_relation
-    remove_node_from_pipeline(cur, old_node_id, pipeline_id)
-    return new_node_id
-
 def get_pipelines_with_node(cur, node_id):
     cur.execute('SELECT pipeline_id FROM node_pipeline_relation WHERE node_id = ?', (node_id,))
     return [row[0] for row in cur.fetchall()]
@@ -420,7 +411,6 @@ def get_node_notes(cur, node_id):
     row = cur.fetchone()
     return row[0] if row else None
 
-# TODO To be tested
 def get_rows_with_pipeline_id_in_node_tags(cur, pipeline_id):
     cur.execute('SELECT * FROM node_tags WHERE pipeline_id = ?', (pipeline_id,))
     return cur.fetchall()
@@ -434,6 +424,11 @@ def get_all_pipeline_ids(cur):
     return [row[0] for row in cur.fetchall()]
 
 def sanitize_node_relation(cur, pipeline_id):
+    """
+    Inside a pipeline, nodes cannot be attached to nodes that do not belong to the same pipeline.
+    This function removes any node relations that violate this rule.
+    It checks all nodes in the pipeline and removes relations where the child node is not part of the pipeline.
+    """
     # Get all nodes in the pipeline
     cur.execute('SELECT node_id FROM node_pipeline_relation WHERE pipeline_id = ?', (pipeline_id,))
     pipeline_nodes = {row[0] for row in cur.fetchall()}
@@ -442,9 +437,13 @@ def sanitize_node_relation(cur, pipeline_id):
     cur.execute('SELECT id, child_id, parent_id FROM node_relation')
     relations = cur.fetchall()
 
-    # Remove relations for nodes that are not in the pipeline
-    for relation_id, child_id, parent_id in relations:
-        if child_id in pipeline_nodes and parent_id not in pipeline_nodes:
-            cur.execute('DELETE FROM node_relation WHERE id = ?', (relation_id,))
-        elif parent_id in pipeline_nodes and child_id not in pipeline_nodes:
-            cur.execute('DELETE FROM node_relation WHERE id = ?', (relation_id,))
+    for node_id in pipeline_nodes:
+        if is_node_editable(cur, node_id):
+            # Get all relations where the node is a child
+            cur.execute('SELECT id, parent_id FROM node_relation WHERE child_id = ?', (node_id,))
+            child_relations = cur.fetchall()
+
+            # Remove relations where the parent node is not in the pipeline
+            for relation_id, parent_id in child_relations:
+                if parent_id not in pipeline_nodes:
+                    cur.execute('DELETE FROM node_relation WHERE id = ?', (relation_id,))

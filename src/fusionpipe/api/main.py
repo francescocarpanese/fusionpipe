@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from fusionpipe.utils import db_utils
+
 import yaml
 import argparse
 import uvicorn
