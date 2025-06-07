@@ -346,9 +346,4 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
     # Add the new graph to the database
     graph_to_db(new_graph, cur)
 
-    # # Remove the original nodes (with old IDs) from the new pipeline
-    # for old_id in nodes_to_replace:
-    #     db_utils.remove_node_from_pipeline(cur, node_id=old_id, pipeline_id=new_pip_id)
-
-    # Sanitize the node connection
-    #db_utils.sanitize_node_relation(cur, new_pip_id)
+    return new_pip_id
