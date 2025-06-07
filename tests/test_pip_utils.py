@@ -216,12 +216,12 @@ def test_visualize_pip_static_runs_without_error(monkeypatch, dag_dummy_1):
 
 from conftest import PARENT_NODE_LIST
 @pytest.mark.parametrize("start_node", PARENT_NODE_LIST)
-def test_iterate_pipeline_from_node(in_memory_db_conn, dag_dummy_1, start_node):
+def test_branch_pipeline_from_node(in_memory_db_conn, dag_dummy_1, start_node):
     """
-    Test that iterate_pipeline_from_node creates a new pipeline where all nodes are preserved,
+    Test that branch_pipeline_from_node creates a new pipeline where all nodes are preserved,
     except the provided node and all its descendants, which are replaced with new IDs.
     """
-    from fusionpipe.utils.pip_utils import iterate_pipeline_from_node, db_to_graph_from_pip_id
+    from fusionpipe.utils.pip_utils import branch_pipeline_from_node, db_to_graph_from_pip_id
     from fusionpipe.utils import db_utils
     import networkx as nx
 
@@ -239,8 +239,8 @@ def test_iterate_pipeline_from_node(in_memory_db_conn, dag_dummy_1, start_node):
     # Get all pipeline IDs before
     pipeline_ids_before = set(db_utils.get_all_pipeline_ids(cur))
 
-    # Run iterate_pipeline_from_node
-    iterate_pipeline_from_node(cur, original_graph.graph['pipeline_id'], start_node)
+    # Run branch_pipeline_from_node
+    branch_pipeline_from_node(cur, original_graph.graph['pipeline_id'], start_node)
     conn.commit()
 
     # Get all pipeline IDs after

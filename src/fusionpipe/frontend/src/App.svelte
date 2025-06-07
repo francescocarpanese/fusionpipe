@@ -245,7 +245,7 @@
   }
 
 
-  async function iteratePipelineFromNode() {
+  async function branchPipelineFromNode() {
     const pipelineId = typeof selectedPipeline === "string" ? selectedPipeline : selectedPipeline.value;
     if (!selectedPipeline) {
       console.error("No pipeline selected");
@@ -261,7 +261,7 @@
     const startNodeId = selectedNode.id;
 
     try {
-      const response = await fetch(`http://localhost:8000/iterate_pipeline/${pipelineId}/${startNodeId}`, {
+      const response = await fetch(`http://localhost:8000/branch_pipeline/${pipelineId}/${startNodeId}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -269,7 +269,7 @@
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to iterate pipeline: ${response.statusText}`);
+        throw new Error(`Failed to branch pipeline: ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -281,7 +281,7 @@
 
     } catch (error) {
       console.error("Error iterating pipeline:", error);
-      alert("Failed to iterate pipeline.");
+      alert("Failed to branch pipeline.");
     }
   }
 
@@ -378,7 +378,7 @@
     />
     <button onclick={createPipeline} style="margin-right: 10px;"> Create pipeline </button>
     <button onclick={deleteSelectedPipeline} style="margin-right: 10px;"> Delete pipeline </button>
-    <button onclick={iteratePipelineFromNode} style="margin-right: 10px;"> Iterate Pipeline from node </button>
+    <button onclick={branchPipelineFromNode} style="margin-right: 10px;"> Branch Pipeline from node </button>
 
     
   </div>

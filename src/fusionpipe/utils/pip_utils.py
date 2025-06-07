@@ -299,9 +299,9 @@ def visualize_pip_interactive(graph, output_file="pipeline_visualization.html"):
     net.write_html(output_file)
 
 
-def iterate_pipeline_from_node(cur, pipeline_id, node_id):
+def branch_pipeline_from_node(cur, pipeline_id, node_id):
     """
-    Iterate a pipeline from a node means:
+    Branch a pipeline from a node means:
     - Copy the pipeline.
     - All nodes are preserved, except the specified node and all its descendants,
       for which new nodes are created (with new IDs).
