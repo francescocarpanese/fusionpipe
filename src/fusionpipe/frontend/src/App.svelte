@@ -146,6 +146,38 @@
   }
 
 
+  // Delete selected edges
+  async function deleteEdge() {
+    const pipelineId = typeof selectedPipeline === "string" ? selectedPipeline : selectedPipeline.value;
+    if (!selectedPipeline) {
+      console.error("No pipeline selected");
+      return;
+    }
+
+    const selectedEdgeIds = edges
+      .filter((edge) => edge.selected)
+      .map((edge) => edge.id);
+
+    await Promise.all(selectedEdgeIds.map(async (edgeId) => {
+      const edge = edges.find(e => e.id === edgeId);
+      if (!edge) return;
+      try {
+        const response = await fetch(`http://localhost:8000/delete_edge/${pipelineId}/${edge.source}/${edge.target}`, {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to delete edge ${edgeId}: ${response.statusText}`);
+        }
+      } catch (error) {
+        console.error(`Error deleting edge ${edgeId}:`, error);
+      }
+    }));
+    await loadPipeline(pipelineId);
+  }
+
   let pipelines: string[] = [];
   let selectedPipeline = "";
 
@@ -367,6 +399,7 @@
   <div style="position: absolute; top: 0; left: 0; width: 100%; background-color: #f4f4f4; padding: 10px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); z-index: 10;">
     <button onclick={addNode} style="margin-right: 10px;"> Add Node </button>
     <button onclick={deleteNode} style="margin-right: 10px;"> Delete Node </button>
+    <button onclick={deleteEdge} style="margin-right: 10px;"> Delete Edge </button>
     <button onclick={() => onLayout('TB')} style="margin-right: 10px;"> Vertical Layout </button>
     <button onclick={() => onLayout('LR')} style="margin-right: 10px;"> Horizontal Layout </button>
     <SvelteSelect

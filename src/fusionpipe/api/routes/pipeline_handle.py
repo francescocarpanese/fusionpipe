@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, Depends, HTTPException
 import os
 from fastapi.responses import JSONResponse
@@ -80,6 +79,17 @@ def delete_node_from_pipeline(pipeline_id: str, node_id: str, db_conn=Depends(ge
         raise HTTPException(status_code=500, detail=str(e))
     
     return {"message": f"Node {node_id} deleted from pipeline {pipeline_id}"}
+
+@router.delete("/delete_edge/{pipeline_id}/{source}/{target}")
+def delete_edge(pipeline_id: str, source: str, target: str, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    try:
+        db_utils.remove_node_relation_with_editable_logic(cur, parent_id=source, child_id=target)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Edge {source} -> {target} deleted from pipeline {pipeline_id}"}
 
 @router.post("/connect_nodes")
 async def connect_nodes_in_pipeline(payload: dict, db_conn=Depends(get_db)):

@@ -447,3 +447,15 @@ def sanitize_node_relation(cur, pipeline_id):
             for relation_id, parent_id in child_relations:
                 if parent_id not in pipeline_nodes:
                     cur.execute('DELETE FROM node_relation WHERE id = ?', (relation_id,))
+
+
+def remove_node_relation_with_editable_logic(cur, parent_id, child_id):
+    """
+    Can only remove relation between nodes if childen is editable
+    """
+    if is_node_editable(cur,child_id):
+        # Remove the relation
+        cur.execute('DELETE FROM node_relation WHERE parent_id = ? AND child_id = ?', (parent_id, child_id))
+        return cur.rowcount
+    else:
+        raise ValueError(f"Cannot remove relation: Node {child_id} is not editable.")
