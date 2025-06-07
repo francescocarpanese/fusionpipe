@@ -347,3 +347,25 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
     graph_to_db(new_graph, cur)
 
     return new_pip_id
+
+
+def delete_node_from_pipeline_with_blocked_logic(cur,pipeline_id, node_id):
+    # Check if the node is editable
+    if db_utils.is_node_editable(cur, node_id=node_id):
+        # If not editable, delete the node directly
+        db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node_id)
+        return
+
+    # Get the pipeline graph from the database
+    graph = db_to_graph_from_pip_id(cur, pipeline_id)
+
+    # Get subgraph of non-editable nodes
+    non_editable_nodes = [n for n in graph.nodes if not graph.nodes[n].get('editable', True)]
+    subgraph = graph.subgraph(non_editable_nodes)
+
+    # Check if the node is a leaf (no children)
+    if list(subgraph.successors(node_id)):
+        raise ValueError(f"Node {node_id} is not a leaf of non editable subgraph.")
+
+    # Delete the node from the pipeline
+    db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node_id)
