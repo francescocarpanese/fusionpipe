@@ -116,9 +116,7 @@ def graph_dict_to_db(graph_dict, cur):
             node_tag = node_data["tag"]
 
             db_utils.add_node_to_nodes(cur, node_id=node_id, status=status, editable=editable, notes=node_notes)
-            db_utils.add_node_tag(cur, node_id=node_id, pipeline_id=pipeline_id, tag=node_tag)
-            db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
-
+            db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, node_tag=node_tag)
 
         # Insert node relations (edges) using parents field
         for child_id, node_data in graph_dict["nodes"].items():
@@ -160,9 +158,7 @@ def graph_to_db(Gnx, cur):
             # If node already existed, parants cannot have change. Children can and will be added later
             for parent in Gnx.predecessors(node):
                 db_utils.add_node_relation(cur, child_id=node_id, parent_id=parent)
-
-        db_utils.add_node_tag(cur, node_id=node_id, pipeline_id=pip_id, tag=node_tag)
-        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pip_id)
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pip_id, node_tag=node_tag)
 
 
 

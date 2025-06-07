@@ -334,7 +334,7 @@
         id,
         type: 'custom',
         data: {
-          label: `${id}\n ${node.tag}`,
+            label: `node_id:${id}\nnode_tag:${node.tag}`,
           editable: node.editable,
         },
         position: { x: Math.random() * 400, y: Math.random() * 400 },
