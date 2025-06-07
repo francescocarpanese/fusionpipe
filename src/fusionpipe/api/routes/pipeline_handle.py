@@ -110,7 +110,7 @@ async def connect_nodes_in_pipeline(payload: dict, db_conn=Depends(get_db)):
 def delete_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     try:
-        db_utils.remove_pipeline(cur, pipeline_id=pipeline_id)
+        db_utils.remove_pipeline_from_everywhere(cur, pipeline_id=pipeline_id)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()

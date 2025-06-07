@@ -1067,7 +1067,7 @@ def test_remove_pipeline_removes_pipeline_and_leaves_related_data(in_memory_db_c
     conn.commit()
 
     # Remove the pipeline
-    db_utils.remove_pipeline(cur, pipeline_id)
+    db_utils.remove_pipeline_from_pipeline(cur, pipeline_id)
     conn.commit()
 
     # Check that the pipeline is removed
@@ -1140,3 +1140,40 @@ def test_sanitize_node_relation(in_memory_db_conn):
     assert (node4, node3) in relations, "Relation (node4, node3) should remain (unrelated to pipeline)"
     assert (node6, node5) in relations, "Relation (node5, node6) should remain (not in pipeline)"
     assert (node7, node5) not in relations, "Relation (node7, node6) should be removed (parent nodes are not in the pipeline)"
+
+def test_remove_pipeline_from_everywhere(in_memory_db_conn):
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+    from fusionpipe.utils import db_utils
+
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+
+    # Create a pipeline and related data
+    pipeline_id = generate_pip_id()
+    node_id = generate_node_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline", owner="owner", notes="notes")
+    db_utils.add_node_to_nodes(cur, node_id=node_id)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+    db_utils.add_node_tag(cur, node_id=node_id, pipeline_id=pipeline_id, tag="tag1")
+    conn.commit()
+
+    # Remove the pipeline from everywhere
+    db_utils.remove_pipeline_from_everywhere(cur, pipeline_id)
+    conn.commit()
+
+    # Check that the pipeline is removed
+    cur.execute("SELECT * FROM pipelines WHERE pipeline_id=?", (pipeline_id,))
+    assert cur.fetchone() is None, "Pipeline was not removed from pipelines table."
+
+    # Check that related data is also removed
+    cur.execute("SELECT * FROM node_pipeline_relation WHERE pipeline_id=?", (pipeline_id,))
+    assert cur.fetchone() is None, "node_pipeline_relation entry was not removed."
+
+    cur.execute("SELECT * FROM node_tags WHERE pipeline_id=?", (pipeline_id,))
+    assert cur.fetchone() is None, "node_tags entry was not removed."
+
+    # Node should still exist
+    cur.execute("SELECT * FROM nodes WHERE node_id=?", (node_id,))
+    assert cur.fetchone() is not None, "Node was unexpectedly removed."
+
+

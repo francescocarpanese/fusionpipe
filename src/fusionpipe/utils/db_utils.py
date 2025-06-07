@@ -345,9 +345,18 @@ def copy_node_relations(cur, source_node_id, new_node_id):
 
     return new_node_id
 
-def remove_pipeline(cur, pipeline_id):
-    # Remove the pieline from pipeline tables
+def remove_pipeline_from_pipeline(cur, pipeline_id):
+    # Remove the pieline from pipeline tables.
+    # This way the pipeline is still available in the database, but not visible in the UI,
+    # and can be repristinated.
     cur.execute('DELETE FROM pipelines WHERE pipeline_id = ?', (pipeline_id,))
+
+def remove_pipeline_from_everywhere(cur, pipeline_id):
+    # Remove the pipeline from all tables
+    cur.execute('DELETE FROM pipelines WHERE pipeline_id = ?', (pipeline_id,))
+    cur.execute('DELETE FROM node_pipeline_relation WHERE pipeline_id = ?', (pipeline_id,))
+    cur.execute('DELETE FROM node_tags WHERE pipeline_id = ?', (pipeline_id,))
+    update_editable_status_for_all_nodes(cur)
 
 def duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id, pipeline_id):
     # Duplicate the node in a pipeline with copying relations
