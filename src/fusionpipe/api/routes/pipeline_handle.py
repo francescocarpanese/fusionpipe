@@ -27,18 +27,19 @@ def create_pipeline(db_conn=Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
     return {"pipeline_id": pipeline_id, "message": "Pipeline created"}
 
-@router.get("/get_all_pipeline_ids")
+@router.get("/get_all_pipeline_ids_tags_dict")
 def get_pip_ids(db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     try:
-        pip_ids = db_utils.get_all_pipeline_ids(cur)
+        ids_tags_dict = db_utils.get_all_pipeline_ids_tags_dict(cur)
+        db_conn.commit()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-    if not pip_ids:
-        pip_ids = []
+    if not ids_tags_dict:
+        ids_tags_dict = {}
     
-    return {"pip_ids": pip_ids}
+    return ids_tags_dict
 
 @router.get("/get_pipeline/{pipeline_id}")
 def get_pipeline(pipeline_id: str, db_conn=Depends(get_db)):

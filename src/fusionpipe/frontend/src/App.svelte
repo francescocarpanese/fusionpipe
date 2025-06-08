@@ -28,6 +28,7 @@
     Navbar,
     NavBrand,
     NavHamburger,
+    Radio,
     NavUl,
     NavLi,
   } from "flowbite-svelte";
@@ -36,7 +37,8 @@
   // Variables and state definitions
   let nodes = $state<Node[]>([]);
   let edges = $state([]);
-  let selectedPipeline = $state(null);
+  let selectedPipelineDropdown = $state(null);
+  let currentPipelineId = $state("");
   const nodeWidth = 172;
   const nodeHeight = 36;
   let nodeDrawereForm = $state({
@@ -53,10 +55,17 @@
 
   let isHiddenPipelinePanel = $state(true);
   let isHiddenNodePanel = $state(true);
-  let pipelines = $state([]);
+  let ids_tags_dict = $state<Record<string, string>>({});
+  let pipelines_dropdown = $state<string[]>([]);
+
 
   let nodeTypes = { custom: CustomNode };
   const dagreGraph = new dagre.graphlib.Graph();
+
+  let radiostate = $state(2) // selector for what to display in pipeline list 1 for ids, 2 for tags
+
+
+
 
   dagreGraph.setDefaultEdgeLabel(() => ({}));
 
@@ -119,11 +128,11 @@
   async function addNode() {
     try {
       const pipelineId =
-        typeof selectedPipeline === "string"
-          ? selectedPipeline
-          : selectedPipeline.value;
+        typeof currentPipelineId === "string"
+          ? currentPipelineId
+          : currentPipelineId.value;
 
-      if (!selectedPipeline) {
+      if (!pipelineId) {
         console.error("No pipeline selected");
         return;
       }
@@ -141,7 +150,7 @@
         throw new Error(`Failed to add node: ${response.statusText}`);
       }
 
-      loadSelectedPipeline();
+      await loadPipeline(pipelineId);
     } catch (error) {
       console.error("Error adding node:", error);
     }
@@ -149,11 +158,11 @@
 
   async function deleteNode() {
     const pipelineId =
-      typeof selectedPipeline === "string"
-        ? selectedPipeline
-        : selectedPipeline.value;
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
 
-    if (!selectedPipeline) {
+    if (!pipelineId) {
       console.error("No pipeline selected");
       return;
     }
@@ -189,11 +198,11 @@
 
   async function deleteEdge() {
     const pipelineId =
-      typeof selectedPipeline === "string"
-        ? selectedPipeline
-        : selectedPipeline.value;
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
 
-    if (!selectedPipeline) {
+    if (!pipelineId) {
       console.error("No pipeline selected");
       return;
     }
@@ -234,16 +243,14 @@
   async function fetchPipelines() {
     try {
       const response = await fetch(
-        "http://localhost:8000/get_all_pipeline_ids",
+        "http://localhost:8000/get_all_pipeline_ids_tags_dict",
       );
 
       if (!response.ok) {
         throw new Error(`Failed to fetch pipelines: ${response.statusText}`);
       }
 
-      const data = await response.json();
-
-      pipelines = data.pip_ids;
+      ids_tags_dict = await response.json();
     } catch (error) {
       console.error("Error fetching pipelines:", error);
     }
@@ -256,11 +263,11 @@
     console.log(`Connected nodes: ${source} → ${target}`);
 
     const pipelineId =
-      typeof selectedPipeline === "string"
-        ? selectedPipeline
-        : selectedPipeline.value;
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
 
-    if (!selectedPipeline) {
+    if (!pipelineId) {
       console.error("No pipeline selected");
       return;
     }
@@ -297,7 +304,7 @@
       const newPipelineId = data.pipeline_id || data.id || data.pip_id;
 
       await fetchPipelines();
-      selectedPipeline = newPipelineId;
+      currentPipelineId = newPipelineId;
       await loadPipeline(newPipelineId);
     } catch (error) {
       console.error("Error creating pipeline:", error);
@@ -305,15 +312,15 @@
   }
 
   async function deleteSelectedPipeline() {
-    if (!selectedPipeline) {
+    if (!currentPipelineId) {
       alert("No pipeline selected");
       return;
     }
 
     const pipelineId =
-      typeof selectedPipeline === "string"
-        ? selectedPipeline
-        : selectedPipeline.value;
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
     const confirmed = confirm(
       `Are you sure you want to delete pipeline "${pipelineId}"? This action cannot be undone.`,
     );
@@ -334,7 +341,7 @@
       }
 
       await fetchPipelines();
-      selectedPipeline = "";
+      currentPipelineId = "";
       nodes = [];
       edges = [];
     } catch (error) {
@@ -345,11 +352,11 @@
 
   async function branchPipelineFromNode() {
     const pipelineId =
-      typeof selectedPipeline === "string"
-        ? selectedPipeline
-        : selectedPipeline.value;
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
 
-    if (!selectedPipeline) {
+    if (!pipelineId) {
       console.error("No pipeline selected");
       return;
     }
@@ -439,11 +446,11 @@
 
   async function loadSelectedPipeline() {
     const pipelineId =
-      typeof selectedPipeline === "string"
-        ? selectedPipeline
-        : selectedPipeline.value;
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
 
-    if (!selectedPipeline) {
+    if (!currentPipelineId) {
       console.error("No pipeline selected");
       return;
     }
@@ -454,15 +461,15 @@
   // Add refs for the input fields
 
   async function updateNodeInfo() {
-    if (!nodeDrawereForm || !selectedPipeline) {
+    if (!nodeDrawereForm || !currentPipelineId) {
       console.error("No node or pipeline selected");
       return;
     }
 
     const pipelineId =
-      typeof selectedPipeline === "string"
-        ? selectedPipeline
-        : selectedPipeline.value;
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
     const nodeId = nodeDrawereForm.id;
     const newTag = nodeDrawereForm.tag;
     const newNotes = nodeDrawereForm.notes;
@@ -520,14 +527,14 @@
 
   // Add a function to update pipeline info
   async function updatePipelineInfo() {
-    if (!pipelineDrawerForm || !selectedPipeline) {
+    if (!pipelineDrawerForm || !currentPipelineId) {
       console.error("No pipeline selected");
       return;
     }
     const pipelineId =
-      typeof selectedPipeline === "string"
-        ? selectedPipeline
-        : selectedPipeline.value;
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
     const newTag = pipelineDrawerForm.tag;
     const newNotes = pipelineDrawerForm.notes;
 
@@ -586,11 +593,11 @@
 
   // Effect to load pipeline info when the panel is opened
   $effect(() => {
-    if (!isHiddenPipelinePanel && selectedPipeline) {
+    if (!isHiddenPipelinePanel && currentPipelineId) {
       const pipelineId =
-        typeof selectedPipeline === "string"
-          ? selectedPipeline
-          : selectedPipeline.value;
+        typeof currentPipelineId === "string"
+          ? currentPipelineId
+          : currentPipelineId.value;
       loadPipelineInfo(pipelineId);
     }
     if (isHiddenPipelinePanel) {
@@ -598,8 +605,32 @@
     }
   });
 
+  $effect(() => {
+    if (radiostate === 1) {
+      pipelines_dropdown = Object.keys(ids_tags_dict);
+    } else if (radiostate === 2) {
+      pipelines_dropdown = Object.values(ids_tags_dict);
+    }
+    selectedPipelineDropdown = null;
+  });
+
+  $effect(() => {
+    if (selectedPipelineDropdown) {
+      if (radiostate === 1) {
+        currentPipelineId = selectedPipelineDropdown.value;
+      } else if (radiostate === 2) {
+      // Dropdown contains tags, so find the pipeline ID for the selected tag
+      currentPipelineId = Object.keys(ids_tags_dict).find(
+          key => ids_tags_dict[key] === selectedPipelineDropdown.value
+        );
+      }
+    }
+  });
+
   $effect(fetchPipelines);
 </script>
+
+
 
 <div class="app-layout">
   <Navbar>
@@ -611,14 +642,24 @@
       </NavLi>
       <Dropdown simple>
         <DropdownItem>
+          <li>
+            <Radio name="radio_state" bind:group={radiostate} value={1}>List ids</Radio>
+          </li>
+          <li>
+            <Radio name="radio_state" bind:group={radiostate} value={2}>List tags</Radio>
+          </li>
+        </DropdownItem>
+        <DropdownItem>
           <SvelteSelect
-            items={pipelines}
-            bind:value={selectedPipeline}
+            items={pipelines_dropdown}
+            bind:value={selectedPipelineDropdown}
             placeholder="Select a pipeline..."
             maxItems={5}
             on:select={loadSelectedPipeline}
           />
         </DropdownItem>
+
+        <DropdownDivider />
         <DropdownItem onclick={() => (isHiddenPipelinePanel = false)}
           >Open selected pipeline panel</DropdownItem
         >
@@ -757,6 +798,9 @@
       style="height: 100%;"
       disableKeyboardA11y={true}
     >
+  <Panel position="top-left">
+    Current Pipeline: {currentPipelineId || "None"}
+  </Panel>
       <Controls />
       <Background />
       <MiniMap />

@@ -570,7 +570,7 @@ def test_duplicate_pipeline(in_memory_db_conn):
     new_pipeline = cur.fetchone()
     assert new_pipeline is not None, "New pipeline was not created."
     assert new_pipeline[0] == new_pipeline_id
-    assert new_pipeline[1] == "v1.0"  # Tag should match the source pipeline
+    assert new_pipeline[1] == new_pipeline_id  # Tag should match the source pipeline
     assert new_pipeline[2] == "group1"  # Owner should match the source pipeline
     assert new_pipeline[3] == "This is the source pipeline."  # Notes should match the source pipeline
 

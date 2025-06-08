@@ -322,6 +322,7 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
     new_graph = nx.DiGraph()
     new_graph.graph.update(original_graph.graph)
     new_graph.graph['pipeline_id'] = new_pip_id
+    new_graph.graph['tag'] = new_pip_id
 
     # Add nodes: copy all nodes, but for nodes_to_replace use new IDs
     for n in original_graph.nodes:

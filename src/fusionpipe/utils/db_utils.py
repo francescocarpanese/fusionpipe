@@ -27,7 +27,7 @@ def init_db(conn):
     cur.execute('''
         CREATE TABLE IF NOT EXISTS pipelines (
             pipeline_id TEXT PRIMARY KEY,
-            tag TEXT DEFAULT NULL,
+            tag TEXT UNIQUE DEFAULT NULL,
             owner TEXT DEFAULT NULL,
             notes TEXT DEFAULT NULL
         )
@@ -70,6 +70,8 @@ def init_db(conn):
 
 
 def add_pipeline(cur, pipeline_id, tag=None, owner=None, notes=None):
+    if tag is None:
+        tag = pipeline_id
     cur.execute('INSERT INTO pipelines (pipeline_id, tag, owner, notes) VALUES (?, ?, ?, ?)', (pipeline_id, tag, owner, notes))
     return cur.lastrowid
 
@@ -238,10 +240,10 @@ def duplicate_pipeline(cur, source_pipeline_id, new_pipeline_id):
     # Duplicate pipelines table
     cur.execute('''
         INSERT INTO pipelines (pipeline_id, tag, owner, notes)
-        SELECT ?, tag, owner, notes
+        SELECT ?, ?, owner, notes
         FROM pipelines
         WHERE pipeline_id = ?
-    ''', (new_pipeline_id, source_pipeline_id))
+    ''', (new_pipeline_id, new_pipeline_id, source_pipeline_id))
 
     # Duplicate node_pipeline_relation table
     cur.execute('''
@@ -375,6 +377,14 @@ def get_rows_with_pipeline_id_in_pipeline_description(cur, pipeline_id):
 def get_all_pipeline_ids(cur):
     cur.execute('SELECT pipeline_id FROM pipelines')
     return [row[0] for row in cur.fetchall()]
+
+def get_all_pipeline_tags(cur):
+    cur.execute('SELECT tag FROM pipelines')
+    return [row[0] for row in cur.fetchall()]
+
+def get_all_pipeline_ids_tags_dict(cur):
+    cur.execute('SELECT pipeline_id, tag FROM pipelines ORDER BY pipeline_id')
+    return {row[0]: row[1] for row in cur.fetchall()}
 
 def sanitize_node_relation(cur, pipeline_id):
     """
