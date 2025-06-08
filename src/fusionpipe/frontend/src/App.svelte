@@ -34,9 +34,9 @@
   } from "flowbite-svelte";
   import { ChevronDownOutline } from "flowbite-svelte-icons";
 
-  // Variables and state definitions
+  //  --- Variables and state definitions --- 
   let nodes = $state<Node[]>([]);
-  let edges = $state([]);
+  let edges = $state.raw<Edge[]>([]);
   let selectedPipelineDropdown = $state(null);
   let currentPipelineId = $state("");
   const nodeWidth = 172;
@@ -66,6 +66,7 @@
 
 
 
+  // --  Definitions of functions --- 
 
   dagreGraph.setDefaultEdgeLabel(() => ({}));
 
@@ -124,6 +125,12 @@
         return "#FFFFFF";
     }
   }
+
+  function refreshLayout() {
+  const layouted = getLayoutedElements(nodes, edges);
+  nodes = [...layouted.nodes];
+  edges = [...layouted.edges];
+}
 
   async function addNode() {
     try {
@@ -711,8 +718,9 @@
       <Dropdown simple>
         <DropdownItem>Vertical</DropdownItem>
         <DropdownItem>Horizontal</DropdownItem>
-        <DropdownItem class="text-gray-400 cursor-not-allowed"
-          >Auto reshape</DropdownItem
+        <DropdownItem onclick={refreshLayout}>
+          Auto reshape
+        </DropdownItem
         >
       </Dropdown>
     </NavUl>
