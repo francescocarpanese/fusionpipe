@@ -416,3 +416,11 @@ def remove_node_relation_with_editable_logic(cur, parent_id, child_id):
 def update_node_notes(cur, node_id, notes):
     cur.execute('UPDATE nodes SET notes = ? WHERE node_id = ?', (notes, node_id))
     return cur.rowcount
+
+def update_pipeline_tag(cur, pipeline_id, tag):
+    cur.execute('UPDATE pipelines SET tag = ? WHERE pipeline_id = ?', (tag, pipeline_id))
+    return cur.rowcount
+
+def update_pipeline_notes(cur, pipeline_id, notes):
+    cur.execute('UPDATE pipelines SET notes = ? WHERE pipeline_id = ?', (notes, pipeline_id))
+    return cur.rowcount

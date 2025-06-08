@@ -32,7 +32,6 @@
     NavLi,
   } from "flowbite-svelte";
   import { ChevronDownOutline } from "flowbite-svelte-icons";
-  import { get } from "svelte/store";
 
   // Variables and state definitions
   let nodes = $state<Node[]>([]);
@@ -40,12 +39,17 @@
   let selectedPipeline = $state(null);
   const nodeWidth = 172;
   const nodeHeight = 36;
-  let drawerForm = $state({
-  id: "",
-  tag: "",
-  notes: ""
+  let nodeDrawereForm = $state({
+    id: "",
+    tag: "",
+    notes: "",
   });
 
+  let pipelineDrawerForm = $state({
+    id: "",
+    tag: "",
+    notes: "",
+  });
 
   let isHiddenPipelinePanel = $state(true);
   let isHiddenNodePanel = $state(true);
@@ -142,34 +146,6 @@
       console.error("Error adding node:", error);
     }
   }
-
-
-  $effect(() => {
-  if (!isHiddenNodePanel) {
-    const selectedNodes = nodes.filter((node) => node.selected);
-    if (selectedNodes.length === 1) {
-      const selectedNode = selectedNodes[0];
-      drawerForm = {
-        id: selectedNode.id,
-        tag: selectedNode.data?.label || "No tag",
-        notes: selectedNode.data?.notes || "",
-      };
-    } else {
-      drawerForm = {
-        id: "",
-        tag: "",
-        notes: ""
-      };
-    }
-  } else {
-    drawerForm = {
-      id: "",
-      tag: "",
-      notes: ""
-    };
-  }
-});
-
 
   async function deleteNode() {
     const pipelineId =
@@ -478,7 +454,7 @@
   // Add refs for the input fields
 
   async function updateNodeInfo() {
-    if (!drawerForm || !selectedPipeline) {
+    if (!nodeDrawereForm || !selectedPipeline) {
       console.error("No node or pipeline selected");
       return;
     }
@@ -487,9 +463,9 @@
       typeof selectedPipeline === "string"
         ? selectedPipeline
         : selectedPipeline.value;
-    const nodeId = drawerForm.id;
-    const newTag = drawerForm.tag;
-    const newNotes = drawerForm.notes;
+    const nodeId = nodeDrawereForm.id;
+    const newTag = nodeDrawereForm.tag;
+    const newNotes = nodeDrawereForm.notes;
 
     try {
       // Update node tag
@@ -499,7 +475,7 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ node_tag: newTag }),
-        }
+        },
       );
 
       // Update node notes
@@ -509,7 +485,7 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ notes: newNotes }),
-        }
+        },
       );
 
       await loadPipeline(pipelineId);
@@ -519,6 +495,108 @@
       alert("Failed to update node info.");
     }
   }
+
+  // Add a function to fetch pipeline info
+  async function loadPipelineInfo(pipelineId: string) {
+    try {
+      const response = await fetch(
+        `http://localhost:8000/get_pipeline/${pipelineId}`,
+        { cache: "no-store" }
+      );
+      if (!response.ok) {
+        throw new Error(`Failed to load pipeline info: ${response.statusText}`);
+      }
+      const pipeline = await response.json();
+      pipelineDrawerForm = {
+        id: pipeline.pipeline_id || "",
+        tag: pipeline.tag || "",
+        notes: pipeline.notes || "",
+      };
+    } catch (error) {
+      console.error("Error loading pipeline info:", error);
+      pipelineDrawerForm = { id: "", tag: "", notes: "" };
+    }
+  }
+
+  // Add a function to update pipeline info
+  async function updatePipelineInfo() {
+    if (!pipelineDrawerForm || !selectedPipeline) {
+      console.error("No pipeline selected");
+      return;
+    }
+    const pipelineId =
+      typeof selectedPipeline === "string"
+        ? selectedPipeline
+        : selectedPipeline.value;
+    const newTag = pipelineDrawerForm.tag;
+    const newNotes = pipelineDrawerForm.notes;
+
+    try {
+      await fetch(
+        `http://localhost:8000/update_pipeline_tag/${pipelineId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tag: newTag }),
+        }
+      );
+      await fetch(
+        `http://localhost:8000/update_pipeline_notes/${pipelineId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notes: newNotes }),
+        }
+      );
+      await fetchPipelines();
+      await loadPipeline(pipelineId);
+      alert("Pipeline info updated.");
+    } catch (error) {
+      console.error("Error updating pipeline info:", error);
+      alert("Failed to update pipeline info.");
+    }
+  }
+
+  // Collection of all reactive effects
+  $effect(() => {
+    if (!isHiddenNodePanel) {
+      const selectedNodes = nodes.filter((node) => node.selected);
+      if (selectedNodes.length === 1) {
+        const selectedNode = selectedNodes[0];
+        nodeDrawereForm = {
+          id: selectedNode.id,
+          tag: selectedNode.data?.label || "No tag",
+          notes: selectedNode.data?.notes || "",
+        };
+      } else {
+        nodeDrawereForm = {
+          id: "",
+          tag: "",
+          notes: "",
+        };
+      }
+    } else {
+      nodeDrawereForm = {
+        id: "",
+        tag: "",
+        notes: "",
+      };
+    }
+  });
+
+  // Effect to load pipeline info when the panel is opened
+  $effect(() => {
+    if (!isHiddenPipelinePanel && selectedPipeline) {
+      const pipelineId =
+        typeof selectedPipeline === "string"
+          ? selectedPipeline
+          : selectedPipeline.value;
+      loadPipelineInfo(pipelineId);
+    }
+    if (isHiddenPipelinePanel) {
+      pipelineDrawerForm = { id: "", tag: "", notes: "" };
+    }
+  });
 
   $effect(fetchPipelines);
 </script>
@@ -601,9 +679,9 @@
 
   <Drawer
     bind:hidden={isHiddenNodePanel}
-    id="sidebar1"
-    aria-controls="sidebar1"
-    aria-labelledby="sidebar1"
+    id="nodesidebar"
+    aria-controls="nodesidebar"
+    aria-labelledby="nodesidebar"
   >
     <div class="flex items-center justify-between">
       <CloseButton
@@ -611,28 +689,61 @@
         class="mb-4 dark:text-white"
       />
     </div>
-    {#if drawerForm}
-    <Label for="node_tag" class="mb-2 block">Node id:</Label>
+    {#if nodeDrawereForm}
+      <Label for="node_tag" class="mb-2 block">Node id:</Label>
       <div class="mt-2 text-sm text-gray-500">
-        {drawerForm.id}
+        {nodeDrawereForm.id}
       </div>
       <Label for="node_tag" class="mb-2 block">Node tag:</Label>
       <Input
         id="node_tag"
         name="node_tag"
         required
-        bind:value={drawerForm.tag}
+        bind:value={nodeDrawereForm.tag}
       />
       <Label for="node_notes" class="mb-2 block">Notes:</Label>
       <Input
         id="node_notes"
         name="node_notes"
         required
-        bind:value={drawerForm.notes}
+        bind:value={nodeDrawereForm.notes}
       />
-      <Button onclick={updateNodeInfo} class="mt-4">
-        Save Changes
-      </Button>
+      <Button onclick={updateNodeInfo} class="mt-4">Save Changes</Button>
+    {/if}
+  </Drawer>
+
+  <Drawer
+    bind:hidden={isHiddenPipelinePanel}
+    id="pipelinesidebar"
+    aria-controls="pipelinesidebar"
+    aria-labelledby="pipelinesidebar"
+  >
+    <div class="flex items-center justify-between">
+      <CloseButton
+        onclick={() => (isHiddenPipelinePanel = false)}
+        class="mb-4 dark:text-white"
+      />
+    </div>
+    {#if pipelineDrawerForm}
+      <Label class="mb-2 block">Pipeline id:</Label>
+      <div class="mt-2 text-sm text-gray-500">
+        {pipelineDrawerForm.id}
+      </div>
+      <Label for="pipeline_tag" class="mb-2 block">Pipeline tag:</Label>
+      <Input
+        id="pipeline_tag"
+        name="pipeline_tag"
+        required
+        bind:value={pipelineDrawerForm.tag}
+      />
+      <Label for="pipeline_notes" class="mb-2 block">Notes:</Label>
+      <Input
+        id="pipeline_notes"
+        name="pipeline_notes"
+        required
+        bind:value={pipelineDrawerForm.notes}
+      />
+      <Button onclick={updatePipelineInfo} class="mt-4">Save Changes</Button>
     {/if}
   </Drawer>
 

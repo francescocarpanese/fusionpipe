@@ -156,3 +156,31 @@ def update_node_notes(pipeline_id: str, node_id: str, payload: dict, db_conn=Dep
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Node notes updated for node {node_id} in pipeline {pipeline_id}"}
+
+@router.post("/update_pipeline_tag/{pipeline_id}")
+def update_pipeline_tag(pipeline_id: str, payload: dict, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    tag = payload.get("tag")
+    if tag is None:
+        raise HTTPException(status_code=400, detail="Missing tag")
+    try:
+        db_utils.update_pipeline_tag(cur, pipeline_id=pipeline_id, tag=tag)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Pipeline tag updated for pipeline {pipeline_id}"}
+
+@router.post("/update_pipeline_notes/{pipeline_id}")
+def update_pipeline_notes(pipeline_id: str, payload: dict, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    notes = payload.get("notes")
+    if notes is None:
+        raise HTTPException(status_code=400, detail="Missing notes")
+    try:
+        db_utils.update_pipeline_notes(cur, pipeline_id=pipeline_id, notes=notes)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Pipeline notes updated for pipeline {pipeline_id}"}
