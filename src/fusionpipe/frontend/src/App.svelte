@@ -857,7 +857,8 @@
       disableKeyboardA11y={true}
     >
   <Panel position="top-left">
-    Current Pipeline: {currentPipelineId || "None"}
+    Pipeline id: {currentPipelineId || "None"}<br>
+    Pipeline tag: {ids_tags_dict[currentPipelineId] || "None"}
   </Panel>
       <Controls />
       <Background />
