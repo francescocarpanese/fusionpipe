@@ -185,3 +185,29 @@ def update_pipeline_notes(pipeline_id: str, payload: dict, db_conn=Depends(get_d
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Pipeline notes updated for pipeline {pipeline_id}"}
+
+@router.post("/update_node_position/{pipeline_id}")
+def update_node_position(pipeline_id: str, payload: dict, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    nodes = payload.get("nodes")
+    if not nodes:
+        raise HTTPException(status_code=400, detail="Missing nodes data")
+    
+    try:
+        for node in nodes:
+            node_id = node.get("id")
+            position = node.get("position")
+            
+            if node_id and position and "x" in position and "y" in position:
+                db_utils.update_node_position(cur, 
+                                            node_id=node_id, 
+                                            pipeline_id=pipeline_id, 
+                                            position_x=position["x"], 
+                                            position_y=position["y"])
+        
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    return {"message": f"Node positions updated in pipeline {pipeline_id}"}

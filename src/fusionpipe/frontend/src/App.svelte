@@ -126,11 +126,43 @@
     }
   }
 
-  function refreshLayout() {
-  const layouted = getLayoutedElements(nodes, edges);
-  nodes = [...layouted.nodes];
-  edges = [...layouted.edges];
-}
+  async function refreshLayout() {
+    const layouted = getLayoutedElements(nodes, edges);
+    nodes = [...layouted.nodes];
+    edges = [...layouted.edges];
+    
+    // Save the new node positions to the backend
+    await saveNodePositions();
+  }
+  
+  async function saveNodePositions() {
+    const pipelineId =
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
+        
+    if (!pipelineId) {
+      console.error("No pipeline selected");
+      return;
+    }
+    
+    try {
+      const response = await fetch(
+        `http://localhost:8000/update_node_position/${pipelineId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nodes: nodes.map(n => ({ id: n.id, position: n.position })) }),
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to save node positions: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error("Error saving node positions:", error);
+    }
+  }
 
   async function addNode() {
     try {
@@ -427,9 +459,9 @@
           editable: node.editable,
           notes: node.notes || "",
         },
-        position: {
-          x: Math.random() * 400,
-          y: Math.random() * 400,
+        position:  {
+          x: node.position[0],
+          y: node.position[1],
         },
         style: `background: ${getNodeColor(node.status)}`,
       }));
@@ -442,10 +474,18 @@
         })),
       );
 
-      const layoutedElements = getLayoutedElements(rawNodes, rawEdges);
-
-      nodes = [...layoutedElements.nodes];
-      edges = [...layoutedElements.edges];
+      // Only apply layout if there are no positions stored
+      const needsLayout = rawNodes.some(node => 
+        !node.position);
+      
+      if (needsLayout) {
+        const layoutedElements = getLayoutedElements(rawNodes, rawEdges);
+        nodes = [...layoutedElements.nodes];
+        edges = [...layoutedElements.edges];
+      } else {
+        nodes = [...rawNodes];
+        edges = [...rawEdges];
+      }
     } catch (error) {
       console.error("Error loading selected pipeline:", error);
     }
@@ -635,6 +675,15 @@
   });
 
   $effect(fetchPipelines);
+
+  // Use effect to handle node drag end event and save positions
+  $effect(() => {
+    nodes.forEach((node) => {
+      if (node.dragging === false && node.selected) {
+        saveNodePositions();
+      }
+    });
+  });
 </script>
 
 
@@ -802,6 +851,7 @@
       bind:edges
       fitView
       onconnect={handleConnect}
+      onnodedragstop={saveNodePositions}
       {nodeTypes}
       style="height: 100%;"
       disableKeyboardA11y={true}

@@ -39,6 +39,7 @@ def dag_dummy_1():
         G.nodes[node]['editable'] = True
         G.nodes[node]['tag'] = 'test_tag'
         G.nodes[node]['notes'] = 'test notes'
+        G.nodes[node]['position'] = [0, 0]  # Default position
         if node == "A":
             G.nodes[node]['status'] = "ready"
         elif node == "B":
@@ -60,11 +61,11 @@ def dict_dummy_1():
         "tag": "test_tag",
         "owner": "test_group",
         "nodes": {
-            "A": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': []},
-            "B": {"status": "running", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A']},
-            "C": {"status": "completed", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A']},
-            "D": {"status": "staledata", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C']},
-            "E": {"status": "staledata", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': []}
+            "A": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0]},
+            "B": {"status": "running", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0]},
+            "C": {"status": "completed", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0]},
+            "D": {"status": "staledata", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C'], 'position': [0, 0]},
+            "E": {"status": "staledata", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0]}
         }
     }
 

@@ -83,6 +83,7 @@ def graph_to_dict(graph):
             'editable': graph.nodes[node].get('editable', True),  # Default editable is True
             'tag': graph.nodes[node].get('tag', None),  # Optional tag for the node
             'notes': graph.nodes[node].get('notes', None),  # Optional notes for the node
+            'position': graph.nodes[node].get('position', None),  # Node position
         }
     return pipeline_data
 
@@ -114,9 +115,10 @@ def graph_dict_to_db(graph_dict, cur):
             editable = int(node_data["editable"])
             node_notes = node_data["notes"]
             node_tag = node_data["tag"]
+            position = node_data.get("position", None)
 
             db_utils.add_node_to_nodes(cur, node_id=node_id, status=status, editable=editable, notes=node_notes)
-            db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, node_tag=node_tag)
+            db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, node_tag=node_tag, position_x=position[0], position_y=position[1])
 
         # Insert node relations (edges) using parents field
         for child_id, node_data in graph_dict["nodes"].items():
@@ -146,7 +148,7 @@ def graph_to_db(Gnx, cur):
         editable = Gnx.nodes[node].get('editable', True)  # Default editable is True
         node_notes = Gnx.nodes[node].get('notes', "")  # Optional notes for the node
         node_tag = Gnx.nodes[node].get('tag', None)  # Optional tag for the node
-
+        position = Gnx.nodes[node].get('position', None)  # Node position
 
         db_utils.get_all_nodes_from_nodes(cur)
         db_utils.get_node_parents(cur, node_id=node_id)
@@ -158,9 +160,8 @@ def graph_to_db(Gnx, cur):
             # If node already existed, parants cannot have change. Children can and will be added later
             for parent in Gnx.predecessors(node):
                 db_utils.add_node_relation(cur, child_id=node_id, parent_id=parent)
-        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pip_id, node_tag=node_tag)
-
-
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pip_id, node_tag=node_tag, 
+                                     position_x=position[0], position_y=position[1])
 
 def db_to_graph_from_pip_id(cur, pip_id):
     # Load the pipeline from the database
@@ -185,6 +186,11 @@ def db_to_graph_from_pip_id(cur, pip_id):
         G.nodes[node_id]['status'] = status
         G.nodes[node_id]['editable'] = editable
         G.nodes[node_id]['notes'] = db_utils.get_node_notes(cur, node_id=node_id)
+
+        # Add position if available
+        position = db_utils.get_node_position(cur, node_id=node_id, pipeline_id=pip_id)
+        if position:
+            G.nodes[node_id]['position'] = position
 
         # Add edges based on parent relationships
         for parent_id in db_utils.get_node_parents(cur, node_id=node_id):
