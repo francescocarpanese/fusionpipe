@@ -118,6 +118,10 @@ def update_node_status(cur, node_id, status):
     cur.execute('UPDATE nodes SET status = ? WHERE node_id = ?', (status, node_id))
     return cur.rowcount
 
+def update_node_tag(cur, pipeline_id, node_id, node_tag):
+    cur.execute('UPDATE node_pipeline_relation SET node_tag = ? WHERE pipeline_id = ? AND node_id = ?', (node_tag, pipeline_id, node_id))
+    return cur.rowcount
+
 def get_node_status(cur, node_id):
     cur.execute('SELECT status FROM nodes WHERE node_id = ?', (node_id,))
     row = cur.fetchone()
@@ -408,3 +412,7 @@ def remove_node_relation_with_editable_logic(cur, parent_id, child_id):
         return cur.rowcount
     else:
         raise ValueError(f"Cannot remove relation: Node {child_id} is not editable.")
+
+def update_node_notes(cur, node_id, notes):
+    cur.execute('UPDATE nodes SET notes = ? WHERE node_id = ?', (notes, node_id))
+    return cur.rowcount

@@ -32,13 +32,21 @@
     NavLi,
   } from "flowbite-svelte";
   import { ChevronDownOutline } from "flowbite-svelte-icons";
+  import { get } from "svelte/store";
 
   // Variables and state definitions
-  let nodes = $state([]);
+  let nodes = $state<Node[]>([]);
   let edges = $state([]);
   let selectedPipeline = $state(null);
   const nodeWidth = 172;
   const nodeHeight = 36;
+  let drawerForm = $state({
+  id: "",
+  tag: "",
+  notes: ""
+  });
+
+
   let isHiddenPipelinePanel = $state(true);
   let isHiddenNodePanel = $state(true);
   let pipelines = $state([]);
@@ -48,6 +56,7 @@
 
   dagreGraph.setDefaultEdgeLabel(() => ({}));
 
+  // Define functions
   function getLayoutedElements(nodes: Node[], edges: Edge[], direction = "TB") {
     const isHorizontal = direction === "LR";
 
@@ -79,13 +88,6 @@
     });
 
     return { nodes: layoutedNodes, edges };
-  }
-
-  function onLayout(direction: string) {
-    const layoutedElements = getLayoutedElements(nodes, edges, direction);
-
-    nodes = layoutedElements.nodes;
-    edges = layoutedElements.edges;
   }
 
   function getNodeColor(status: string): string {
@@ -140,6 +142,34 @@
       console.error("Error adding node:", error);
     }
   }
+
+
+  $effect(() => {
+  if (!isHiddenNodePanel) {
+    const selectedNodes = nodes.filter((node) => node.selected);
+    if (selectedNodes.length === 1) {
+      const selectedNode = selectedNodes[0];
+      drawerForm = {
+        id: selectedNode.id,
+        tag: selectedNode.data?.label || "No tag",
+        notes: selectedNode.data?.notes || "",
+      };
+    } else {
+      drawerForm = {
+        id: "",
+        tag: "",
+        notes: ""
+      };
+    }
+  } else {
+    drawerForm = {
+      id: "",
+      tag: "",
+      notes: ""
+    };
+  }
+});
+
 
   async function deleteNode() {
     const pipelineId =
@@ -405,6 +435,7 @@
         data: {
           label: `${node.tag}`,
           editable: node.editable,
+          notes: node.notes || "",
         },
         position: {
           x: Math.random() * 400,
@@ -442,6 +473,51 @@
     }
 
     await loadPipeline(pipelineId);
+  }
+
+  // Add refs for the input fields
+
+  async function updateNodeInfo() {
+    if (!drawerForm || !selectedPipeline) {
+      console.error("No node or pipeline selected");
+      return;
+    }
+
+    const pipelineId =
+      typeof selectedPipeline === "string"
+        ? selectedPipeline
+        : selectedPipeline.value;
+    const nodeId = drawerForm.id;
+    const newTag = drawerForm.tag;
+    const newNotes = drawerForm.notes;
+
+    try {
+      // Update node tag
+      await fetch(
+        `http://localhost:8000/update_node_tag/${pipelineId}/${nodeId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ node_tag: newTag }),
+        }
+      );
+
+      // Update node notes
+      await fetch(
+        `http://localhost:8000/update_node_notes/${pipelineId}/${nodeId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notes: newNotes }),
+        }
+      );
+
+      await loadPipeline(pipelineId);
+      alert("Node info updated.");
+    } catch (error) {
+      console.error("Error updating node info:", error);
+      alert("Failed to update node info.");
+    }
   }
 
   $effect(fetchPipelines);
@@ -535,10 +611,29 @@
         class="mb-4 dark:text-white"
       />
     </div>
-    <div class="mb-6">
-      <Label for="node_tag" class="mb-2 block">Node tag</Label>
-      <Input id="node_tag" name="node_tag" required placeholder="" />
-    </div>
+    {#if drawerForm}
+    <Label for="node_tag" class="mb-2 block">Node id:</Label>
+      <div class="mt-2 text-sm text-gray-500">
+        {drawerForm.id}
+      </div>
+      <Label for="node_tag" class="mb-2 block">Node tag:</Label>
+      <Input
+        id="node_tag"
+        name="node_tag"
+        required
+        bind:value={drawerForm.tag}
+      />
+      <Label for="node_notes" class="mb-2 block">Notes:</Label>
+      <Input
+        id="node_notes"
+        name="node_notes"
+        required
+        bind:value={drawerForm.notes}
+      />
+      <Button onclick={updateNodeInfo} class="mt-4">
+        Save Changes
+      </Button>
+    {/if}
   </Drawer>
 
   <div class="main-content">
@@ -549,6 +644,7 @@
       onconnect={handleConnect}
       {nodeTypes}
       style="height: 100%;"
+      disableKeyboardA11y={true}
     >
       <Controls />
       <Background />
