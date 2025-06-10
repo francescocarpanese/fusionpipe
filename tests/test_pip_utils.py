@@ -26,9 +26,9 @@ def test_init_node_folder(tmp_base_dir):
 
     node_id = "test_node"
     base_path = tmp_base_dir
-    init_node_folder(base_path, node_id, verbose=True)
+    init_node_folder(base_path, verbose=True)
 
-    node_folder = os.path.join(base_path, node_id)
+    node_folder = os.path.join(base_path)
     code_folder = os.path.join(node_folder, "code")
     data_folder = os.path.join(node_folder, "data")
     reports_folder = os.path.join(node_folder, "reports")

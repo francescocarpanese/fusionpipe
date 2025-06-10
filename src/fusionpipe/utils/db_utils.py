@@ -38,7 +38,8 @@ def init_db(conn):
             node_id TEXT PRIMARY KEY,
             status TEXT CHECK(status IN ('ready', 'running', 'completed', 'failed', 'staledata')) DEFAULT 'ready',
             editable BOOLEAN DEFAULT TRUE,
-            notes TEXT DEFAULT NULL
+            notes TEXT DEFAULT NULL,
+            folder_path TEXT DEFAULT NULL
         )
     ''')
 
@@ -77,9 +78,9 @@ def add_pipeline(cur, pipeline_id, tag=None, owner=None, notes=None):
     cur.execute('INSERT INTO pipelines (pipeline_id, tag, owner, notes) VALUES (?, ?, ?, ?)', (pipeline_id, tag, owner, notes))
     return cur.lastrowid
 
-def add_node_to_nodes(cur, node_id, status='ready', editable=True, notes=None):
-    cur.execute('INSERT INTO nodes (node_id, status, editable, notes) VALUES (?, ?, ?, ?)', 
-                (node_id, status, editable, notes))
+def add_node_to_nodes(cur, node_id, status='ready', editable=True, notes=None, folder_path=None):
+    cur.execute('INSERT INTO nodes (node_id, status, editable, notes, folder_path) VALUES (?, ?, ?, ?, ?)', 
+                (node_id, status, editable, notes, folder_path))
     return cur.lastrowid
 
 def remove_node_from_nodes(cur, node_id):
@@ -444,6 +445,11 @@ def get_node_position(cur, node_id, pipeline_id):
     if result and result[0] is not None and result[1] is not None:
         return [result[0], result[1]]
     return None
+
+def get_node_folder_path(cur, node_id):
+    cur.execute('SELECT folder_path FROM nodes WHERE node_id = ?', (node_id,))
+    row = cur.fetchone()
+    return row[0] if row else None
 
 def update_node_position(cur, node_id, pipeline_id, position_x, position_y):
     cur.execute('UPDATE node_pipeline_relation SET position_x = ?, position_y = ? WHERE node_id = ? AND pipeline_id = ?', 

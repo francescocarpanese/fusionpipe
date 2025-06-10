@@ -28,13 +28,13 @@ conn = create_db(path_to_db)
 cur = conn.cursor()
 
 nodes = [
-    {"node_id": "node1", "status": "ready", "editable": True, "notes": "First node"},
-    {"node_id": "node2", "status": "ready", "editable": True, "notes": "Second node"},
-    {"node_id": "node3", "status": "ready", "editable": False, "notes": "Third node"}
+    {"node_id": "node1", "status": "ready", "editable": True, "notes": "First node","folder_path": "dummy1"},
+    {"node_id": "node2", "status": "ready", "editable": True, "notes": "Second node", "folder_path": "dummy2"},
+    {"node_id": "node3", "status": "ready", "editable": False, "notes": "Third node", "folder_path": "dummy3"},
 ]
 
 for node in nodes:
-    add_node_to_nodes(cur, node_id=node["node_id"], status=node["status"], editable=node["editable"], notes=node["notes"])
+    add_node_to_nodes(cur, node_id=node["node_id"], status=node["status"], editable=node["editable"], notes=node["notes"], folder_path=node["folder_path"])
 
 add_node_relation(cur, child_id="node1", parent_id="node2")
 

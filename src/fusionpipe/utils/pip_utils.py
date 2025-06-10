@@ -6,10 +6,7 @@ import matplotlib.pyplot as plt
 import json
 from fusionpipe.utils import db_utils
 import copy
-
-
 from enum import Enum
-
 
 class NodeState(Enum):
     READY = "ready"       # Node is created but not yet processed
@@ -32,10 +29,7 @@ def generate_node_id():
 def generate_pip_id():
     return "p_" + generate_id()
 
-def init_node_folder(node_folder_path, node_id, verbose=False):
-    
-    # Create the node folder path
-    node_folder_path = f"{node_folder_path}/{node_id}"
+def init_node_folder(node_folder_path, verbose=False):
     
     # Create the main node folder
     os.makedirs(node_folder_path, exist_ok=True)
@@ -44,6 +38,16 @@ def init_node_folder(node_folder_path, node_id, verbose=False):
     os.makedirs(f"{node_folder_path}/code", exist_ok=True)
     os.makedirs(f"{node_folder_path}/data", exist_ok=True)
     os.makedirs(f"{node_folder_path}/reports", exist_ok=True)
+
+    # Copy the template file into the code folder
+    template_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates', 'run.py')
+    if os.path.exists(template_file_path):
+        destination_file_path = os.path.join(node_folder_path, 'code', 'run.py')
+        with open(template_file_path, 'r') as template_file:
+            with open(destination_file_path, 'w') as dest_file:
+                dest_file.write(template_file.read())
+    else:
+        raise FileNotFoundError(f"Template file not found at {template_file_path}")
     
     if verbose:
         print(f"Node folder created at: {node_folder_path}")
@@ -84,6 +88,7 @@ def graph_to_dict(graph):
             'tag': graph.nodes[node].get('tag', None),  # Optional tag for the node
             'notes': graph.nodes[node].get('notes', None),  # Optional notes for the node
             'position': graph.nodes[node].get('position', None),  # Node position
+            'folder_path': graph.nodes[node].get('folder_path', None)  # Optional folder path for the node
         }
     return pipeline_data
 
@@ -116,8 +121,9 @@ def graph_dict_to_db(graph_dict, cur):
             node_notes = node_data["notes"]
             node_tag = node_data["tag"]
             position = node_data.get("position", None)
+            folder_path = node_data.get("folder_path", None)
 
-            db_utils.add_node_to_nodes(cur, node_id=node_id, status=status, editable=editable, notes=node_notes)
+            db_utils.add_node_to_nodes(cur, node_id=node_id, status=status, editable=editable, notes=node_notes,folder_path=folder_path)
             db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, node_tag=node_tag, position_x=position[0], position_y=position[1])
 
         # Insert node relations (edges) using parents field
@@ -186,6 +192,7 @@ def db_to_graph_from_pip_id(cur, pip_id):
         G.nodes[node_id]['status'] = status
         G.nodes[node_id]['editable'] = editable
         G.nodes[node_id]['notes'] = db_utils.get_node_notes(cur, node_id=node_id)
+        G.nodes[node_id]['folder_path'] = db_utils.get_node_folder_path(cur, node_id=node_id)
 
         # Add position if available
         position = db_utils.get_node_position(cur, node_id=node_id, pipeline_id=pip_id)
@@ -225,7 +232,7 @@ def dict_to_graph(graph_dict):
     # Add nodes and their attributes
     for node_id, node_data in graph_dict['nodes'].items():
         G.add_node(node_id, status=node_data.get('status', 'ready'), editable=node_data.get('editable', True),
-                   tag=node_data.get('tag', None), notes=node_data.get('notes', None))
+                   tag=node_data.get('tag', None), notes=node_data.get('notes', None), folder_path=node_data.get('folder_path', None))
         for parent in node_data.get('parents', []):
             G.add_edge(parent, node_id)
 

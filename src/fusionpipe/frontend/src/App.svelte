@@ -45,6 +45,7 @@
     id: "",
     tag: "",
     notes: "",
+    folder_path: "",
   });
 
   let pipelineDrawerForm = $state({
@@ -458,6 +459,8 @@
           label: `${node.tag}`,
           editable: node.editable,
           notes: node.notes || "",
+          folder_path: node.folder_path || "",
+          status: node.status || "ready",
         },
         position:  {
           x: node.position[0],
@@ -520,6 +523,7 @@
     const nodeId = nodeDrawereForm.id;
     const newTag = nodeDrawereForm.tag;
     const newNotes = nodeDrawereForm.notes;
+    const newFolderPath = nodeDrawereForm.folder_path;
 
     try {
       // Update node tag
@@ -621,6 +625,7 @@
           id: selectedNode.id,
           tag: selectedNode.data?.label || "No tag",
           notes: selectedNode.data?.notes || "",
+          folder_path: selectedNode.data?.folder_path || "",
         };
       } else {
         nodeDrawereForm = {
@@ -806,6 +811,10 @@
         required
         bind:value={nodeDrawereForm.notes}
       />
+      <Label for="node_tag" class="mb-2 block">Node tag:</Label>
+      <div class="mt-2 text-sm text-gray-500">
+        {nodeDrawereForm.folder_path || "No folder path"}
+      </div>            
       <Button onclick={updateNodeInfo} class="mt-4">Save Changes</Button>
     {/if}
   </Drawer>

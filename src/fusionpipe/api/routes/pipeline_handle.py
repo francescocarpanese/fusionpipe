@@ -60,8 +60,10 @@ def add_node_to_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     try:
         node_id = pip_utils.generate_node_id()
-        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True)
+        node_folder_path = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"),node_id)
+        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=node_folder_path)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+        pip_utils.init_node_folder(node_folder_path=node_folder_path)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
