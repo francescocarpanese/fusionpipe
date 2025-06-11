@@ -33,6 +33,7 @@
     NavLi,
   } from "flowbite-svelte";
   import { ChevronDownOutline } from "flowbite-svelte-icons";
+    import { run } from "svelte/legacy";
 
   //  --- Variables and state definitions --- 
   let nodes = $state<Node[]>([]);
@@ -615,6 +616,44 @@
     }
   }
 
+
+async function runSelectedNode() {
+  const selectedNode = nodes.find((node) => node.selected);
+  const pipelineatcall = typeof currentPipelineId === "string"
+    ? currentPipelineId
+    : currentPipelineId.value;
+  if (!selectedNode) {
+    alert("No node selected");
+    return;
+  }
+  const nodeId = selectedNode.id;
+  try {
+    const response = await fetch(`http://localhost:8000/run_node/${nodeId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run_mode: "local" }),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || response.statusText);
+    }
+    const data = await response.json();
+    // Optionally reload pipeline to update node status
+    if (currentPipelineId && pipelineatcall === currentPipelineId) {
+      const pipelineId =
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
+      await loadPipeline(pipelineId);
+    }
+  } catch (error) {
+    console.error("Error running node:", error);
+    alert("Failed to run node.");
+  }
+}
+
+
+
   // Collection of all reactive effects
   $effect(() => {
     if (!isHiddenNodePanel) {
@@ -754,6 +793,9 @@
         />
       </NavLi>
       <Dropdown simple>
+        <DropdownItem onclick={runSelectedNode}
+          >Run selected node</DropdownItem
+        >        
         <DropdownItem class="text-gray-400 cursor-not-allowed"
           >Run pipeline</DropdownItem
         >

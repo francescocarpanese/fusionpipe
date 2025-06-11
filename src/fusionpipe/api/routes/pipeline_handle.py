@@ -3,7 +3,7 @@ import os
 from fastapi.responses import JSONResponse
 
 
-from fusionpipe.utils import db_utils, pip_utils
+from fusionpipe.utils import db_utils, pip_utils, runner_utils
 
 router = APIRouter()
 
@@ -213,3 +213,57 @@ def update_node_position(pipeline_id: str, payload: dict, db_conn=Depends(get_db
         raise HTTPException(status_code=500, detail=str(e))
     
     return {"message": f"Node positions updated in pipeline {pipeline_id}"}
+
+
+
+@router.post("/update_node_status/{node_id}")
+def update_node_status(node_id: str, payload: dict, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    status = payload.get("status")
+    if status is None:
+        raise HTTPException(status_code=400, detail="Missing status")
+    try:
+        db_utils.update_node_status(cur, node_id=node_id, status=status)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Node status updated for node {node_id}"}
+
+
+
+
+@router.post("/run_pipeline/{pipeline_id}")
+def run_pipeline_route(pipeline_id: str, payload: dict = None, db_conn=Depends(get_db)):
+    run_mode = "local"
+    poll_interval = 1.0
+    debug = False
+
+    if payload:
+        run_mode = payload.get("run_mode", "local")
+        poll_interval = payload.get("poll_interval", 1.0)
+        debug = payload.get("debug", False)
+
+    try:
+        result = runner_utils.run_pipeline(
+            db_conn,
+            pipeline_id,
+            run_mode=run_mode,
+            poll_interval=poll_interval,
+            debug=debug
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Pipeline {pipeline_id} run completed", "result": result}
+
+
+@router.post("/run_node/{node_id}")
+def run_node_route(node_id: str, payload: dict = None, db_conn=Depends(get_db)):
+    run_mode = "local"
+    if payload:
+        run_mode = payload.get("run_mode", "local")
+    try:
+        runner_utils.run_node(db_conn, node_id, run_mode=run_mode)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Node {node_id} run completed in {run_mode} mode"}

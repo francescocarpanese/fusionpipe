@@ -1111,4 +1111,32 @@ def test_remove_pipeline_from_everywhere(in_memory_db_conn):
     cur.execute("SELECT * FROM nodes WHERE node_id=?", (node_id,))
     assert cur.fetchone() is not None, "Node was unexpectedly removed."
 
+def test_can_node_run_logic(in_memory_db_conn):
+    """
+    Test logic for determining if a node can run based on its status.
+    """
+    from fusionpipe.utils import pip_utils
+    from fusionpipe.utils import pip_utils
+    from fusionpipe.utils import db_utils
+
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+
+    # Create a node with default status ('ready') and editable True
+    node_id = pip_utils.generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id)
+    conn.commit()
+
+    canrun = pip_utils.can_node_run(cur, node_id)
+    assert canrun is True, "Node should be able to run when status is 'ready' and editable is True."
+    # Update node status to 'running' and check again
+    cur.execute("UPDATE nodes SET status='running' WHERE node_id=?", (node_id,))
+    conn.commit()
+    canrun = pip_utils.can_node_run(cur, node_id)
+    assert canrun is False, "Node should not be able to run when status is 'running'."
+    # Update node status to 'failed' and check again
+    cur.execute("UPDATE nodes SET status='failed' WHERE node_id=?", (node_id,))
+    conn.commit()
+    canrun = pip_utils.can_node_run(cur, node_id)
+    assert canrun is False, "Node should not be able to run when status is 'failed'."
 

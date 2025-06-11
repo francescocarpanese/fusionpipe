@@ -1,137 +1,84 @@
-#import ray
-import subprocess
+from fusionpipe.utils import db_utils, pip_utils
 import os
+import subprocess
 import time
-from fusionpipe.utils import db_utils
 
-#ray.init(ignore_reinit_error=True)
+def run_node(conn, node_id, run_mode="local"):
+    cur = conn.cursor()
+    if not pip_utils.can_node_run(cur, node_id):
+        raise RuntimeError(f"Node {node_id} cannot be run.")
+    
+    node_path = db_utils.get_node_folder_path(cur, node_id)
+    if run_mode == "local":
+        # Simulate running the node locally
+        print(f"Running node {node_id} in local mode...")
+        db_utils.update_node_status(cur, node_id, "running")
+        conn.commit()
+        try:
+            subprocess.run(["python", os.path.join(node_path, "code", "run.py")], check=True)
+            db_utils.update_node_status(cur, node_id, "completed")
+            conn.commit()
+        except subprocess.CalledProcessError as e:
+            db_utils.update_node_status(cur, node_id, "failed")
+            conn.commit()
+            print(f"Node {node_id} failed to run: {e}")
+    elif run_mode == "ray":
+        # To be implemented
+        return
 
-#@ray.remote
-def run_node(node_id, db_path):
-    # Run the node's run.py as a subprocess
-    try:
-        conn = db_utils.connect_to_db(db_path)
+
+def run_pipeline(conn, pipeline_id, run_mode="local", poll_interval=1.0, debug=False):
+    """
+    Orchestrate the execution of a pipeline.
+    - conn: sqlite3.Connection
+    - pipeline_id: str
+    - poll_interval: float, seconds between polling for new runnable nodes
+    """
+    from fusionpipe.utils import db_utils, pip_utils
+
+    cur = conn.cursor()
+    all_nodes = set(db_utils.get_all_nodes_from_pip_id(cur, pipeline_id))
+    running_nodes = set()
+    completed_nodes = set()
+    failed_nodes = set()
+
+    while True:
         cur = conn.cursor()
-        node_path = db_utils.get_node_folder_path(cur, node_id)
+        # Update status sets
+        for node_id in all_nodes:
+            status = db_utils.get_node_status(cur, node_id)
+            if status == "completed":
+                completed_nodes.add(node_id)
+            elif status == "failed":
+                failed_nodes.add(node_id)
+            elif status == "running":
+                running_nodes.add(node_id)
+
+        if debug:
+            print(f"Running nodes: {running_nodes}")
+            print(f"Completed nodes: {completed_nodes}")
+            print(f"Failed nodes: {failed_nodes}")
+
+        # Find nodes that can run and are not already running/completed/failed
+        runnable_nodes = [
+            node_id for node_id in all_nodes
+            if pip_utils.can_node_run(cur, node_id)
+        ]
+
+        if debug:
+            print(f"Runnable nodes: {runnable_nodes}")
+
+        # Start processes for runnable nodes
+        for node_id in runnable_nodes:
+            run_node(conn, node_id, run_mode=run_mode)
+            running_nodes.add(node_id)
+            if debug:
+                print(f"Started running node {node_id}")
         
-        db_utils.update_node_status(cur, node_id, 'running')
-        conn.commit()
-        result = subprocess.run(['python', os.path.join(node_path, 'code','run.py')], check=True)
-        # Update status to completed
-        db_utils.update_node_status(cur, node_id, 'completed')
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        # Update status to failed
-        conn = db_utils.connect_to_db(db_path)
-        cur = conn.cursor()
-        db_utils.update_node_status(cur, node_id, 'failed')
-        conn.commit()
-        conn.close()
-        return False
+        # Stop if all nodes are completed or failed, or no more can be scheduled
+        if len(completed_nodes | failed_nodes) == len(all_nodes):
+            break
+        if not runnable_nodes and not running_nodes:
+            break
 
-def can_run(cur, node_id):
-    # All parents must be completed
-    parents = db_utils.get_node_parents(cur, node_id)
-    return all(db_utils.get_node_status(cur, pid) == 'completed' for pid in parents)
-
-# def orchestrate_pipeline(db_path, pipeline_id, node_paths, debug=False):
-#     conn = db_utils.connect_to_db(db_path)
-#     cur = conn.cursor()
-#     all_nodes = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
-#     running = {}
-#     completed = set()
-#     failed = set()
-
-#     while True:
-#         progress = False
-#         for node_id in all_nodes:
-#             status = db_utils.get_node_status(cur, node_id)
-#             if status == 'completed':
-#                 completed.add(node_id)
-#                 continue
-#             if status == 'failed':
-#                 failed.add(node_id)
-#                 continue
-#             if node_id in running:
-#                 continue
-#             if can_run(cur, node_id):
-#                 # Schedule node
-#                 #node_path = node_paths[node_id]
-#                 running[node_id] = run_node(node_id, db_path)
-#                 progress = True
-
-#         # Check for finished nodes
-#         finished = []
-#         for node_id, obj_ref in running.items():
-#             if ray.get(obj_ref):
-#                 finished.append(node_id)
-#         for node_id in finished:
-#             running.pop(node_id)
-
-#         if len(completed) + len(failed) == len(all_nodes):
-#             break
-#         if not progress and not running:
-#             # No progress and nothing running: deadlock or done
-#             break
-#         time.sleep(1)
-#     conn.close()
-
-
-# Applying ray will be done later
-db_path = "/misc/carpanes/fusionpipe/bin/pipeline.db"
-pipeline_id = "p_20250610190444_4358"
-
-conn = db_utils.connect_to_db(db_path)
-cur = conn.cursor()
-all_nodes = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
-running = {}
-completed = set()
-failed = set()
-
-
-# Define color mapping based on node status
-color_map = {
-    "ready": "gray",
-    "failed": "red",
-    "completed": "green",
-    "running": "blue",
-    "staledata": "yellow"
-}
-
-node_id = "n_20250610190446_4500"
-run_node(node_id, db_path)
-
-# while True:
-#     progress = False
-#     for node_id in all_nodes:
-#         status = db_utils.get_node_status(cur, node_id)
-#         if status == 'completed':
-#             completed.add(node_id)
-#             continue
-#         if status == 'failed':
-#             failed.add(node_id)
-#             continue
-#         if node_id in running:
-#             continue
-#         if can_run(cur, node_id):
-#             # Schedule node
-#             running[node_id] = run_node(node_id, db_path)
-#             progress = True
-
-#     # Check for finished nodes
-#     finished = []
-#     for node_id, obj_ref in running.items():
-#         if ray.get(obj_ref):
-#             finished.append(node_id)
-#     for node_id in finished:
-#         running.pop(node_id)
-
-#     if len(completed) + len(failed) == len(all_nodes):
-#         break
-#     if not progress and not running:
-#         # No progress and nothing running: deadlock or done
-#         break
-#     time.sleep(1)
-# conn.close()
+        time.sleep(poll_interval)

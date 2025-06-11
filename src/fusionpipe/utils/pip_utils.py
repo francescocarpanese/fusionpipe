@@ -379,3 +379,21 @@ def delete_node_from_pipeline_with_editable_logic(cur,pipeline_id, node_id):
 
     # Delete the node from the pipeline
     db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node_id)
+
+
+def can_node_run(cur, node_id):
+    # Check if the node is in 'ready' state
+    status = db_utils.get_node_status(cur, node_id=node_id)
+    if status != NodeState.READY.value:
+        return False
+
+    # Get all parent nodes
+    parent_ids = db_utils.get_node_parents(cur, node_id=node_id)
+    # Check if all parents are in 'completed' state
+    for parent_id in parent_ids:
+        parent_status = db_utils.get_node_status(cur, node_id=parent_id)
+        if parent_status != NodeState.COMPLETED.value:
+            return False
+    # If node has no parents, it can run
+    return True
+
