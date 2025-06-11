@@ -33,7 +33,6 @@
     NavLi,
   } from "flowbite-svelte";
   import { ChevronDownOutline } from "flowbite-svelte-icons";
-    import { run } from "svelte/legacy";
 
   //  --- Variables and state definitions --- 
   let nodes = $state<Node[]>([]);
