@@ -653,6 +653,38 @@ async function runSelectedNode() {
 }
 
 
+async function runCurrentPipeline() {
+  const pipelineId =
+    typeof currentPipelineId === "string"
+      ? currentPipelineId
+      : currentPipelineId.value;
+
+  if (!pipelineId) {
+    alert("No pipeline selected");
+    return;
+  }
+
+  try {
+    const response = await fetch(`http://localhost:8000/run_pipeline/${pipelineId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run_mode: "local" }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || response.statusText);
+    }
+
+    const data = await response.json();
+    await loadPipeline(pipelineId);
+    alert(data.message || "Pipeline run completed.");
+  } catch (error) {
+    console.error("Error running pipeline:", error);
+    alert("Failed to run pipeline.");
+  }
+}
+
 
   // Collection of all reactive effects
   $effect(() => {
@@ -796,7 +828,7 @@ async function runSelectedNode() {
         <DropdownItem onclick={runSelectedNode}
           >Run selected node</DropdownItem
         >        
-        <DropdownItem class="text-gray-400 cursor-not-allowed"
+        <DropdownItem onclick={runCurrentPipeline}
           >Run pipeline</DropdownItem
         >
         <DropdownItem class="text-gray-400 cursor-not-allowed"
@@ -812,6 +844,9 @@ async function runSelectedNode() {
         />
       </NavLi>
       <Dropdown simple>
+        <DropdownItem onclick={() => loadPipeline(currentPipelineId)}>
+          Refresh pipeline
+        </DropdownItem>
         <DropdownItem>Vertical</DropdownItem>
         <DropdownItem>Horizontal</DropdownItem>
         <DropdownItem onclick={refreshLayout}>
