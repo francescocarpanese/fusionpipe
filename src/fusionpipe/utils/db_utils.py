@@ -261,7 +261,6 @@ def duplicate_pipeline(cur, source_pipeline_id, new_pipeline_id):
 
 
 def dupicate_node_in_pipeline(cur, source_node_id, new_node_id, pipeline_id):
-    # Duplicate the node in a pipeline without copying relations
 
     # Duplicate nodes table
     cur.execute('''
@@ -273,11 +272,11 @@ def dupicate_node_in_pipeline(cur, source_node_id, new_node_id, pipeline_id):
 
     # Duplicate node_pipeline_relation table
     cur.execute('''
-        INSERT INTO node_pipeline_relation (last_update, user, node_id, pipeline_id)
-        SELECT last_update, user, ?, pipeline_id
+        INSERT INTO node_pipeline_relation (last_update, user, node_id, pipeline_id, node_tag, position_x, position_y)
+        SELECT last_update, user, ?, pipeline_id, ?, position_x, position_y
         FROM node_pipeline_relation
         WHERE node_id = ? AND pipeline_id = ?
-    ''', (new_node_id, source_node_id, pipeline_id))
+    ''', (new_node_id, new_node_id, source_node_id, pipeline_id))
 
     return new_node_id
 
@@ -454,4 +453,8 @@ def get_node_folder_path(cur, node_id):
 def update_node_position(cur, node_id, pipeline_id, position_x, position_y):
     cur.execute('UPDATE node_pipeline_relation SET position_x = ?, position_y = ? WHERE node_id = ? AND pipeline_id = ?', 
                (position_x, position_y, node_id, pipeline_id))
+    return cur.rowcount
+
+def update_node_folder_path(cur, node_id, folder_path):
+    cur.execute('UPDATE nodes SET folder_path = ? WHERE node_id = ?', (folder_path, node_id))
     return cur.rowcount

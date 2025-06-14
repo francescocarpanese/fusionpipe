@@ -48,7 +48,7 @@ def test_run_node_creates_and_runs_node(in_memory_db_conn, tmp_base_dir, node_in
     (1, "completed", "completed", "ready"),
     (2, "completed", "completed", "completed"),
 ])
-def test_run_pipeline_simple(in_memory_db_conn, tmp_path, last_node, expected_status_a, expected_status_b, expected_status_c):
+def test_run_pipeline(in_memory_db_conn, tmp_path, last_node, expected_status_a, expected_status_b, expected_status_c):
     from fusionpipe.utils import db_utils, pip_utils, runner_utils
 
     # Setup DB
@@ -74,7 +74,7 @@ def test_run_pipeline_simple(in_memory_db_conn, tmp_path, last_node, expected_st
     db_utils.add_node_to_pipeline(cur, node_id=node_b, pipeline_id=pipeline_id)
     db_utils.add_node_to_pipeline(cur, node_id=node_c, pipeline_id=pipeline_id)    
     db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_a)
-    db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_c)
+    db_utils.add_node_relation(cur, child_id=node_c, parent_id=node_b)
     pip_utils.init_node_folder(node_folder_path=folder_a)
     pip_utils.init_node_folder(node_folder_path=folder_b)
     pip_utils.init_node_folder(node_folder_path=folder_c)    

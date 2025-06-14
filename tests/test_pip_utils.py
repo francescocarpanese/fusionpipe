@@ -300,3 +300,51 @@ def test_branch_pipeline_from_node(in_memory_db_conn, dag_dummy_1, start_node):
     assert len(replaced_nodes) == len(nodes_to_replace), "Each replaced node should have a new node ID in the new pipeline."
 
 
+def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, in_memory_db_conn, tmp_base_dir):
+    """
+    Test that duplicate_node_in_pipeline_w_code_and_data duplicates a node in the pipeline,
+    including its code and data folder.
+    """
+    import os
+    import shutil
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id, duplicate_node_in_pipeline_w_code_and_data
+    from fusionpipe.utils import db_utils
+
+    # Setup: create a pipeline and a node with a folder
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+    pipeline_id = generate_pip_id()
+    node_id = generate_node_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, node_tag="test", position_x=0, position_y=0)
+    conn.commit()
+
+    # Create a dummy folder for the node
+    node_folder_path = os.path.join(tmp_base_dir, node_id)
+    os.makedirs(node_folder_path, exist_ok=True)
+    with open(os.path.join(node_folder_path, "dummy.txt"), "w") as f:
+        f.write("test content")
+    db_utils.update_node_folder_path(cur, node_id, node_folder_path)
+
+    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
+
+    # Run duplication
+    duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, node_id)
+    conn.commit()
+
+    # Find the new node id (should be the only node not equal to node_id)
+    all_nodes = db_utils.get_all_nodes_from_nodes(cur)
+    new_node_id = [n for n in all_nodes if n != node_id][0]
+
+    # Check new node exists in pipeline
+    nodes_in_pipeline = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
+    assert new_node_id in nodes_in_pipeline
+
+    # Check new folder exists and file is copied
+    new_node_folder_path = os.path.join(tmp_base_dir, node_id)
+    assert os.path.exists(new_node_folder_path)
+    assert os.path.exists(os.path.join(new_node_folder_path, "dummy.txt"))
+
+

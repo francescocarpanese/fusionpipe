@@ -7,6 +7,7 @@ import json
 from fusionpipe.utils import db_utils
 import copy
 from enum import Enum
+import shutil
 
 class NodeState(Enum):
     READY = "ready"       # Node is created but not yet processed
@@ -343,6 +344,7 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
       for which new nodes are created (with new IDs).
     """
     from fusionpipe.utils import db_utils
+
     # Get the original graph from the database
     original_graph = db_to_graph_from_pip_id(cur, pipeline_id)
     
@@ -430,3 +432,24 @@ def get_all_children_nodes(cur, pipeline_id, node_id):
     """
     graph = db_to_graph_from_pip_id(cur, pipeline_id)
     return list(nx.descendants(graph, node_id))
+
+def duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, node_id):
+    """
+    Duplicate a node in the pipeline, including its code and data.
+    """
+
+    new_node_id = generate_node_id()
+    # Duplicate node in the databae
+    db_utils.duplicate_node_in_pipeline_with_relations(cur, node_id, new_node_id, pipeline_id)
+
+    # Copy the folder into the new node folder
+    new_node_folder_path = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"), new_node_id)
+    # Update database
+    db_utils.update_node_folder_path(cur, new_node_id, new_node_folder_path)
+
+    old_node_folder_path = db_utils.get_node_folder_path(cur, node_id=node_id)
+
+    if old_node_folder_path:
+        # Copy the entire folder
+        os.makedirs(new_node_folder_path, exist_ok=True)
+        shutil.copytree(old_node_folder_path, new_node_folder_path, dirs_exist_ok=True)

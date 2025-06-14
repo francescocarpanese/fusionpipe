@@ -281,6 +281,48 @@
     await loadPipeline(pipelineId);
   }
 
+
+  async function duplicateSelectedNode() {
+    const pipelineId =
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
+
+    if (!pipelineId) {
+      console.error("No pipeline selected");
+      return;
+    }
+
+    const selectedNode = nodes.find((node) => node.selected);
+
+    if (!selectedNode) {
+      console.error("No node selected");
+      return;
+    }
+
+    const nodeId = selectedNode.id;
+
+    try {
+      const response = await fetch(
+        `http://localhost:8000/duplicate_node_in_pipeline/${pipelineId}/${nodeId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to duplicate node: ${response.statusText}`);
+      }
+
+      await loadPipeline(pipelineId);
+      alert(`Node ${nodeId} duplicated successfully.`);
+    } catch (error) {
+      console.error("Error duplicating node:", error);
+      alert("Failed to duplicate node.");
+    }
+  }
+
   async function fetchPipelines() {
     try {
       const response = await fetch(
@@ -852,8 +894,7 @@
           >Open selected node panel</DropdownItem
         >
         <DropdownItem onclick={addNode}>Create node</DropdownItem>
-        <DropdownItem class="text-gray-400 cursor-not-allowed"
-          >Copy selected nodes</DropdownItem
+        <DropdownItem onclick={duplicateSelectedNode}>Duplicate seleted node</DropdownItem
         >
         <DropdownItem onclick={deleteNode}>Delete selected nodes</DropdownItem>
         <DropdownItem onclick={deleteEdge}>Delete selected edge</DropdownItem>

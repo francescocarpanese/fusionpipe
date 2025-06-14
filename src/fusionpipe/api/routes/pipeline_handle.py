@@ -290,3 +290,16 @@ def run_node_route(node_id: str, payload: dict = None, db_conn=Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Node {node_id} run completed in {run_mode} mode"}
+
+@router.post("/duplicate_node_in_pipeline/{pipeline_id}/{node_id}")
+def duplicate_node_in_pipeline_with_code_and_data(pipeline_id: str, node_id: str, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    try:
+        pip_utils.duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, node_id)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Node {node_id} duplicated in pipeline {pipeline_id} with code and data"}
+
+
