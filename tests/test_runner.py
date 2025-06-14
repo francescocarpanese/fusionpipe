@@ -42,8 +42,13 @@ def test_run_node_creates_and_runs_node(in_memory_db_conn, tmp_base_dir, node_in
 
 
 
-
-def test_run_pipeline_simple(in_memory_db_conn, tmp_path):
+@pytest.mark.parametrize("last_node,expected_status_a,expected_status_b,expected_status_c", [
+    (None, "completed", "completed", "completed"),
+    (0, "completed", "ready", "ready"),
+    (1, "completed", "completed", "ready"),
+    (2, "completed", "completed", "completed"),
+])
+def test_run_pipeline_simple(in_memory_db_conn, tmp_path, last_node, expected_status_a, expected_status_b, expected_status_c):
     from fusionpipe.utils import db_utils, pip_utils, runner_utils
 
     # Setup DB
@@ -56,25 +61,37 @@ def test_run_pipeline_simple(in_memory_db_conn, tmp_path):
 
     node_a = pip_utils.generate_node_id()
     node_b = pip_utils.generate_node_id()
+    node_c = pip_utils.generate_node_id()
+    node_ids = [node_a, node_b, node_c] 
     folder_a = os.path.join(tmp_path, node_a)
     folder_b = os.path.join(tmp_path, node_b)
+    folder_c = os.path.join(tmp_path, node_c)    
 
     db_utils.add_node_to_nodes(cur, node_id=node_a, status="ready", editable=True, folder_path=folder_a)
     db_utils.add_node_to_nodes(cur, node_id=node_b, status="ready", editable=True, folder_path=folder_b)
+    db_utils.add_node_to_nodes(cur, node_id=node_c, status="ready", editable=True, folder_path=folder_c)
     db_utils.add_node_to_pipeline(cur, node_id=node_a, pipeline_id=pipeline_id)
     db_utils.add_node_to_pipeline(cur, node_id=node_b, pipeline_id=pipeline_id)
+    db_utils.add_node_to_pipeline(cur, node_id=node_c, pipeline_id=pipeline_id)    
     db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_a)
+    db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_c)
     pip_utils.init_node_folder(node_folder_path=folder_a)
     pip_utils.init_node_folder(node_folder_path=folder_b)
+    pip_utils.init_node_folder(node_folder_path=folder_c)    
     conn.commit()
 
-    # Run the pipeline
-    runner_utils.run_pipeline(conn, pipeline_id, run_mode="local", poll_interval=0.2, debug=True)
+    if last_node is not None:
+        # Run pipeline from last node
+        runner_utils.run_pipeline(conn, pipeline_id, last_node_id=node_ids[last_node], run_mode="local", poll_interval=0.2, debug=True)
+    else:
+        runner_utils.run_pipeline(conn, pipeline_id, run_mode="local", poll_interval=0.2, debug=True)
 
     # Assert both nodes are completed
     status_a = db_utils.get_node_status(cur, node_a)
     status_b = db_utils.get_node_status(cur, node_b)
-    assert status_a == "completed"
-    assert status_b == "completed"
+    status_c = db_utils.get_node_status(cur, node_c)    
+    assert status_a == expected_status_a
+    assert status_b == expected_status_b
+    assert status_c == expected_status_c
 
     conn.close()

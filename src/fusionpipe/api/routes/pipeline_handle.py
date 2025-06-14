@@ -231,8 +231,6 @@ def update_node_status(node_id: str, payload: dict, db_conn=Depends(get_db)):
     return {"message": f"Node status updated for node {node_id}"}
 
 
-
-
 @router.post("/run_pipeline/{pipeline_id}")
 def run_pipeline_route(pipeline_id: str, payload: dict = None, db_conn=Depends(get_db)):
     run_mode = "local"
@@ -255,6 +253,31 @@ def run_pipeline_route(pipeline_id: str, payload: dict = None, db_conn=Depends(g
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Pipeline {pipeline_id} run completed", "result": result}
+
+
+@router.post("/run_pipeline_up_to_node/{pipeline_id}/{node_id}")
+def run_pipeline_up_to_node_route(pipeline_id: str, node_id: str, payload: dict = None, db_conn=Depends(get_db)):
+    run_mode = "local"
+    poll_interval = 1.0
+    debug = False
+
+    if payload:
+        run_mode = payload.get("run_mode", "local")
+        poll_interval = payload.get("poll_interval", 1.0)
+        debug = payload.get("debug", False)
+
+    try:
+        result = runner_utils.run_pipeline(
+            db_conn,
+            pipeline_id,
+            last_node_id=node_id,
+            run_mode=run_mode,
+            poll_interval=poll_interval,
+            debug=debug
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Pipeline {pipeline_id} run up to node {node_id} completed", "result": result}
 
 
 @router.post("/run_node/{node_id}")

@@ -15,7 +15,8 @@ def run_node(conn, node_id, run_mode="local"):
         db_utils.update_node_status(cur, node_id, "running")
         conn.commit()
         try:
-            subprocess.run(["python", os.path.join(node_path, "code", "run.py")], check=True)
+            # Make sure this is run with uv in order to have access to the package manager
+            subprocess.run(["uv","run","python", os.path.join(node_path, "code", "main.py")], check=True)
             db_utils.update_node_status(cur, node_id, "completed")
             conn.commit()
         except subprocess.CalledProcessError as e:
@@ -27,7 +28,7 @@ def run_node(conn, node_id, run_mode="local"):
         return
 
 
-def run_pipeline(conn, pipeline_id, run_mode="local", poll_interval=1.0, debug=False):
+def run_pipeline(conn, pipeline_id, last_node_id=None, run_mode="local", poll_interval=1.0, debug=False):
     """
     Orchestrate the execution of a pipeline.
     - conn: sqlite3.Connection
@@ -38,6 +39,11 @@ def run_pipeline(conn, pipeline_id, run_mode="local", poll_interval=1.0, debug=F
 
     cur = conn.cursor()
     all_nodes = set(db_utils.get_all_nodes_from_pip_id(cur, pipeline_id))
+
+    if last_node_id is not None:
+        children_nodes = set(pip_utils.get_all_children_nodes(cur, pipeline_id=pipeline_id, node_id=last_node_id))
+        all_nodes = all_nodes - children_nodes
+
     running_nodes = set()
     completed_nodes = set()
     failed_nodes = set()
@@ -68,7 +74,8 @@ def run_pipeline(conn, pipeline_id, run_mode="local", poll_interval=1.0, debug=F
         if debug:
             print(f"Runnable nodes: {runnable_nodes}")
 
-        # Start processes for runnable nodes
+        # Start processes for runnable nodes.
+        # For the moment this is run sequentially
         for node_id in runnable_nodes:
             run_node(conn, node_id, run_mode=run_mode)
             running_nodes.add(node_id)
@@ -82,3 +89,4 @@ def run_pipeline(conn, pipeline_id, run_mode="local", poll_interval=1.0, debug=F
             break
 
         time.sleep(poll_interval)
+

@@ -34,7 +34,7 @@
   } from "flowbite-svelte";
   import { ChevronDownOutline } from "flowbite-svelte-icons";
 
-  //  --- Variables and state definitions --- 
+  //  --- Variables and state definitions ---
   let nodes = $state<Node[]>([]);
   let edges = $state.raw<Edge[]>([]);
   let selectedPipelineDropdown = $state(null);
@@ -59,15 +59,12 @@
   let ids_tags_dict = $state<Record<string, string>>({});
   let pipelines_dropdown = $state<string[]>([]);
 
-
   let nodeTypes = { custom: CustomNode };
   const dagreGraph = new dagre.graphlib.Graph();
 
-  let radiostate = $state(2) // selector for what to display in pipeline list 1 for ids, 2 for tags
+  let radiostate = $state(2); // selector for what to display in pipeline list 1 for ids, 2 for tags
 
-
-
-  // --  Definitions of functions --- 
+  // --  Definitions of functions ---
 
   dagreGraph.setDefaultEdgeLabel(() => ({}));
 
@@ -131,34 +128,38 @@
     const layouted = getLayoutedElements(nodes, edges);
     nodes = [...layouted.nodes];
     edges = [...layouted.edges];
-    
+
     // Save the new node positions to the backend
     await saveNodePositions();
   }
-  
+
   async function saveNodePositions() {
     const pipelineId =
       typeof currentPipelineId === "string"
         ? currentPipelineId
         : currentPipelineId.value;
-        
+
     if (!pipelineId) {
       console.error("No pipeline selected");
       return;
     }
-    
+
     try {
       const response = await fetch(
         `http://localhost:8000/update_node_position/${pipelineId}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nodes: nodes.map(n => ({ id: n.id, position: n.position })) }),
-        }
+          body: JSON.stringify({
+            nodes: nodes.map((n) => ({ id: n.id, position: n.position })),
+          }),
+        },
       );
-      
+
       if (!response.ok) {
-        throw new Error(`Failed to save node positions: ${response.statusText}`);
+        throw new Error(
+          `Failed to save node positions: ${response.statusText}`,
+        );
       }
     } catch (error) {
       console.error("Error saving node positions:", error);
@@ -462,7 +463,7 @@
           folder_path: node.folder_path || "",
           status: node.status || "ready",
         },
-        position:  {
+        position: {
           x: node.position[0],
           y: node.position[1],
         },
@@ -478,9 +479,8 @@
       );
 
       // Only apply layout if there are no positions stored
-      const needsLayout = rawNodes.some(node => 
-        !node.position);
-      
+      const needsLayout = rawNodes.some((node) => !node.position);
+
       if (needsLayout) {
         const layoutedElements = getLayoutedElements(rawNodes, rawEdges);
         nodes = [...layoutedElements.nodes];
@@ -559,7 +559,7 @@
     try {
       const response = await fetch(
         `http://localhost:8000/get_pipeline/${pipelineId}`,
-        { cache: "no-store" }
+        { cache: "no-store" },
       );
       if (!response.ok) {
         throw new Error(`Failed to load pipeline info: ${response.statusText}`);
@@ -590,22 +590,16 @@
     const newNotes = pipelineDrawerForm.notes;
 
     try {
-      await fetch(
-        `http://localhost:8000/update_pipeline_tag/${pipelineId}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tag: newTag }),
-        }
-      );
-      await fetch(
-        `http://localhost:8000/update_pipeline_notes/${pipelineId}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ notes: newNotes }),
-        }
-      );
+      await fetch(`http://localhost:8000/update_pipeline_tag/${pipelineId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tag: newTag }),
+      });
+      await fetch(`http://localhost:8000/update_pipeline_notes/${pipelineId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: newNotes }),
+      });
       await fetchPipelines();
       await loadPipeline(pipelineId);
       alert("Pipeline info updated.");
@@ -615,75 +609,119 @@
     }
   }
 
-
-async function runSelectedNode() {
-  const selectedNode = nodes.find((node) => node.selected);
-  const pipelineatcall = typeof currentPipelineId === "string"
-    ? currentPipelineId
-    : currentPipelineId.value;
-  if (!selectedNode) {
-    alert("No node selected");
-    return;
-  }
-  const nodeId = selectedNode.id;
-  try {
-    const response = await fetch(`http://localhost:8000/run_node/${nodeId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ run_mode: "local" }),
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || response.statusText);
-    }
-    const data = await response.json();
-    // Optionally reload pipeline to update node status
-    if (currentPipelineId && pipelineatcall === currentPipelineId) {
-      const pipelineId =
+  async function runSelectedNode() {
+    const selectedNode = nodes.find((node) => node.selected);
+    const pipelineatcall =
       typeof currentPipelineId === "string"
         ? currentPipelineId
         : currentPipelineId.value;
+    if (!selectedNode) {
+      alert("No node selected");
+      return;
+    }
+    const nodeId = selectedNode.id;
+    try {
+      const response = await fetch(`http://localhost:8000/run_node/${nodeId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ run_mode: "local" }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || response.statusText);
+      }
+      const data = await response.json();
+      // Optionally reload pipeline to update node status
+      if (currentPipelineId && pipelineatcall === currentPipelineId) {
+        const pipelineId =
+          typeof currentPipelineId === "string"
+            ? currentPipelineId
+            : currentPipelineId.value;
+        await loadPipeline(pipelineId);
+      }
+    } catch (error) {
+      console.error("Error running node:", error);
+      alert("Failed to run node.");
+    }
+  }
+
+  async function runCurrentPipeline() {
+    const pipelineId =
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
+
+    if (!pipelineId) {
+      alert("No pipeline selected");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `http://localhost:8000/run_pipeline/${pipelineId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ run_mode: "local" }),
+        },
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || response.statusText);
+      }
+
+      const data = await response.json();
       await loadPipeline(pipelineId);
+      alert(data.message || "Pipeline run completed.");
+    } catch (error) {
+      console.error("Error running pipeline:", error);
+      alert("Failed to run pipeline.");
     }
-  } catch (error) {
-    console.error("Error running node:", error);
-    alert("Failed to run node.");
-  }
-}
-
-
-async function runCurrentPipeline() {
-  const pipelineId =
-    typeof currentPipelineId === "string"
-      ? currentPipelineId
-      : currentPipelineId.value;
-
-  if (!pipelineId) {
-    alert("No pipeline selected");
-    return;
   }
 
-  try {
-    const response = await fetch(`http://localhost:8000/run_pipeline/${pipelineId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ run_mode: "local" }),
-    });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || response.statusText);
+
+  async function runPipelineUpToNode() {
+    const pipelineId =
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
+
+    if (!pipelineId) {
+      alert("No pipeline selected");
+      return;
     }
 
-    const data = await response.json();
-    await loadPipeline(pipelineId);
-    alert(data.message || "Pipeline run completed.");
-  } catch (error) {
-    console.error("Error running pipeline:", error);
-    alert("Failed to run pipeline.");
-  }
-}
+    const selectedNode = nodes.find((node) => node.selected);
+    if (!selectedNode) {
+      alert("No node selected");
+      return;
+    }
 
+    try {
+      const response = await fetch(
+        `http://localhost:8000/run_pipeline_up_to_node/${pipelineId}/${selectedNode.id}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ run_mode: "local" }),
+        },
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || response.statusText);
+      }
+
+      const data = await response.json();
+      await loadPipeline(pipelineId);
+      alert(data.message || "Pipeline run completed.");
+    } catch (error) {
+      console.error("Error running pipeline:", error);
+      alert("Failed to run pipeline.");
+    }
+  }
 
   // Collection of all reactive effects
   $effect(() => {
@@ -741,9 +779,9 @@ async function runCurrentPipeline() {
       if (radiostate === 1) {
         currentPipelineId = selectedPipelineDropdown.value;
       } else if (radiostate === 2) {
-      // Dropdown contains tags, so find the pipeline ID for the selected tag
-      currentPipelineId = Object.keys(ids_tags_dict).find(
-          key => ids_tags_dict[key] === selectedPipelineDropdown.value
+        // Dropdown contains tags, so find the pipeline ID for the selected tag
+        currentPipelineId = Object.keys(ids_tags_dict).find(
+          (key) => ids_tags_dict[key] === selectedPipelineDropdown.value,
         );
       }
     }
@@ -761,8 +799,6 @@ async function runCurrentPipeline() {
   });
 </script>
 
-
-
 <div class="app-layout">
   <Navbar>
     <NavUl class="ms-3 pt-1">
@@ -774,10 +810,14 @@ async function runCurrentPipeline() {
       <Dropdown simple>
         <DropdownItem>
           <li>
-            <Radio name="radio_state" bind:group={radiostate} value={1}>List ids</Radio>
+            <Radio name="radio_state" bind:group={radiostate} value={1}
+              >List ids</Radio
+            >
           </li>
           <li>
-            <Radio name="radio_state" bind:group={radiostate} value={2}>List tags</Radio>
+            <Radio name="radio_state" bind:group={radiostate} value={2}
+              >List tags</Radio
+            >
           </li>
         </DropdownItem>
         <DropdownItem>
@@ -824,12 +864,9 @@ async function runCurrentPipeline() {
         />
       </NavLi>
       <Dropdown simple>
-        <DropdownItem onclick={runSelectedNode}
-          >Run selected node</DropdownItem
-        >        
-        <DropdownItem onclick={runCurrentPipeline}
-          >Run pipeline</DropdownItem
-        >
+        <DropdownItem onclick={runSelectedNode}>Run selected node</DropdownItem>
+        <DropdownItem onclick={runCurrentPipeline}>Run full pipeline</DropdownItem>
+        <DropdownItem onclick={runPipelineUpToNode}>Run pipeline up to selected node</DropdownItem>        
         <DropdownItem class="text-gray-400 cursor-not-allowed"
           >Run up to selected node</DropdownItem
         >
@@ -848,10 +885,7 @@ async function runCurrentPipeline() {
         </DropdownItem>
         <DropdownItem>Vertical</DropdownItem>
         <DropdownItem>Horizontal</DropdownItem>
-        <DropdownItem onclick={refreshLayout}>
-          Auto reshape
-        </DropdownItem
-        >
+        <DropdownItem onclick={refreshLayout}>Auto reshape</DropdownItem>
       </Dropdown>
     </NavUl>
   </Navbar>
@@ -890,7 +924,7 @@ async function runCurrentPipeline() {
       <Label for="node_tag" class="mb-2 block">Node tag:</Label>
       <div class="mt-2 text-sm text-gray-500">
         {nodeDrawereForm.folder_path || "No folder path"}
-      </div>            
+      </div>
       <Button onclick={updateNodeInfo} class="mt-4">Save Changes</Button>
     {/if}
   </Drawer>
@@ -941,10 +975,10 @@ async function runCurrentPipeline() {
       style="height: 100%;"
       disableKeyboardA11y={true}
     >
-  <Panel position="top-left">
-    Pipeline id: {currentPipelineId || "None"}<br>
-    Pipeline tag: {ids_tags_dict[currentPipelineId] || "None"}
-  </Panel>
+      <Panel position="top-left">
+        Pipeline id: {currentPipelineId || "None"}<br />
+        Pipeline tag: {ids_tags_dict[currentPipelineId] || "None"}
+      </Panel>
       <Controls />
       <Background />
       <MiniMap />

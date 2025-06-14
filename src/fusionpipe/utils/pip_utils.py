@@ -33,21 +33,48 @@ def init_node_folder(node_folder_path, verbose=False):
     
     # Create the main node folder
     os.makedirs(node_folder_path, exist_ok=True)
+
+    code_folder_path = os.path.join(node_folder_path,"code")
     
     # Create subfolders 'code' and 'data'
-    os.makedirs(f"{node_folder_path}/code", exist_ok=True)
+    os.makedirs(f"{code_folder_path}", exist_ok=True)
     os.makedirs(f"{node_folder_path}/data", exist_ok=True)
     os.makedirs(f"{node_folder_path}/reports", exist_ok=True)
 
+    # Save the current working directory
+    current_dir = os.getcwd()
+
+    try:
+        # Run the 'uv init' command inside the node folder
+        os.chdir(code_folder_path)
+        os.system("uv init")
+        # Run empty main to set-up the .venv
+        os.system("uv run")
+    finally:
+        # Change back to the previous working directory
+        os.chdir(current_dir)
+
+
     # Copy the template file into the code folder
-    template_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates', 'run.py')
+    template_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates', 'main_template.py')
     if os.path.exists(template_file_path):
-        destination_file_path = os.path.join(node_folder_path, 'code', 'run.py')
+        destination_file_path = os.path.join(code_folder_path, 'main.py')        
         with open(template_file_path, 'r') as template_file:
             with open(destination_file_path, 'w') as dest_file:
                 dest_file.write(template_file.read())
     else:
-        raise FileNotFoundError(f"Template file not found at {template_file_path}")
+        raise FileNotFoundError(f"Template file not found at {template_file_path}") 
+    
+    # Commit all changes in the code folder path
+    os.chdir(code_folder_path)
+    os.system("git init")  # Initialize a git repository if not already initialized
+    os.system("git add .")  # Add all changes to the staging area
+    os.system('git commit -m "Initial commit for code folder"')  # Commit the changes
+    
+
+    os.chdir(current_dir)  # Change back to the original directory    
+
+
     
     if verbose:
         print(f"Node folder created at: {node_folder_path}")
@@ -397,3 +424,9 @@ def can_node_run(cur, node_id):
     # If node has no parents, it can run
     return True
 
+def get_all_children_nodes(cur, pipeline_id, node_id):
+    """
+    Get all children of a node in the pipeline.
+    """
+    graph = db_to_graph_from_pip_id(cur, pipeline_id)
+    return list(nx.descendants(graph, node_id))

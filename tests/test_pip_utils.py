@@ -214,6 +214,27 @@ def test_visualize_pip_static_runs_without_error(monkeypatch, dag_dummy_1):
     # Should not raise
     visualize_pip_static(dag_dummy_1)
 
+def test_get_all_children_nodes(in_memory_db_conn, dag_dummy_1):
+    """
+    Test that get_all_children_nodes returns all descendants of a node in the pipeline.
+    """
+    from fusionpipe.utils.pip_utils import get_all_children_nodes, graph_to_db
+    from fusionpipe.utils import db_utils
+    import networkx as nx
+
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+
+    # Add the dummy graph to the database
+    graph_to_db(dag_dummy_1, cur)
+    conn.commit()
+
+    # For each node, compare get_all_children_nodes to nx.descendants
+    for node in dag_dummy_1.nodes:
+        expected = set(nx.descendants(dag_dummy_1, node))
+        result = set(get_all_children_nodes(cur, dag_dummy_1.graph['pipeline_id'], node))
+        assert result == expected, f"Children nodes for {node} do not match expected descendants."
+
 from conftest import PARENT_NODE_LIST
 @pytest.mark.parametrize("start_node", PARENT_NODE_LIST)
 def test_branch_pipeline_from_node(in_memory_db_conn, dag_dummy_1, start_node):
@@ -277,3 +298,5 @@ def test_branch_pipeline_from_node(in_memory_db_conn, dag_dummy_1, start_node):
 
     # The set of replaced nodes should be the same size as nodes_to_replace
     assert len(replaced_nodes) == len(nodes_to_replace), "Each replaced node should have a new node ID in the new pipeline."
+
+
