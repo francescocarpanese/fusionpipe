@@ -868,9 +868,6 @@
         <DropdownItem onclick={runCurrentPipeline}>Run full pipeline</DropdownItem>
         <DropdownItem onclick={runPipelineUpToNode}>Run pipeline up to selected node</DropdownItem>        
         <DropdownItem class="text-gray-400 cursor-not-allowed"
-          >Run up to selected node</DropdownItem
-        >
-        <DropdownItem class="text-gray-400 cursor-not-allowed"
           >Open run panel</DropdownItem
         >
       </Dropdown>
