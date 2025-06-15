@@ -308,7 +308,7 @@ def test_branch_pipeline_from_node(in_memory_db_conn, dag_dummy_1, start_node):
     # The set of replaced nodes should be the same size as nodes_to_replace
     assert len(replaced_nodes) == len(nodes_to_replace), "Each replaced node should have a new node ID in the new pipeline."
 
-
+#@pytest.mark.parametrize("start_node", PARENT_NODE_LIST)
 def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, in_memory_db_conn, tmp_base_dir):
     """
     Test that duplicate_node_in_pipeline_w_code_and_data duplicates a node in the pipeline,
@@ -339,7 +339,8 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, in_memory_db_co
 
 
     # Run duplication
-    new_node_id = duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, node_id)
+    new_node_id = generate_node_id()
+    duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, node_id, new_node_id)
     conn.commit()
 
     # Check new node exists in pipeline
@@ -358,3 +359,69 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, in_memory_db_co
     with open(pyproject_file_path, "r") as f:
         pyproject_content = toml.load(f)
     assert new_node_id in pyproject_content["project"]["name"], "pyproject.toml does not contain 'dependencies' section."
+
+@pytest.mark.parametrize("selected_nodes",
+                          [
+                              ("A",),
+                              ("A","B",),
+                              ("B",),
+                              ("E",),
+                              ("C","D"),
+                              ("A","C","D"),
+                              ("E","C","D"),
+                              ("B","D"),
+                              ]
+                          )
+def test_duplicate_duplicate_nodes_in_pipeline_with_relations(monkeypatch, in_memory_db_conn, dag_dummy_1, tmp_base_dir, selected_nodes):
+    """
+    Test that duplicate_subtree_in_pipeline duplicates a subtree rooted at a node,
+    with new node IDs and correct parent-child relations.
+    """
+    import os
+    from fusionpipe.utils.pip_utils import (
+        graph_to_db, db_to_graph_from_pip_id, duplicate_nodes_in_pipeline_with_relations, generate_node_id, init_node_folder
+    )
+    from fusionpipe.utils import db_utils
+    import networkx as nx
+
+    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
+
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+
+    # Add the dummy graph to the database
+    graph_to_db(dag_dummy_1, cur)
+    conn.commit()
+
+    pipeline_id = dag_dummy_1.graph['pipeline_id']
+
+    # Setup folders for all nodes to be duplicated
+    for node_id in selected_nodes:
+        folder_path = os.path.join(tmp_base_dir, node_id)
+        init_node_folder(folder_path)
+        db_utils.update_node_folder_path(cur, node_id, folder_path)
+    conn.commit()
+
+    # Duplicate nodes with relation
+    id_map = duplicate_nodes_in_pipeline_with_relations(cur, pipeline_id, selected_nodes)
+    conn.commit()
+
+    # Check: all nodes in the subtree have new IDs, and are present in the pipeline
+    for old_id, new_id in id_map.items():
+        assert old_id != new_id
+        # The new node should exist in the pipeline
+        all_nodes = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
+        assert new_id in all_nodes
+        # The new node's folder should exist
+        new_folder = os.path.join(tmp_base_dir, new_id)
+        assert os.path.exists(new_folder)
+
+    # Check: parent-child relations are preserved in the duplicated subtree
+    graph = db_to_graph_from_pip_id(cur, pipeline_id)
+    for old_parent, old_child in dag_dummy_1.subgraph(selected_nodes).edges:
+        assert (id_map[old_parent], id_map[old_child]) in graph.edges
+
+    # Check: original nodes are still present and unchanged
+    for node_id in selected_nodes:
+        assert node_id in graph.nodes

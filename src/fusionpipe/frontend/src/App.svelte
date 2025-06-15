@@ -281,8 +281,7 @@
     await loadPipeline(pipelineId);
   }
 
-
-  async function duplicateSelectedNode() {
+  async function duplicateSelectedNodes() {
     const pipelineId =
       typeof currentPipelineId === "string"
         ? currentPipelineId
@@ -293,33 +292,34 @@
       return;
     }
 
-    const selectedNode = nodes.find((node) => node.selected);
+    // Collect all selected node IDs
+    const selectedNodeIds = nodes.filter((node) => node.selected).map((node) => node.id);
 
-    if (!selectedNode) {
-      console.error("No node selected");
+    if (!selectedNodeIds.length) {
+      console.error("No nodes selected");
+      alert("Please select at least one node to duplicate.");
       return;
     }
 
-    const nodeId = selectedNode.id;
-
     try {
       const response = await fetch(
-        `http://localhost:8000/duplicate_node_in_pipeline/${pipelineId}/${nodeId}`,
+        `http://localhost:8000/duplicate_nodes_in_pipeline/${pipelineId}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ node_ids: selectedNodeIds }),
         },
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to duplicate node: ${response.statusText}`);
+        throw new Error(`Failed to duplicate nodes: ${response.statusText}`);
       }
 
       await loadPipeline(pipelineId);
-      alert(`Node ${nodeId} duplicated successfully.`);
+      alert(`Nodes ${selectedNodeIds.join(", ")} duplicated successfully.`);
     } catch (error) {
-      console.error("Error duplicating node:", error);
-      alert("Failed to duplicate node.");
+      console.error("Error duplicating nodes:", error);
+      alert("Failed to duplicate nodes.");
     }
   }
 
@@ -894,7 +894,7 @@
           >Open selected node panel</DropdownItem
         >
         <DropdownItem onclick={addNode}>Create node</DropdownItem>
-        <DropdownItem onclick={duplicateSelectedNode}>Duplicate seleted node</DropdownItem
+        <DropdownItem onclick={duplicateSelectedNodes}>Duplicate selected nodes into this pipeline</DropdownItem
         >
         <DropdownItem class="text-red-600" onclick={deleteNode}>Delete selected nodes</DropdownItem>
         <DropdownItem class="text-red-600" onclick={deleteEdge}>Delete selected edge</DropdownItem>

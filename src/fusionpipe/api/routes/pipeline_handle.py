@@ -291,15 +291,24 @@ def run_node_route(node_id: str, payload: dict = None, db_conn=Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Node {node_id} run completed in {run_mode} mode"}
 
-@router.post("/duplicate_node_in_pipeline/{pipeline_id}/{node_id}")
-def duplicate_node_in_pipeline_with_code_and_data(pipeline_id: str, node_id: str, db_conn=Depends(get_db)):
+@router.post("/duplicate_nodes_in_pipeline/{pipeline_id}")
+def duplicate_nodes_in_pipeline_route(pipeline_id: str, payload: dict, db_conn=Depends(get_db)):
+    """
+    Duplicate a set of nodes in the pipeline, preserving their relations.
+    Payload example: {"node_ids": ["n_123", "n_456"]}
+    """
     cur = db_conn.cursor()
+    node_ids = payload.get("node_ids")
+    if not node_ids or not isinstance(node_ids, list):
+        raise HTTPException(status_code=400, detail="Payload must contain a list of node_ids")
     try:
-        pip_utils.duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, node_id)
+        # Use the correct function name (with 'relation')
+        id_map = pip_utils.duplicate_nodes_in_pipeline_with_relations(cur, pipeline_id, node_ids)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-    return {"message": f"Node {node_id} duplicated in pipeline {pipeline_id} with code and data"}
-
-
+    return {
+        "message": f"Nodes {node_ids} duplicated in pipeline {pipeline_id} with code, data, and relations",
+        "id_map": id_map
+    }

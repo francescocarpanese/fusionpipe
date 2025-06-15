@@ -273,10 +273,10 @@ def dupicate_node_in_pipeline(cur, source_node_id, new_node_id, pipeline_id):
     # Duplicate node_pipeline_relation table
     cur.execute('''
         INSERT INTO node_pipeline_relation (last_update, user, node_id, pipeline_id, node_tag, position_x, position_y)
-        SELECT last_update, user, ?, pipeline_id, ?, position_x, position_y
+        SELECT last_update, user, ?, pipeline_id, node_tag, position_x, position_y
         FROM node_pipeline_relation
         WHERE node_id = ? AND pipeline_id = ?
-    ''', (new_node_id, new_node_id, source_node_id, pipeline_id))
+    ''', (new_node_id, source_node_id, pipeline_id))
 
     return new_node_id
 
@@ -314,11 +314,11 @@ def remove_pipeline_from_everywhere(cur, pipeline_id):
     cur.execute('DELETE FROM node_pipeline_relation WHERE pipeline_id = ?', (pipeline_id,))
     update_editable_status_for_all_nodes(cur)
 
-def duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id, pipeline_id):
+def duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id, pipeline_id, parents=False, childrens=False):
     # Duplicate the node in a pipeline with copying relations
     dupicate_node_in_pipeline(cur, source_node_id, new_node_id, pipeline_id)
     # Only parents are copied otherwise childrens will have a different input signature
-    copy_node_relations(cur, source_node_id, new_node_id, parents=True)
+    copy_node_relations(cur, source_node_id, new_node_id, parents=parents, childrens=childrens)
     return new_node_id
 
 def get_pipelines_with_node(cur, node_id):
