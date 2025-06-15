@@ -880,7 +880,7 @@
         <DropdownItem onclick={branchPipelineFromNode}
           >Branch Pipeline from selected node</DropdownItem
         >
-        <DropdownItem onclick={deleteSelectedPipeline}
+        <DropdownItem class="text-red-600" onclick={deleteSelectedPipeline}
           >Delete Pipeline</DropdownItem
         >
       </Dropdown>
@@ -896,8 +896,8 @@
         <DropdownItem onclick={addNode}>Create node</DropdownItem>
         <DropdownItem onclick={duplicateSelectedNode}>Duplicate seleted node</DropdownItem
         >
-        <DropdownItem onclick={deleteNode}>Delete selected nodes</DropdownItem>
-        <DropdownItem onclick={deleteEdge}>Delete selected edge</DropdownItem>
+        <DropdownItem class="text-red-600" onclick={deleteNode}>Delete selected nodes</DropdownItem>
+        <DropdownItem class="text-red-600" onclick={deleteEdge}>Delete selected edge</DropdownItem>
       </Dropdown>
       <NavLi class="cursor-pointer">
         Actions<ChevronDownOutline
