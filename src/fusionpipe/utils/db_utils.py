@@ -280,22 +280,25 @@ def dupicate_node_in_pipeline(cur, source_node_id, new_node_id, pipeline_id):
 
     return new_node_id
 
-def copy_node_relations(cur, source_node_id, new_node_id):
-    # Copy child relations
-    cur.execute('''
-        INSERT INTO node_relation (child_id, parent_id)
-        SELECT ?, parent_id
-        FROM node_relation
-        WHERE child_id = ?
-    ''', (new_node_id, source_node_id))
+def copy_node_relations(cur, source_node_id, new_node_id, childrens = False, parents = False):
 
-    # Copy parent relations
-    cur.execute('''
-        INSERT INTO node_relation (child_id, parent_id)
-        SELECT child_id, ?
-        FROM node_relation
-        WHERE parent_id = ?
-    ''', (new_node_id, source_node_id))
+    if parents:
+        # Copy child relations
+        cur.execute('''
+            INSERT INTO node_relation (child_id, parent_id)
+            SELECT ?, parent_id
+            FROM node_relation
+            WHERE child_id = ?
+        ''', (new_node_id, source_node_id))
+
+    if childrens:
+        # Copy parent relations
+        cur.execute('''
+            INSERT INTO node_relation (child_id, parent_id)
+            SELECT child_id, ?
+            FROM node_relation
+            WHERE parent_id = ?
+        ''', (new_node_id, source_node_id))
 
     return new_node_id
 
@@ -314,7 +317,8 @@ def remove_pipeline_from_everywhere(cur, pipeline_id):
 def duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id, pipeline_id):
     # Duplicate the node in a pipeline with copying relations
     dupicate_node_in_pipeline(cur, source_node_id, new_node_id, pipeline_id)
-    copy_node_relations(cur, source_node_id, new_node_id)
+    # Only parents are copied otherwise childrens will have a different input signature
+    copy_node_relations(cur, source_node_id, new_node_id, parents=True)
     return new_node_id
 
 def get_pipelines_with_node(cur, node_id):
@@ -457,4 +461,18 @@ def update_node_position(cur, node_id, pipeline_id, position_x, position_y):
 
 def update_node_folder_path(cur, node_id, folder_path):
     cur.execute('UPDATE nodes SET folder_path = ? WHERE node_id = ?', (folder_path, node_id))
+    return cur.rowcount
+
+def update_editable_status(cur, node_id, editable):
+    """
+    Update the editable status of a node.
+    :param cur: Database cursor
+    :param node_id: ID of the node to update
+    :param editable: New editable status (True or False)
+    :return: Number of rows affected
+    """
+    if not isinstance(editable, bool):
+        raise ValueError("Editable status must be a boolean value.")
+    
+    cur.execute('UPDATE nodes SET editable = ? WHERE node_id = ?', (editable, node_id))
     return cur.rowcount

@@ -456,7 +456,11 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, node_id):
 
     new_node_id = generate_node_id()
     # Duplicate node in the database
+    # 
     db_utils.duplicate_node_in_pipeline_with_relations(cur, node_id, new_node_id, pipeline_id)
+
+    # New node is 
+    db_utils.update_editable_status(cur, node_id=new_node_id, editable=True)
 
     # Copy the folder into the new node folder
     new_node_folder_path = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"), new_node_id)

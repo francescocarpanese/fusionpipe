@@ -677,8 +677,14 @@ def test_dupicate_node_in_pipeline_full_coverage(in_memory_db_conn):
     assert duplicated_entry is not None, "Duplicated node entry was not created."
     assert duplicated_entry[1] == pipeline_id, "Duplicated entry pipeline_id does not match original."
 
-
-def test_copy_node_relations(in_memory_db_conn):
+@pytest.mark.parametrize("parents","childrens",
+            [
+             (True, False),  # Copy parents only
+             (True, False),
+             (False, True),  # Copy children only
+            ]
+)
+def test_copy_node_relations(in_memory_db_conn, parents, childrens):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
@@ -707,22 +713,25 @@ def test_copy_node_relations(in_memory_db_conn):
     conn.commit()
 
     # Copy relations from source_node_id to new_node_id
-    db_utils.copy_node_relations(cur, source_node_id, new_node_id)
+    db_utils.copy_node_relations(cur, source_node_id, new_node_id, parents=parents, childrens=childrens)
     conn.commit()
 
-    # Check parent relations for new_node_id (should match source_node_id's parents)
-    cur.execute("SELECT parent_id FROM node_relation WHERE child_id=?", (new_node_id,))
-    parent_rows = cur.fetchall()
-    parent_ids = {row[0] for row in parent_rows}
-    assert parent1_id in parent_ids and parent2_id in parent_ids, \
-        f"Parent relations not copied correctly: {parent_ids}"
+    if parents:
+        # Check parent relations for new_node_id (should match source_node_id's parents)
+        cur.execute("SELECT parent_id FROM node_relation WHERE child_id=?", (new_node_id,))
+        parent_rows = cur.fetchall()
+        parent_ids = {row[0] for row in parent_rows}
+        assert parent1_id in parent_ids and parent2_id in parent_ids, \
+            f"Parent relations not copied correctly: {parent_ids}"
+        
+    if childrens:
+        # Check child relations for new_node_id (should match source_node_id's children)
+        cur.execute("SELECT child_id FROM node_relation WHERE parent_id=?", (new_node_id,))
+        child_rows = cur.fetchall()
+        child_ids = {row[0] for row in child_rows}
+        assert child1_id in child_ids and child2_id in child_ids, \
+            f"Child relations not copied correctly: {child_ids}"
 
-    # Check child relations for new_node_id (should match source_node_id's children)
-    cur.execute("SELECT child_id FROM node_relation WHERE parent_id=?", (new_node_id,))
-    child_rows = cur.fetchall()
-    child_ids = {row[0] for row in child_rows}
-    assert child1_id in child_ids and child2_id in child_ids, \
-        f"Child relations not copied correctly: {child_ids}"
 
 
 def test_duplicate_node_in_pipeline_with_relations(in_memory_db_conn):
@@ -1140,3 +1149,36 @@ def test_can_node_run_logic(in_memory_db_conn):
     canrun = pip_utils.can_node_run(cur, node_id)
     assert canrun is False, "Node should not be able to run when status is 'failed'."
 
+def test_update_editable_status(in_memory_db_conn):
+    from fusionpipe.utils.pip_utils import generate_node_id
+    from fusionpipe.utils import db_utils
+
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+
+    # Create a node
+    node_id = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id)
+    conn.commit()
+
+    # Update editable status to False
+    rows_updated = db_utils.update_editable_status(cur, node_id=node_id, editable=False)
+    conn.commit()
+
+    # Verify the editable status was updated
+    assert rows_updated == 1, "Editable status was not updated in the database."
+    cur.execute("SELECT editable FROM nodes WHERE node_id=?", (node_id,))
+    result = cur.fetchone()
+    assert result is not None, "Node not found in database."
+    assert result[0] == 0, f"Expected editable status to be False, got {result[0]}"
+
+    # Update editable status back to True
+    rows_updated = db_utils.update_editable_status(cur, node_id=node_id, editable=True)
+    conn.commit()
+
+    # Verify the editable status was updated
+    assert rows_updated == 1, "Editable status was not updated in the database."
+    cur.execute("SELECT editable FROM nodes WHERE node_id=?", (node_id,))
+    result = cur.fetchone()
+    assert result is not None, "Node not found in database."
+    assert result[0] == 1, f"Expected editable status to be True, got {result[0]}"
