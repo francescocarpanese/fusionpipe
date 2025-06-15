@@ -340,7 +340,7 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, in_memory_db_co
 
     # Run duplication
     new_node_id = generate_node_id()
-    duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, node_id, new_node_id)
+    duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, pipeline_id, node_id, new_node_id)
     conn.commit()
 
     # Check new node exists in pipeline
@@ -404,7 +404,7 @@ def test_duplicate_duplicate_nodes_in_pipeline_with_relations(monkeypatch, in_me
     conn.commit()
 
     # Duplicate nodes with relation
-    id_map = duplicate_nodes_in_pipeline_with_relations(cur, pipeline_id, selected_nodes)
+    id_map = duplicate_nodes_in_pipeline_with_relations(cur, pipeline_id, pipeline_id, selected_nodes)
     conn.commit()
 
     # Check: all nodes in the subtree have new IDs, and are present in the pipeline

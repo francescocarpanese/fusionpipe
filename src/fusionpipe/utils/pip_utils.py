@@ -452,12 +452,20 @@ def get_all_children_nodes(cur, pipeline_id, node_id):
 
 
 
-def duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, source_node_id, new_node_id, parents=False, childrens=False):
+def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_pipeline_id, source_node_id, new_node_id, parents=False, childrens=False):
     """
     Duplicate a node in the pipeline, including its code and data.
     """
     # Duplicate node in the database
-    db_utils.duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id, pipeline_id, parents=parents, childrens=childrens)
+    db_utils.duplicate_node_in_pipeline_with_relations(
+        cur,
+        source_node_id, 
+        new_node_id,
+        source_pipeline_id,
+        target_pipeline_id,
+        parents=parents,
+        childrens=childrens,
+        )
 
     # New node is 
     db_utils.update_editable_status(cur, node_id=new_node_id, editable=True)
@@ -497,14 +505,14 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, source_node_id,
         os.chdir(current_dir)
 
 
-def duplicate_nodes_in_pipeline_with_relations(cur, pipeline_id, source_node_ids):
+def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_pipeline_id, source_node_ids):
     """
     Duplicate a list of nodes including their relation inside a pipeline.
     """
     if isinstance(source_node_ids, str):
         source_node_ids = [source_node_ids]
     # Get the pipeline graph
-    graph = db_to_graph_from_pip_id(cur, pipeline_id)
+    graph = db_to_graph_from_pip_id(cur, source_pipeline_id)
     # Get all nodes in the subtree(s)
     subtree_nodes = set()
     for root in source_node_ids:
@@ -518,8 +526,7 @@ def duplicate_nodes_in_pipeline_with_relations(cur, pipeline_id, source_node_ids
         new_id = id_map[old_id]
         # Duplicate node in DB (without parents/children relations)
         duplicate_node_in_pipeline_w_code_and_data(
-            cur, pipeline_id, old_id, new_id, parents=False, childrens=False
-        )
+            cur, source_pipeline_id,target_pipeline_id, old_id, new_id, parents=False, childrens=False)
     # Set parent-child relations in the duplicated subtree
     for old_parent, old_child in subtree.edges:
         db_utils.add_node_relation(
