@@ -925,6 +925,7 @@
           </li>
         </DropdownItem>
         <DropdownItem>
+          <div class="w-64">
           <SvelteSelect
             items={pipelines_dropdown}
             bind:value={selectedPipelineDropdown}
@@ -932,6 +933,7 @@
             maxItems={5}
             on:select={loadSelectedPipeline}
           />
+          </div>
         </DropdownItem>
 
         <DropdownDivider />
