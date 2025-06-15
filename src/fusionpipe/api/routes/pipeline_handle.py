@@ -291,24 +291,27 @@ def run_node_route(node_id: str, payload: dict = None, db_conn=Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Node {node_id} run completed in {run_mode} mode"}
 
-@router.post("/duplicate_nodes_in_pipeline/{pipeline_id}")
-def duplicate_nodes_in_pipeline_route(pipeline_id: str, payload: dict, db_conn=Depends(get_db)):
+@router.post("/duplicate_nodes_in_pipeline")
+def duplicate_nodes_in_pipeline_route(payload: dict, db_conn=Depends(get_db)):
     """
-    Duplicate a set of nodes in the pipeline, preserving their relations.
-    Payload example: {"node_ids": ["n_123", "n_456"]}
+    Duplicate a set of nodes from a source pipeline into a target pipeline, preserving their relations.
+    Payload example: {"source_pipeline_id": "...", "target_pipeline_id": "...", "node_ids": ["n_123", "n_456"]}
     """
     cur = db_conn.cursor()
+    source_pipeline_id = payload.get("source_pipeline_id")
+    target_pipeline_id = payload.get("target_pipeline_id")
     node_ids = payload.get("node_ids")
-    if not node_ids or not isinstance(node_ids, list):
-        raise HTTPException(status_code=400, detail="Payload must contain a list of node_ids")
+    if not source_pipeline_id or not target_pipeline_id or not node_ids or not isinstance(node_ids, list):
+        raise HTTPException(status_code=400, detail="Payload must contain source_pipeline_id, target_pipeline_id, and a list of node_ids")
     try:
-        # Use the correct function name (with 'relation')
-        id_map = pip_utils.duplicate_nodes_in_pipeline_with_relations(cur, pipeline_id, node_ids)
+        id_map = pip_utils.duplicate_nodes_in_pipeline_with_relations(
+            cur, source_pipeline_id, target_pipeline_id, node_ids
+        )
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     return {
-        "message": f"Nodes {node_ids} duplicated in pipeline {pipeline_id} with code, data, and relations",
+        "message": f"Nodes {node_ids} duplicated from pipeline {source_pipeline_id} to {target_pipeline_id} with code, data, and relations",
         "id_map": id_map
     }

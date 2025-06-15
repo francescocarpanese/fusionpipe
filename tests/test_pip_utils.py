@@ -360,6 +360,55 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, in_memory_db_co
         pyproject_content = toml.load(f)
     assert new_node_id in pyproject_content["project"]["name"], "pyproject.toml does not contain 'dependencies' section."
 
+def test_duplicate_node_in_different_pipeline_w_code_and_data(monkeypatch, in_memory_db_conn, tmp_base_dir):
+    """
+    Test that duplicate_node_in_pipeline_w_code_and_data can duplicate a node from one pipeline into another,
+    including its code and data folder.
+    """
+    import os
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id, duplicate_node_in_pipeline_w_code_and_data, init_node_folder
+    from fusionpipe.utils import db_utils
+    import toml
+
+    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
+
+    # Setup: create two pipelines and a node with a folder in the first pipeline
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+    pipeline_id_src = generate_pip_id()
+    pipeline_id_dst = generate_pip_id()
+    node_id = generate_node_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id_src, tag="src", owner="tester", notes="src pipeline")
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id_dst, tag="dst", owner="tester", notes="dst pipeline")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id_src, node_tag="test", position_x=0, position_y=0)
+    db_utils.update_node_folder_path(cur, node_id, os.path.join(tmp_base_dir, node_id))
+    conn.commit()
+
+    node_folder_path = os.path.join(tmp_base_dir, node_id)
+    init_node_folder(node_folder_path, verbose=True)
+
+    # Run duplication into a different pipeline
+    new_node_id = generate_node_id()
+    duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id_src, pipeline_id_dst, node_id, new_node_id)
+    conn.commit()
+
+    # Check new node exists in destination pipeline
+    nodes_in_dst = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id_dst)
+    assert new_node_id in nodes_in_dst
+
+    # Check new folder exists and file is copied
+    new_node_folder_path = os.path.join(tmp_base_dir, new_node_id)
+    assert os.path.exists(new_node_folder_path)
+    new_code_folder_path = os.path.join(new_node_folder_path, "code")
+    pyproject_file_path = os.path.join(new_code_folder_path, "pyproject.toml")
+    assert os.path.isfile(pyproject_file_path), "pyproject.toml file does not exist in the new node's code folder."
+
+    with open(pyproject_file_path, "r") as f:
+        pyproject_content = toml.load(f)
+    assert new_node_id in pyproject_content["project"]["name"], "pyproject.toml does not contain the new node id in 'name'."
+
 @pytest.mark.parametrize("selected_nodes",
                           [
                               ("A",),

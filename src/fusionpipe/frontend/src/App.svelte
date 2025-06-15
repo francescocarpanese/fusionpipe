@@ -281,6 +281,10 @@
     await loadPipeline(pipelineId);
   }
 
+
+
+
+
   async function duplicateSelectedNodes() {
     const pipelineId =
       typeof currentPipelineId === "string"
@@ -303,11 +307,15 @@
 
     try {
       const response = await fetch(
-        `http://localhost:8000/duplicate_nodes_in_pipeline/${pipelineId}`,
+        `http://localhost:8000/duplicate_nodes_in_pipeline`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ node_ids: selectedNodeIds }),
+          body: JSON.stringify({
+            source_pipeline_id: pipelineId,
+            target_pipeline_id: pipelineId,
+            node_ids: selectedNodeIds
+          }),
         },
       );
 
@@ -894,8 +902,7 @@
           >Open selected node panel</DropdownItem
         >
         <DropdownItem onclick={addNode}>Create node</DropdownItem>
-        <DropdownItem onclick={duplicateSelectedNodes}>Duplicate selected nodes into this pipeline</DropdownItem
-        >
+        <DropdownItem onclick={duplicateSelectedNodes}>Duplicate selected nodes into this pipeline</DropdownItem>
         <DropdownItem class="text-red-600" onclick={deleteNode}>Delete selected nodes</DropdownItem>
         <DropdownItem class="text-red-600" onclick={deleteEdge}>Delete selected edge</DropdownItem>
       </Dropdown>
