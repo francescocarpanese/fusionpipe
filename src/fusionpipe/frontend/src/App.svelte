@@ -38,6 +38,8 @@
   let nodes = $state<Node[]>([]);
   let edges = $state.raw<Edge[]>([]);
   let selectedPipelineDropdown = $state(null);
+  let selectedPipelineTarget = $state(null);
+
   let currentPipelineId = $state("");
   const nodeWidth = 172;
   const nodeHeight = 36;
@@ -282,9 +284,6 @@
   }
 
 
-
-
-
   async function duplicateSelectedNodes() {
     const pipelineId =
       typeof currentPipelineId === "string"
@@ -330,6 +329,61 @@
       alert("Failed to duplicate nodes.");
     }
   }
+
+  async function duplicateSelectedNodesIntoPipeline() {
+    const pipelineId =
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
+
+    if (!pipelineId) {
+      console.error("No pipeline selected");
+      return;
+    }
+
+    if (!selectedPipelineTarget) {
+      console.error("No target pipeline selected");
+      alert("Please select a target pipeline to duplicate nodes into.");
+      return;
+    }
+
+    // Collect all selected node IDs
+    const selectedNodeIds = nodes.filter((node) => node.selected).map((node) => node.id);
+
+    if (!selectedNodeIds.length) {
+      console.error("No nodes selected");
+      alert("Please select at least one node to duplicate.");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `http://localhost:8000/duplicate_nodes_in_pipeline`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source_pipeline_id: pipelineId,
+            target_pipeline_id: selectedPipelineTarget.value,
+            node_ids: selectedNodeIds
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to duplicate nodes: ${response.statusText}`);
+      }
+
+      await loadPipeline(selectedPipelineTarget.value);
+      alert(`Nodes ${selectedNodeIds.join(", ")} duplicated successfully.`);
+    } catch (error) {
+      console.error("Error duplicating nodes:", error);
+      alert("Failed to duplicate nodes.");
+    }
+  }
+
+
+
 
   async function fetchPipelines() {
     try {
@@ -903,6 +957,19 @@
         >
         <DropdownItem onclick={addNode}>Create node</DropdownItem>
         <DropdownItem onclick={duplicateSelectedNodes}>Duplicate selected nodes into this pipeline</DropdownItem>
+        <DropdownItem >Duplicate selected nodes into other pipeline
+          <Dropdown simple>
+            <div class="w-64">
+            <SvelteSelect
+            items={pipelines_dropdown}
+            bind:value={selectedPipelineTarget}
+            placeholder="Select a pipeline..."
+            maxItems={5}
+          />
+        </div>
+          <Button onclick={duplicateSelectedNodesIntoPipeline} class="mt-2">Duplicate nodes</Button>
+          </Dropdown>
+        </DropdownItem>
         <DropdownItem class="text-red-600" onclick={deleteNode}>Delete selected nodes</DropdownItem>
         <DropdownItem class="text-red-600" onclick={deleteEdge}>Delete selected edge</DropdownItem>
       </Dropdown>
