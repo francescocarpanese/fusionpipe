@@ -18,25 +18,34 @@ def test_generate_data_folder(tmp_base_dir):
     for dir_path in expected_dirs:
         assert os.path.exists(dir_path), f"Expected directory {dir_path} does not exist."
 
-
-def test_init_node_folder(tmp_base_dir):
-    # Test if the function creates the expected node folder structure
+def test_init_node_folder(tmp_base_dir, monkeypatch):
+    # Test if the function creates the expected node folder structure and initializes the code folder
     from fusionpipe.utils.pip_utils import init_node_folder
     import os
+    import toml
 
-    node_id = "test_node"
-    base_path = tmp_base_dir
-    init_node_folder(base_path, verbose=True)
+    node_folder_path = os.path.join(tmp_base_dir, "test_node")
+    init_node_folder(node_folder_path, verbose=True)
 
-    node_folder = os.path.join(base_path)
-    code_folder = os.path.join(node_folder, "code")
-    data_folder = os.path.join(node_folder, "data")
-    reports_folder = os.path.join(node_folder, "reports")
+    code_folder = os.path.join(node_folder_path, "code")
+    data_folder = os.path.join(node_folder_path, "data")
+    reports_folder = os.path.join(node_folder_path, "reports")
 
-    assert os.path.isdir(node_folder), "Node folder was not created."
+    assert os.path.isdir(node_folder_path), "Node folder was not created."
     assert os.path.isdir(code_folder), "Code subfolder was not created."
     assert os.path.isdir(data_folder), "Data subfolder was not created."
     assert os.path.isdir(reports_folder), "Reports subfolder was not created."
+
+    # Check if the main.py file was created in the code folder
+    main_file_path = os.path.join(code_folder, "main.py")
+    assert os.path.isfile(main_file_path), "main.py file was not created in the code folder."
+
+    # Check if pyproject.toml file was updated
+    pyproject_file_path = os.path.join(code_folder, "pyproject.toml")
+    assert os.path.isfile(pyproject_file_path), "pyproject.toml file was not created in the code folder."
+    with open(pyproject_file_path, "r") as f:
+        pyproject_content = toml.load(f)
+    assert "test_node" in pyproject_content["project"]["name"], "pyproject.toml does not contain 'dependencies' section."
 
 
 def test_delete_node_folder_removes_existing_folder(tmp_base_dir):
@@ -307,8 +316,12 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, in_memory_db_co
     """
     import os
     import shutil
-    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id, duplicate_node_in_pipeline_w_code_and_data
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id, duplicate_node_in_pipeline_w_code_and_data, init_node_folder
     from fusionpipe.utils import db_utils
+    import toml
+
+    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
 
     # Setup: create a pipeline and a node with a folder
     conn = in_memory_db_conn
@@ -318,33 +331,30 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, in_memory_db_co
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
     db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, node_tag="test", position_x=0, position_y=0)
+    db_utils.update_node_folder_path(cur, node_id, os.path.join(tmp_base_dir, node_id))
     conn.commit()
-
-    # Create a dummy folder for the node
+  
     node_folder_path = os.path.join(tmp_base_dir, node_id)
-    os.makedirs(node_folder_path, exist_ok=True)
-    with open(os.path.join(node_folder_path, "dummy.txt"), "w") as f:
-        f.write("test content")
-    db_utils.update_node_folder_path(cur, node_id, node_folder_path)
+    init_node_folder(node_folder_path, verbose=True)
 
-    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
-    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
 
     # Run duplication
-    duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, node_id)
+    new_node_id = duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, node_id)
     conn.commit()
-
-    # Find the new node id (should be the only node not equal to node_id)
-    all_nodes = db_utils.get_all_nodes_from_nodes(cur)
-    new_node_id = [n for n in all_nodes if n != node_id][0]
 
     # Check new node exists in pipeline
     nodes_in_pipeline = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
     assert new_node_id in nodes_in_pipeline
 
     # Check new folder exists and file is copied
-    new_node_folder_path = os.path.join(tmp_base_dir, node_id)
+    new_node_folder_path = os.path.join(tmp_base_dir, new_node_id)
     assert os.path.exists(new_node_folder_path)
-    assert os.path.exists(os.path.join(new_node_folder_path, "dummy.txt"))
+    # Check if pyproject.toml file exists in the new node's code folder
+    new_code_folder_path = os.path.join(new_node_folder_path, "code")
+    pyproject_file_path = os.path.join(new_code_folder_path, "pyproject.toml")
+    assert os.path.isfile(pyproject_file_path), "pyproject.toml file does not exist in the new node's code folder."
 
 
+    with open(pyproject_file_path, "r") as f:
+        pyproject_content = toml.load(f)
+    assert new_node_id in pyproject_content["project"]["name"], "pyproject.toml does not contain 'dependencies' section."

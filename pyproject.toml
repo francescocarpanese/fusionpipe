@@ -17,6 +17,7 @@ dependencies = [
     "pyvis>=0.3.2",
     "pyyaml>=6.0.2",
     "requests>=2.32.3",
+    "toml>=0.10.2",
     "uvicorn>=0.34.2",
 ]
 

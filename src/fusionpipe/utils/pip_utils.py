@@ -8,6 +8,7 @@ from fusionpipe.utils import db_utils
 import copy
 from enum import Enum
 import shutil
+import toml
 
 class NodeState(Enum):
     READY = "ready"       # Node is created but not yet processed
@@ -49,23 +50,36 @@ def init_node_folder(node_folder_path, verbose=False):
         # Run the 'uv init' command inside the node folder
         os.chdir(code_folder_path)
         os.system("uv init")
-        # Run empty main to set-up the .venv
-        os.system("uv run")
+
+        # Copy the template file into the code folder
+        template_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates', 'main_template.py')
+        if os.path.exists(template_file_path):
+            destination_file_path = os.path.join(code_folder_path, 'main.py')        
+            with open(template_file_path, 'r') as template_file:
+                with open(destination_file_path, 'w') as dest_file:
+                    dest_file.write(template_file.read())
+        else:
+            raise FileNotFoundError(f"Template file not found at {template_file_path}") 
+        
+        # Update the name entry in pyproject.toml using the toml library
+        pyproject_file_path = os.path.join(code_folder_path, 'pyproject.toml')
+        if os.path.exists(pyproject_file_path):
+            with open(pyproject_file_path, 'r') as file:
+                pyproject_data = toml.load(file)
+                
+            # Update the 'name' field
+            pyproject_data['project']['name'] = os.path.basename(node_folder_path)
+            
+            # Write the updated data back to the file
+            with open(pyproject_file_path, 'w') as file:
+                toml.dump(pyproject_data, file)
+
+
     finally:
         # Change back to the previous working directory
         os.chdir(current_dir)
 
 
-    # Copy the template file into the code folder
-    template_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates', 'main_template.py')
-    if os.path.exists(template_file_path):
-        destination_file_path = os.path.join(code_folder_path, 'main.py')        
-        with open(template_file_path, 'r') as template_file:
-            with open(destination_file_path, 'w') as dest_file:
-                dest_file.write(template_file.read())
-    else:
-        raise FileNotFoundError(f"Template file not found at {template_file_path}") 
-    
     # Commit all changes in the code folder path
     os.chdir(code_folder_path)
     os.system("git init")  # Initialize a git repository if not already initialized
@@ -73,6 +87,8 @@ def init_node_folder(node_folder_path, verbose=False):
     os.system('git commit -m "Initial commit for code folder"')  # Commit the changes
     
 
+    # Run empty main to set-up the .venv
+    os.system("uv run")
     os.chdir(current_dir)  # Change back to the original directory    
 
 
@@ -439,7 +455,7 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, node_id):
     """
 
     new_node_id = generate_node_id()
-    # Duplicate node in the databae
+    # Duplicate node in the database
     db_utils.duplicate_node_in_pipeline_with_relations(cur, node_id, new_node_id, pipeline_id)
 
     # Copy the folder into the new node folder
@@ -453,3 +469,27 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, node_id):
         # Copy the entire folder
         os.makedirs(new_node_folder_path, exist_ok=True)
         shutil.copytree(old_node_folder_path, new_node_folder_path, dirs_exist_ok=True)
+
+    # Load and update the project.toml file
+    project_toml_path = os.path.join(new_node_folder_path, "code", "pyproject.toml")
+    if os.path.exists(project_toml_path):
+        with open(project_toml_path, 'r') as file:
+            pyproject_data = toml.load(file)
+
+        # Update the 'name' field with the new node ID
+        pyproject_data['project']['name'] = new_node_id
+
+        # Write the updated data back to the file
+        with open(project_toml_path, 'w') as file:
+            toml.dump(pyproject_data, file)
+
+    # Initialize the .venv using uv
+    code_folder_path = os.path.join(new_node_folder_path, "code")
+    current_dir = os.getcwd()
+    try:
+        os.chdir(code_folder_path)
+        os.system("uv run")
+    finally:
+        os.chdir(current_dir)
+
+    return new_node_id
