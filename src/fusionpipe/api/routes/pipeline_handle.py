@@ -355,3 +355,23 @@ def delete_node_data_route(payload: dict, db_conn=Depends(get_db)):
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Data for nodes {node_ids} deleted successfully"}
+
+
+
+@router.post("/manual_set_node_status/{node_id}/{status}")
+def manual_set_node_status(node_id: str, status: str, db_conn=Depends(get_db)):
+    """
+    Manually set the status of a node.
+    """
+    if status not in ["ready", "running", "completed", "failed", "staledata"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    
+    cur = db_conn.cursor()
+    try:
+        db_utils.update_node_status(cur, node_id=node_id, status=status)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    return {"message": f"Node {node_id} status set to {status}"}

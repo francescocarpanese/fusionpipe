@@ -383,6 +383,68 @@
   }
 
 
+  async function setNodeCompleted() {
+    const selectedNode = nodes.find((node) => node.selected);
+    if (!selectedNode) {
+      alert("No node selected");
+      return;
+    }
+    try {
+      const response = await fetch(
+        `http://localhost:8000/manual_set_node_status/${selectedNode.id}/completed`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || response.statusText);
+      }
+      const pipelineId =
+        typeof currentPipelineId === "string"
+          ? currentPipelineId
+          : currentPipelineId.value;
+      await loadPipeline(pipelineId);
+      alert(`Node ${selectedNode.id} status set to completed.`);
+    } catch (error) {
+      console.error("Error setting node status:", error);
+      alert("Failed to set node status.");
+    }
+  }
+
+
+
+
+  async function setNodeStaleData() {
+    const selectedNode = nodes.find((node) => node.selected);
+    if (!selectedNode) {
+      alert("No node selected");
+      return;
+    }
+    try {
+      const response = await fetch(
+        `http://localhost:8000/manual_set_node_status/${selectedNode.id}/staledata`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || response.statusText);
+      }
+      const pipelineId =
+        typeof currentPipelineId === "string"
+          ? currentPipelineId
+          : currentPipelineId.value;
+      await loadPipeline(pipelineId);
+      alert(`Node ${selectedNode.id} status set to completed.`);
+    } catch (error) {
+      console.error("Error setting node status:", error);
+      alert("Failed to set node status.");
+    }
+  }
 
 
   async function fetchPipelines() {
@@ -828,47 +890,52 @@
   }
 
 
-  async function deleteNodeOutputs() {
-    const pipelineId =
-      typeof currentPipelineId === "string"
-        ? currentPipelineId
-        : currentPipelineId.value;
+    async function deleteNodeOutputs() {
+      const pipelineId =
+        typeof currentPipelineId === "string"
+          ? currentPipelineId
+          : currentPipelineId.value;
 
-    if (!pipelineId) {
-      console.error("No pipeline selected");
-      return;
-    }
-
-    const selectedNodeIds = nodes
-      .filter((node) => node.selected)
-      .map((node) => node.id);
-
-    if (!selectedNodeIds.length) {
-      alert("Please select at least one node to delete outputs.");
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `http://localhost:8000/delete_node_data/`,
-        {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ node_ids: selectedNodeIds }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to delete node outputs: ${response.statusText}`);
+      if (!pipelineId) {
+        console.error("No pipeline selected");
+        return;
       }
 
-      await loadPipeline(pipelineId);
-      alert(`Outputs for nodes ${selectedNodeIds.join(", ")} deleted successfully.`);
-    } catch (error) {
-      console.error("Error deleting node outputs:", error);
-      alert("Failed to delete node outputs.");
+      const selectedNodeIds = nodes
+        .filter((node) => node.selected)
+        .map((node) => node.id);
+
+      if (!selectedNodeIds.length) {
+        alert("Please select at least one node to delete outputs.");
+        return;
+      }
+
+      const confirmed = confirm(
+        `Are you sure you want to delete outputs for nodes: ${selectedNodeIds.join(", ")}? This action cannot be undone.`
+      );
+      if (!confirmed) return;
+
+      try {
+        const response = await fetch(
+          `http://localhost:8000/delete_node_data/`,
+          {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ node_ids: selectedNodeIds }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to delete node outputs: ${response.statusText}`);
+        }
+
+        await loadPipeline(pipelineId);
+        alert(`Outputs for nodes ${selectedNodeIds.join(", ")} deleted successfully.`);
+      } catch (error) {
+        console.error("Error deleting node outputs:", error);
+        alert("Failed to delete node outputs.");
+      }
     }
-  }
 
 
   // ------------ Collection of all reactive effects ---------------
@@ -1017,6 +1084,8 @@
           <Button onclick={duplicateSelectedNodesIntoPipeline} class="mt-2">Duplicate nodes</Button>
           </Dropdown>
         </DropdownItem>
+        <DropdownItem class="text-yellow-600" onclick={setNodeCompleted}>Manual set node "completed"</DropdownItem>
+        <DropdownItem class="text-yellow-600" onclick={setNodeStaleData}>Manual set node "stale-data"</DropdownItem>
         <DropdownItem class="text-red-600" onclick={deleteNodeOutputs}>Delete output selected nodes</DropdownItem>
         <DropdownItem class="text-red-600" onclick={deleteNode}>Delete selected nodes</DropdownItem>
         <DropdownItem class="text-red-600" onclick={deleteEdge}>Delete selected edge</DropdownItem>
