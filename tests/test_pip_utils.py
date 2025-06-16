@@ -474,3 +474,51 @@ def test_duplicate_duplicate_nodes_in_pipeline_with_relations(monkeypatch, in_me
     # Check: original nodes are still present and unchanged
     for node_id in selected_nodes:
         assert node_id in graph.nodes
+
+def test_delete_node_data_removes_data_contents(monkeypatch, in_memory_db_conn, tmp_base_dir):
+    """
+    Test that delete_node_data removes all contents of the node's data folder but not the folder itself.
+    """
+    import os
+    from fusionpipe.utils.pip_utils import generate_node_id, delete_node_data, init_node_folder
+    from fusionpipe.utils import db_utils
+
+    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
+
+    # Setup: create a node with a data folder and some files
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+    node_id = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None)
+    db_utils.update_node_folder_path(cur, node_id, os.path.join(tmp_base_dir, node_id))
+    conn.commit()
+
+    node_folder_path = os.path.join(tmp_base_dir, node_id)
+    init_node_folder(node_folder_path, verbose=True)
+    data_folder = os.path.join(node_folder_path, "data")
+    os.makedirs(data_folder, exist_ok=True)
+    # Create dummy files and subfolders
+    file1 = os.path.join(data_folder, "file1.txt")
+    file2 = os.path.join(data_folder, "file2.txt")
+    subfolder = os.path.join(data_folder, "subfolder")
+    os.makedirs(subfolder, exist_ok=True)
+    file3 = os.path.join(subfolder, "file3.txt")
+    with open(file1, "w") as f:
+        f.write("test1")
+    with open(file2, "w") as f:
+        f.write("test2")
+    with open(file3, "w") as f:
+        f.write("test3")
+
+    # Ensure files exist before deletion
+    assert os.path.exists(file1)
+    assert os.path.exists(file2)
+    assert os.path.exists(file3)
+
+    # Run delete_node_data
+    delete_node_data(cur, node_id)
+
+    # Data folder should still exist, but be empty
+    assert os.path.exists(data_folder)
+    assert not any(os.scandir(data_folder)), "Data folder is not empty after deletion"

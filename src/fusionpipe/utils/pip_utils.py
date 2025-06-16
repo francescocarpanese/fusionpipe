@@ -535,3 +535,32 @@ def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_p
             parent_id=id_map[old_parent]
         )
     return id_map
+
+
+def delete_node_data(cur, node_ids):
+    """
+    Delete the data associated with node in list
+    """
+    if isinstance(node_ids, str):
+        node_ids = [node_ids]
+    
+    for node_id in node_ids:
+        # Get the folder path of the node
+        folder_path = db_utils.get_node_folder_path(cur, node_id=node_id)
+        
+        if folder_path and os.path.exists(folder_path):
+            # Remove only the contents of the "data" folder, not the folder itself
+            data_folder = os.path.join(folder_path, "data")
+            if os.path.exists(data_folder):
+                for entry in os.scandir(data_folder):
+                    if entry.is_file() or entry.is_symlink():
+                        os.unlink(entry.path)
+                    elif entry.is_dir():
+                        shutil.rmtree(entry.path, ignore_errors=True)
+            print(f"Data for node {node_id} deleted from {folder_path}")
+
+    for node_id in node_ids:
+        db_utils.update_node_status(cur, node_id=node_id, status=NodeState.READY.value)
+
+    else:
+        print(f"No data found for node {node_id} or folder does not exist.")

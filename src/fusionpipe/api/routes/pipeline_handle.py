@@ -337,3 +337,21 @@ def reference_nodes_into_pipeline_route(payload: dict, db_conn=Depends(get_db)):
         "message": f"Nodes {node_ids} duplicated from pipeline {source_pipeline_id} to {target_pipeline_id} with code, data, and relations",
         "id_map": id_map
     }
+
+@router.delete("/delete_node_data")
+def delete_node_data_route(payload: dict, db_conn=Depends(get_db)):
+    """
+    Delete the data associated with a list of nodes (but not the nodes themselves).
+    Payload example: {"node_ids": ["n_123", "n_456"]}
+    """
+    node_ids = payload.get("node_ids")
+    if not node_ids or not isinstance(node_ids, list):
+        raise HTTPException(status_code=400, detail="Payload must contain a list of node_ids")
+    try:
+        cur = db_conn.cursor()
+        pip_utils.delete_node_data(cur, node_ids)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Data for nodes {node_ids} deleted successfully"}
