@@ -358,7 +358,7 @@
 
     try {
       const response = await fetch(
-        `http://localhost:8000/duplicate_nodes_in_pipeline`,
+        `http://localhost:8000/reference_nodes_into_pipeline`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -959,7 +959,7 @@
         >
         <DropdownItem onclick={addNode}>Create node</DropdownItem>
         <DropdownItem onclick={duplicateSelectedNodes}>Duplicate selected nodes into this pipeline</DropdownItem>
-        <DropdownItem >Duplicate selected nodes into other pipeline
+        <DropdownItem >Duplicate selected nodes into another pipeline
           <Dropdown simple>
             <div class="w-64">
             <SvelteSelect

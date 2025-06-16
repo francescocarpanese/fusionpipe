@@ -663,7 +663,7 @@ def test_dupicate_node_in_pipeline_full_coverage(in_memory_db_conn):
 
     # Duplicate the node
     duplicated_node_id = f"{original_node_id}_copy"
-    db_utils.dupicate_node_in_pipeline(cur, original_node_id, duplicated_node_id, pipeline_id)
+    db_utils.dupicate_node_in_pipeline(cur, original_node_id, duplicated_node_id, pipeline_id, pipeline_id)
     conn.commit()
 
     # Check nodes table
@@ -677,7 +677,7 @@ def test_dupicate_node_in_pipeline_full_coverage(in_memory_db_conn):
     assert duplicated_entry is not None, "Duplicated node entry was not created."
     assert duplicated_entry[1] == pipeline_id, "Duplicated entry pipeline_id does not match original."
 
-@pytest.mark.parametrize("parents","childrens",
+@pytest.mark.parametrize(["parents","childrens"],
             [
              (True, False),  # Copy parents only
              (True, False),
@@ -761,7 +761,7 @@ def test_duplicate_node_in_pipeline_with_relations(in_memory_db_conn):
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Duplicate node with relations
-    db_utils.duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id, pipeline_id)
+    db_utils.duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id, pipeline_id, pipeline_id, parents=True, childrens=True)
     conn.commit()
 
     # Check that the new node exists
@@ -1182,3 +1182,33 @@ def test_update_editable_status(in_memory_db_conn):
     result = cur.fetchone()
     assert result is not None, "Node not found in database."
     assert result[0] == 1, f"Expected editable status to be True, got {result[0]}"
+
+
+def test_duplicate_node_pipeline_relation(in_memory_db_conn):
+    from fusionpipe.utils import db_utils
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+
+    # Create source pipeline and nodes
+    source_pipeline_id = generate_pip_id()
+    target_pipeline_id = generate_pip_id()
+    node_ids = [generate_node_id() for _ in range(2)]
+    db_utils.add_pipeline(cur, pipeline_id=source_pipeline_id, tag="source_pipeline")
+    db_utils.add_pipeline(cur, pipeline_id=target_pipeline_id, tag="target_pipeline")
+    for node_id in node_ids:
+        db_utils.add_node_to_nodes(cur, node_id=node_id)
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=source_pipeline_id, user="test_user")
+
+    conn.commit()
+
+    # Duplicate node-pipeline relations for both nodes to the target pipeline
+    db_utils.duplicate_node_pipeline_relation(cur, source_pipeline_id, node_ids, target_pipeline_id)
+    conn.commit()
+
+    # Check that the relations exist in the target pipeline
+    for node_id in node_ids:
+        cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=? AND pipeline_id=?", (node_id, target_pipeline_id))
+        result = cur.fetchone()
+        assert result is not None, f"Node-pipeline relation for node {node_id} was not duplicated to target pipeline."
