@@ -239,6 +239,10 @@ def duplicate_node_pipeline_relation(cur, source_pipeline_id, node_ids, new_pipe
             WHERE pipeline_id = ? AND node_id = ?
         ''', (new_pipeline_id, source_pipeline_id, node_id))
 
+    # As node are now duplicated they cannot be edited anymore.
+    for node_id in node_ids:
+        update_editable_status(cur, node_id, False)
+
     return new_pipeline_id
 
 
