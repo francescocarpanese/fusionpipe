@@ -87,7 +87,7 @@ def delete_node_from_pipeline(pipeline_id: str, node_id: str, db_conn=Depends(ge
 def delete_edge(pipeline_id: str, source: str, target: str, db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     try:
-        db_utils.remove_node_relation_with_editable_logic(cur, parent_id=source, child_id=target)
+        pip_utils.delete_edge_and_update_status(cur, pipeline_id=pipeline_id, parent_id=source, child_id=target)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()

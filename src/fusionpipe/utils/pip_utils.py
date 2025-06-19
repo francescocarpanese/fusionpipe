@@ -569,3 +569,31 @@ def set_children_stale(cur, pipeline_id, node_id):
     children = get_all_children_nodes(cur, pipeline_id, node_id)
     for child_id in children:
         db_utils.update_node_status(cur, node_id=child_id, status=NodeState.STALEDATA.value)
+
+def update_stale_status_for_pipeline_nodes(cur, pipeline_id):
+    """
+    Propagate 'staledata' status through the pipeline graph:
+    If a node has any parent in 'staledata' or 'failed', set its status to 'staledata'.
+    This is done recursively using the NetworkX graph structure.
+    """
+    # Build the graph from the database
+    G = db_to_graph_from_pip_id(cur, pipeline_id)
+    # Traverse in topological order (parents before children)
+    for node_id in nx.topological_sort(G):
+        # Check all parents
+        for parent_id in G.predecessors(node_id):
+            parent_status = G.nodes[parent_id]["status"]
+            if parent_status in [NodeState.STALEDATA.value, NodeState.FAILED.value]:
+                db_utils.update_node_status(cur, node_id, NodeState.STALEDATA.value)
+                G.nodes[node_id]["status"] = NodeState.STALEDATA.value
+
+def delete_edge_and_update_status(cur, pipeline_id, parent_id, child_id):
+    # Check if the child node is editable
+    if not db_utils.is_node_editable(cur, node_id=child_id):
+        raise ValueError(f"Child node {child_id} is not editable. You cannot delete edges from it. Consider duplicating the node if you want to branch the pipeline")
+
+    # Set all descendants of the child node to 'staledata'
+    set_children_stale(cur, pipeline_id, parent_id)
+
+    # Remove the edge and update the pipeline using editable logic
+    db_utils.remove_node_relation_with_editable_logic(cur, parent_id=parent_id, child_id=child_id)

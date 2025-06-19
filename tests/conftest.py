@@ -50,7 +50,7 @@ def dag_dummy_1():
         elif node == "D":
             G.nodes[node]['status'] = "staledata"
         elif node == "E":
-            G.nodes[node]['status'] = "staledata"            
+            G.nodes[node]['status'] = "ready"            
     return G
 
 @pytest.fixture
@@ -66,7 +66,7 @@ def dict_dummy_1():
             "B": {"status": "running", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path'},
             "C": {"status": "completed", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path'},
             "D": {"status": "staledata", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C'], 'position': [0, 0], 'folder_path': 'dummy_folder_path'},
-            "E": {"status": "staledata", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0,], 'folder_path': 'dummy_folder_path'}
+            "E": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0,], 'folder_path': 'dummy_folder_path'}
         }
     }
 

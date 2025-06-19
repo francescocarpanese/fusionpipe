@@ -617,3 +617,49 @@ def test_set_children_stale_sets_descendants_to_staledata(in_memory_db_conn, dag
     # The node itself should not be changed
     status_self = db_utils.get_node_status(cur, node)
     assert status_self != "staledata", f"Node {node} itself should not be set to staledata"
+
+def test_update_stale_status_for_pipeline_nodes(in_memory_db_conn, dag_dummy_1):
+    """
+    Test that update_stale_status_for_pipeline_nodes propagates 'staledata' from a parent to all descendants.
+    """
+    from fusionpipe.utils.pip_utils import graph_to_db, update_stale_status_for_pipeline_nodes
+    from fusionpipe.utils import db_utils
+    import networkx as nx
+
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+
+    # Add the dummy graph to the database
+    graph_to_db(dag_dummy_1, cur)
+    conn.commit()
+
+    pipeline_id = dag_dummy_1.graph['pipeline_id']
+    # Pick a node with descendants
+    for node in dag_dummy_1.nodes:
+        descendants = set(nx.descendants(dag_dummy_1, node))
+        if descendants:
+            break
+    else:
+        pytest.skip("No node with descendants in dummy graph.")
+
+    # Set the parent node to 'staledata'
+    db_utils.update_node_status(cur, node, "staledata")
+    conn.commit()
+
+    # Run the propagation function
+    update_stale_status_for_pipeline_nodes(cur, pipeline_id)
+    conn.commit()
+
+    # All descendants should now be 'staledata'
+    for child in descendants:
+        status = db_utils.get_node_status(cur, child)
+        assert status == "staledata", f"Node {child} should be staledata, got {status}"
+    # The node itself should remain 'staledata'
+    status_self = db_utils.get_node_status(cur, node)
+    assert status_self == "staledata", f"Node {node} itself should be staledata"
+
+    # Unrelated nodes (not descendants and not the node itself) should not be changed
+    unaffected = set(dag_dummy_1.nodes) - descendants - {node}
+    for n in unaffected:
+        status = db_utils.get_node_status(cur, n)
+        assert status != "staledata", f"Unrelated node {n} should not be set to staledata"
