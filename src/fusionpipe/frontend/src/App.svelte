@@ -575,6 +575,7 @@
           notes: node.notes || "",
           folder_path: node.folder_path || "",
           status: node.status || "ready",
+          tag: node.tag || "",
         },
         position: {
           x: node.position[0],
@@ -888,7 +889,7 @@
         const selectedNode = selectedNodes[0];
         nodeDrawereForm = {
           id: selectedNode.id,
-          tag: selectedNode.data?.label || "No tag",
+          tag: selectedNode.data?.tag || "No tag",
           notes: selectedNode.data?.notes || "",
           folder_path: selectedNode.data?.folder_path || "",
         };
