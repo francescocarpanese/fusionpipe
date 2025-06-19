@@ -978,7 +978,7 @@ def test_get_node_notes_existing_and_nonexistent(in_memory_db_conn):
     from fusionpipe.utils import db_utils
 
     conn = in_memory_db_conn
-    cur = db_utils.init_db(con)
+    cur = db_utils.init_db(conn)
 
     # Add a node with notes
     node_id = generate_node_id()
