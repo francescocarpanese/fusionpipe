@@ -158,11 +158,7 @@
         },
       );
 
-      if (!response.ok) {
-        throw new Error(
-          `Failed to save node positions: ${response.statusText}`,
-        );
-      }
+      if (!response.ok) await handleApiError(response);
     } catch (error) {
       console.error("Error saving node positions:", error);
     }
@@ -189,10 +185,7 @@
         },
       );
 
-      if (!response.ok) {
-        throw new Error(`Failed to add node: ${response.statusText}`);
-      }
-
+      if (!response.ok) await handleApiError(response);
       await loadPipeline(pipelineId);
     } catch (error) {
       console.error("Error adding node:", error);
@@ -225,17 +218,12 @@
             },
           );
 
-          if (!response.ok) {
-            throw new Error(
-              `Failed to delete node ${nodeId}: ${response.statusText}`,
-            );
-          }
+          if (!response.ok) await handleApiError(response);
         } catch (error) {
           console.error(`Error deleting node ${nodeId}:`, error);
         }
       }),
     );
-
     await loadPipeline(pipelineId);
   }
 
@@ -257,9 +245,7 @@
     await Promise.all(
       selectedEdgeIds.map(async (edgeId) => {
         const edge = edges.find((e) => e.id === edgeId);
-
         if (!edge) return;
-
         try {
           const response = await fetch(
             `http://localhost:8000/delete_edge/${pipelineId}/${edge.source}/${edge.target}`,
@@ -268,21 +254,14 @@
               headers: { "Content-Type": "application/json" },
             },
           );
-
-          if (!response.ok) {
-            throw new Error(
-              `Failed to delete edge ${edgeId}: ${response.statusText}`,
-            );
-          }
+          if (!response.ok) await handleApiError(response);
         } catch (error) {
           console.error(`Error deleting edge ${edgeId}:`, error);
         }
       }),
     );
-
     await loadPipeline(pipelineId);
   }
-
 
   async function duplicateSelectedNodes() {
     const pipelineId =
@@ -296,7 +275,9 @@
     }
 
     // Collect all selected node IDs
-    const selectedNodeIds = nodes.filter((node) => node.selected).map((node) => node.id);
+    const selectedNodeIds = nodes
+      .filter((node) => node.selected)
+      .map((node) => node.id);
 
     if (!selectedNodeIds.length) {
       console.error("No nodes selected");
@@ -313,15 +294,11 @@
           body: JSON.stringify({
             source_pipeline_id: pipelineId,
             target_pipeline_id: pipelineId,
-            node_ids: selectedNodeIds
+            node_ids: selectedNodeIds,
           }),
         },
       );
-
-      if (!response.ok) {
-        throw new Error(`Failed to duplicate nodes: ${response.statusText}`);
-      }
-
+      if (!response.ok) await handleApiError(response);
       await loadPipeline(pipelineId);
       alert(`Nodes ${selectedNodeIds.join(", ")} duplicated successfully.`);
     } catch (error) {
@@ -348,7 +325,9 @@
     }
 
     // Collect all selected node IDs
-    const selectedNodeIds = nodes.filter((node) => node.selected).map((node) => node.id);
+    const selectedNodeIds = nodes
+      .filter((node) => node.selected)
+      .map((node) => node.id);
 
     if (!selectedNodeIds.length) {
       console.error("No nodes selected");
@@ -365,15 +344,11 @@
           body: JSON.stringify({
             source_pipeline_id: pipelineId,
             target_pipeline_id: selectedPipelineTarget.value,
-            node_ids: selectedNodeIds
+            node_ids: selectedNodeIds,
           }),
         },
       );
-
-      if (!response.ok) {
-        throw new Error(`Failed to duplicate nodes: ${response.statusText}`);
-      }
-
+      if (!response.ok) await handleApiError(response);
       await loadPipeline(selectedPipelineTarget.value);
       alert(`Nodes ${selectedNodeIds.join(", ")} duplicated successfully.`);
     } catch (error) {
@@ -381,7 +356,6 @@
       alert("Failed to duplicate nodes.");
     }
   }
-
 
   async function setNodeCompleted() {
     const selectedNode = nodes.find((node) => node.selected);
@@ -395,12 +369,9 @@
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || response.statusText);
-      }
+      if (!response.ok) await handleApiError(response);
       const pipelineId =
         typeof currentPipelineId === "string"
           ? currentPipelineId
@@ -412,9 +383,6 @@
       alert("Failed to set node status.");
     }
   }
-
-
-
 
   async function setNodeStaleData() {
     const selectedNode = nodes.find((node) => node.selected);
@@ -428,12 +396,9 @@
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || response.statusText);
-      }
+      if (!response.ok) await handleApiError(response);
       const pipelineId =
         typeof currentPipelineId === "string"
           ? currentPipelineId
@@ -446,17 +411,12 @@
     }
   }
 
-
   async function fetchPipelines() {
     try {
       const response = await fetch(
         "http://localhost:8000/get_all_pipeline_ids_tags_dict",
       );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch pipelines: ${response.statusText}`);
-      }
-
+      if (!response.ok) await handleApiError(response);
       ids_tags_dict = await response.json();
     } catch (error) {
       console.error("Error fetching pipelines:", error);
@@ -485,11 +445,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source, target }),
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to connect nodes: ${response.statusText}`);
-      }
-
+      if (!response.ok) await handleApiError(response);
       await loadPipeline(pipelineId);
     } catch (error) {
       console.error("Error connecting nodes:", error);
@@ -502,14 +458,9 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to create pipeline: ${response.statusText}`);
-      }
-
+      if (!response.ok) await handleApiError(response);
       const data = await response.json();
       const newPipelineId = data.pipeline_id || data.id || data.pip_id;
-
       await fetchPipelines();
       currentPipelineId = newPipelineId;
       await loadPipeline(newPipelineId);
@@ -542,11 +493,7 @@
           headers: { "Content-Type": "application/json" },
         },
       );
-
-      if (!response.ok) {
-        throw new Error(`Failed to delete pipeline: ${response.statusText}`);
-      }
-
+      if (!response.ok) await handleApiError(response);
       await fetchPipelines();
       currentPipelineId = "";
       nodes = [];
@@ -585,11 +532,7 @@
           headers: { "Content-Type": "application/json" },
         },
       );
-
-      if (!response.ok) {
-        throw new Error(`Failed to branch pipeline: ${response.statusText}`);
-      }
-
+      if (!response.ok) await handleApiError(response);
       const data = await response.json();
 
       console.log("Pipeline iteration result:", data);
@@ -610,13 +553,7 @@
         `http://localhost:8000/get_pipeline/${pipelineId}`,
         { cache: "no-store" },
       );
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to load selected pipeline: ${response.statusText}`,
-        );
-      }
-
+      if (!response.ok) await handleApiError(response);
       const pipeline = await response.json();
 
       const rawNodes = Object.entries(pipeline.nodes).map(([id, node]) => ({
@@ -700,8 +637,9 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ node_tag: newTag }),
         },
-      );
-
+      ).then(async (response) => {
+        if (!response.ok) await handleApiError(response);
+      });
       // Update node notes
       await fetch(
         `http://localhost:8000/update_node_notes/${pipelineId}/${nodeId}`,
@@ -710,8 +648,9 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ notes: newNotes }),
         },
-      );
-
+      ).then(async (response) => {
+        if (!response.ok) await handleApiError(response);
+      });
       await loadPipeline(pipelineId);
       alert("Node info updated.");
     } catch (error) {
@@ -727,9 +666,7 @@
         `http://localhost:8000/get_pipeline/${pipelineId}`,
         { cache: "no-store" },
       );
-      if (!response.ok) {
-        throw new Error(`Failed to load pipeline info: ${response.statusText}`);
-      }
+      if (!response.ok) await handleApiError(response);
       const pipeline = await response.json();
       pipelineDrawerForm = {
         id: pipeline.pipeline_id || "",
@@ -760,11 +697,15 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tag: newTag }),
+      }).then(async (response) => {
+        if (!response.ok) await handleApiError(response);
       });
       await fetch(`http://localhost:8000/update_pipeline_notes/${pipelineId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notes: newNotes }),
+      }).then(async (response) => {
+        if (!response.ok) await handleApiError(response);
       });
       await fetchPipelines();
       await loadPipeline(pipelineId);
@@ -792,10 +733,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ run_mode: "local" }),
       });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || response.statusText);
-      }
+      if (!response.ok) await handleApiError(response);
       const data = await response.json();
       // Optionally reload pipeline to update node status
       if (currentPipelineId && pipelineatcall === currentPipelineId) {
@@ -831,12 +769,7 @@
           body: JSON.stringify({ run_mode: "local" }),
         },
       );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || response.statusText);
-      }
-
+      if (!response.ok) await handleApiError(response);
       const data = await response.json();
       await loadPipeline(pipelineId);
       alert(data.message || "Pipeline run completed.");
@@ -845,8 +778,6 @@
       alert("Failed to run pipeline.");
     }
   }
-
-
 
   async function runPipelineUpToNode() {
     const pipelineId =
@@ -874,12 +805,7 @@
           body: JSON.stringify({ run_mode: "local" }),
         },
       );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || response.statusText);
-      }
-
+      if (!response.ok) await handleApiError(response);
       const data = await response.json();
       await loadPipeline(pipelineId);
       alert(data.message || "Pipeline run completed.");
@@ -889,54 +815,60 @@
     }
   }
 
+  async function deleteNodeOutputs() {
+    const pipelineId =
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
 
-    async function deleteNodeOutputs() {
-      const pipelineId =
-        typeof currentPipelineId === "string"
-          ? currentPipelineId
-          : currentPipelineId.value;
-
-      if (!pipelineId) {
-        console.error("No pipeline selected");
-        return;
-      }
-
-      const selectedNodeIds = nodes
-        .filter((node) => node.selected)
-        .map((node) => node.id);
-
-      if (!selectedNodeIds.length) {
-        alert("Please select at least one node to delete outputs.");
-        return;
-      }
-
-      const confirmed = confirm(
-        `Are you sure you want to delete outputs for nodes: ${selectedNodeIds.join(", ")}? This action cannot be undone.`
-      );
-      if (!confirmed) return;
-
-      try {
-        const response = await fetch(
-          `http://localhost:8000/delete_node_data/`,
-          {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ node_ids: selectedNodeIds }),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`Failed to delete node outputs: ${response.statusText}`);
-        }
-
-        await loadPipeline(pipelineId);
-        alert(`Outputs for nodes ${selectedNodeIds.join(", ")} deleted successfully.`);
-      } catch (error) {
-        console.error("Error deleting node outputs:", error);
-        alert("Failed to delete node outputs.");
-      }
+    if (!pipelineId) {
+      console.error("No pipeline selected");
+      return;
     }
 
+    const selectedNodeIds = nodes
+      .filter((node) => node.selected)
+      .map((node) => node.id);
+
+    if (!selectedNodeIds.length) {
+      alert("Please select at least one node to delete outputs.");
+      return;
+    }
+
+    const confirmed = confirm(
+      `Are you sure you want to delete outputs for nodes: ${selectedNodeIds.join(", ")}? This action cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`http://localhost:8000/delete_node_data/`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ node_ids: selectedNodeIds }),
+      });
+      if (!response.ok) await handleApiError(response);
+      await loadPipeline(pipelineId);
+      alert(
+        `Outputs for nodes ${selectedNodeIds.join(", ")} deleted successfully.`,
+      );
+    } catch (error) {
+      console.error("Error deleting node outputs:", error);
+      alert("Failed to delete node outputs.");
+    }
+  }
+
+  // Helper function for API error handling
+  async function handleApiError(response: Response) {
+    let errorMsg = response.statusText;
+    try {
+      const errorData = await response.json();
+      errorMsg = errorData.detail || errorMsg;
+    } catch (e) {
+      // fallback if not JSON
+    }
+    alert("Error: " + errorMsg);
+    throw new Error(errorMsg);
+  }
 
   // ------------ Collection of all reactive effects ---------------
   $effect(() => {
@@ -1038,13 +970,13 @@
         </DropdownItem>
         <DropdownItem>
           <div class="w-64">
-          <SvelteSelect
-            items={pipelines_dropdown}
-            bind:value={selectedPipelineDropdown}
-            placeholder="Select a pipeline..."
-            maxItems={5}
-            on:select={loadSelectedPipeline}
-          />
+            <SvelteSelect
+              items={pipelines_dropdown}
+              bind:value={selectedPipelineDropdown}
+              placeholder="Select a pipeline..."
+              maxItems={5}
+              on:select={loadSelectedPipeline}
+            />
           </div>
         </DropdownItem>
 
@@ -1070,25 +1002,40 @@
           >Open selected node panel</DropdownItem
         >
         <DropdownItem onclick={addNode}>Create node</DropdownItem>
-        <DropdownItem onclick={duplicateSelectedNodes}>Duplicate selected nodes into this pipeline</DropdownItem>
-        <DropdownItem >Duplicate selected nodes into another pipeline
+        <DropdownItem onclick={duplicateSelectedNodes}
+          >Duplicate selected nodes into this pipeline</DropdownItem
+        >
+        <DropdownItem
+          >Duplicate selected nodes into another pipeline
           <Dropdown simple>
             <div class="w-64">
-            <SvelteSelect
-            items={pipelines_dropdown}
-            bind:value={selectedPipelineTarget}
-            placeholder="Select a pipeline..."
-            maxItems={5}
-          />
-        </div>
-          <Button onclick={duplicateSelectedNodesIntoPipeline} class="mt-2">Duplicate nodes</Button>
+              <SvelteSelect
+                items={pipelines_dropdown}
+                bind:value={selectedPipelineTarget}
+                placeholder="Select a pipeline..."
+                maxItems={5}
+              />
+            </div>
+            <Button onclick={duplicateSelectedNodesIntoPipeline} class="mt-2"
+              >Duplicate nodes</Button
+            >
           </Dropdown>
         </DropdownItem>
-        <DropdownItem class="text-yellow-600" onclick={setNodeCompleted}>Manual set node "completed"</DropdownItem>
-        <DropdownItem class="text-yellow-600" onclick={setNodeStaleData}>Manual set node "stale-data"</DropdownItem>
-        <DropdownItem class="text-red-600" onclick={deleteNodeOutputs}>Delete output selected nodes</DropdownItem>
-        <DropdownItem class="text-red-600" onclick={deleteNode}>Delete selected nodes</DropdownItem>
-        <DropdownItem class="text-red-600" onclick={deleteEdge}>Delete selected edge</DropdownItem>
+        <DropdownItem class="text-yellow-600" onclick={setNodeCompleted}
+          >Manual set node "completed"</DropdownItem
+        >
+        <DropdownItem class="text-yellow-600" onclick={setNodeStaleData}
+          >Manual set node "stale-data"</DropdownItem
+        >
+        <DropdownItem class="text-red-600" onclick={deleteNodeOutputs}
+          >Delete output selected nodes</DropdownItem
+        >
+        <DropdownItem class="text-red-600" onclick={deleteNode}
+          >Delete selected nodes</DropdownItem
+        >
+        <DropdownItem class="text-red-600" onclick={deleteEdge}
+          >Delete selected edge</DropdownItem
+        >
       </Dropdown>
       <NavLi class="cursor-pointer">
         Actions<ChevronDownOutline
@@ -1097,8 +1044,12 @@
       </NavLi>
       <Dropdown simple>
         <DropdownItem onclick={runSelectedNode}>Run selected node</DropdownItem>
-        <DropdownItem onclick={runCurrentPipeline}>Run full pipeline</DropdownItem>
-        <DropdownItem onclick={runPipelineUpToNode}>Run pipeline up to selected node</DropdownItem>        
+        <DropdownItem onclick={runCurrentPipeline}
+          >Run full pipeline</DropdownItem
+        >
+        <DropdownItem onclick={runPipelineUpToNode}
+          >Run pipeline up to selected node</DropdownItem
+        >
         <DropdownItem class="text-gray-400 cursor-not-allowed"
           >Open run panel</DropdownItem
         >
