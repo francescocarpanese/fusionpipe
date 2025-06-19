@@ -405,6 +405,7 @@ def delete_node_from_pipeline_with_editable_logic(cur,pipeline_id, node_id):
     # Check if the node is editable
     if db_utils.is_node_editable(cur, node_id=node_id):
         # If editable, delete the node directly from the pipeline database
+        set_children_stale(cur, pipeline_id, node_id)
         db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node_id)
         delete_node_folder(db_utils.get_node_folder_path(cur, node_id=node_id))
         return
@@ -446,8 +447,6 @@ def get_all_children_nodes(cur, pipeline_id, node_id):
     """
     graph = db_to_graph_from_pip_id(cur, pipeline_id)
     return list(nx.descendants(graph, node_id))
-
-
 
 
 def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_pipeline_id, source_node_id, new_node_id, parents=False, childrens=False):
@@ -562,3 +561,11 @@ def delete_node_data(cur, node_ids):
 
     else:
         print(f"No data found for node {node_id} or folder does not exist.")
+
+def set_children_stale(cur, pipeline_id, node_id):
+    """
+    Set the status of all children (descendants) of a node to 'staledata'.
+    """
+    children = get_all_children_nodes(cur, pipeline_id, node_id)
+    for child_id in children:
+        db_utils.update_node_status(cur, node_id=child_id, status=NodeState.STALEDATA.value)

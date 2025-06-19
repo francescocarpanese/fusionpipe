@@ -581,3 +581,39 @@ def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, in_memory_db
     import pytest
     with pytest.raises(ValueError):
         delete_node_from_pipeline_with_editable_logic(cur, pipeline_id, parent_id)
+
+def test_set_children_stale_sets_descendants_to_staledata(in_memory_db_conn, dag_dummy_1):
+    """
+    Test that set_children_stale sets all descendants of a node to 'staledata' status.
+    """
+    from fusionpipe.utils.pip_utils import graph_to_db, set_children_stale
+    from fusionpipe.utils import db_utils
+    import networkx as nx
+
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+
+    # Add the dummy graph to the database
+    graph_to_db(dag_dummy_1, cur)
+    conn.commit()
+
+    pipeline_id = dag_dummy_1.graph['pipeline_id']
+    # Pick a node with descendants
+    for node in dag_dummy_1.nodes:
+        descendants = set(nx.descendants(dag_dummy_1, node))
+        if descendants:
+            break
+    else:
+        pytest.skip("No node with descendants in dummy graph.")
+
+    # Set all children to staledata
+    set_children_stale(cur, pipeline_id, node)
+    conn.commit()
+
+    # Check all descendants are staledata
+    for child in descendants:
+        status = db_utils.get_node_status(cur, child)
+        assert status == "staledata", f"Node {child} should be staledata, got {status}"
+    # The node itself should not be changed
+    status_self = db_utils.get_node_status(cur, node)
+    assert status_self != "staledata", f"Node {node} itself should not be set to staledata"
