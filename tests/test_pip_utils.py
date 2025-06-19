@@ -24,14 +24,14 @@ def test_init_node_folder(tmp_base_dir, monkeypatch):
     import os
     import toml
 
-    node_folder_path = os.path.join(tmp_base_dir, "test_node")
-    init_node_folder(node_folder_path, verbose=True)
+    folder_path_nodes = os.path.join(tmp_base_dir, "test_node")
+    init_node_folder(folder_path_nodes, verbose=True)
 
-    code_folder = os.path.join(node_folder_path, "code")
-    data_folder = os.path.join(node_folder_path, "data")
-    reports_folder = os.path.join(node_folder_path, "reports")
+    code_folder = os.path.join(folder_path_nodes, "code")
+    data_folder = os.path.join(folder_path_nodes, "data")
+    reports_folder = os.path.join(folder_path_nodes, "reports")
 
-    assert os.path.isdir(node_folder_path), "Node folder was not created."
+    assert os.path.isdir(folder_path_nodes), "Node folder was not created."
     assert os.path.isdir(code_folder), "Code subfolder was not created."
     assert os.path.isdir(data_folder), "Data subfolder was not created."
     assert os.path.isdir(reports_folder), "Reports subfolder was not created."
@@ -58,7 +58,7 @@ def test_delete_node_folder_removes_existing_folder(tmp_base_dir):
     os.makedirs(node_folder_path, exist_ok=True)
     # Ensure the folder exists before deletion
     assert os.path.exists(node_folder_path)
-    delete_node_folder(tmp_base_dir, node_id, verbose=True)
+    delete_node_folder(node_folder_path, verbose=True)
     # Folder should be deleted
     assert not os.path.exists(node_folder_path)
 
@@ -71,7 +71,7 @@ def test_delete_node_folder_nonexistent_folder(tmp_base_dir, capsys):
     # Ensure the folder does not exist
     if os.path.exists(node_folder_path):
         os.rmdir(node_folder_path)
-    delete_node_folder(tmp_base_dir, node_id, verbose=True)
+    delete_node_folder(node_folder_path, verbose=True)
     # Should not raise, and should print a message
     captured = capsys.readouterr()
     assert f"Node folder does not exist" in captured.out
@@ -331,11 +331,11 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, in_memory_db_co
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
     db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, node_tag="test", position_x=0, position_y=0)
-    db_utils.update_node_folder_path(cur, node_id, os.path.join(tmp_base_dir, node_id))
+    db_utils.update_folder_path_nodes(cur, node_id, os.path.join(tmp_base_dir, node_id))
     conn.commit()
   
-    node_folder_path = os.path.join(tmp_base_dir, node_id)
-    init_node_folder(node_folder_path, verbose=True)
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    init_node_folder(folder_path_nodes, verbose=True)
 
 
     # Run duplication
@@ -348,10 +348,10 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, in_memory_db_co
     assert new_node_id in nodes_in_pipeline
 
     # Check new folder exists and file is copied
-    new_node_folder_path = os.path.join(tmp_base_dir, new_node_id)
-    assert os.path.exists(new_node_folder_path)
+    new_folder_path_nodes = os.path.join(tmp_base_dir, new_node_id)
+    assert os.path.exists(new_folder_path_nodes)
     # Check if pyproject.toml file exists in the new node's code folder
-    new_code_folder_path = os.path.join(new_node_folder_path, "code")
+    new_code_folder_path = os.path.join(new_folder_path_nodes, "code")
     pyproject_file_path = os.path.join(new_code_folder_path, "pyproject.toml")
     assert os.path.isfile(pyproject_file_path), "pyproject.toml file does not exist in the new node's code folder."
 
@@ -383,11 +383,11 @@ def test_duplicate_node_in_different_pipeline_w_code_and_data(monkeypatch, in_me
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id_dst, tag="dst", owner="tester", notes="dst pipeline")
     db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id_src, node_tag="test", position_x=0, position_y=0)
-    db_utils.update_node_folder_path(cur, node_id, os.path.join(tmp_base_dir, node_id))
+    db_utils.update_folder_path_nodes(cur, node_id, os.path.join(tmp_base_dir, node_id))
     conn.commit()
 
-    node_folder_path = os.path.join(tmp_base_dir, node_id)
-    init_node_folder(node_folder_path, verbose=True)
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    init_node_folder(folder_path_nodes, verbose=True)
 
     # Run duplication into a different pipeline
     new_node_id = generate_node_id()
@@ -399,9 +399,9 @@ def test_duplicate_node_in_different_pipeline_w_code_and_data(monkeypatch, in_me
     assert new_node_id in nodes_in_dst
 
     # Check new folder exists and file is copied
-    new_node_folder_path = os.path.join(tmp_base_dir, new_node_id)
-    assert os.path.exists(new_node_folder_path)
-    new_code_folder_path = os.path.join(new_node_folder_path, "code")
+    new_folder_path_nodes = os.path.join(tmp_base_dir, new_node_id)
+    assert os.path.exists(new_folder_path_nodes)
+    new_code_folder_path = os.path.join(new_folder_path_nodes, "code")
     pyproject_file_path = os.path.join(new_code_folder_path, "pyproject.toml")
     assert os.path.isfile(pyproject_file_path), "pyproject.toml file does not exist in the new node's code folder."
 
@@ -449,7 +449,7 @@ def test_duplicate_duplicate_nodes_in_pipeline_with_relations(monkeypatch, in_me
     for node_id in selected_nodes:
         folder_path = os.path.join(tmp_base_dir, node_id)
         init_node_folder(folder_path)
-        db_utils.update_node_folder_path(cur, node_id, folder_path)
+        db_utils.update_folder_path_nodes(cur, node_id, folder_path)
     conn.commit()
 
     # Duplicate nodes with relation
@@ -491,12 +491,12 @@ def test_delete_node_data_removes_data_contents(monkeypatch, in_memory_db_conn, 
     cur = db_utils.init_db(conn)
     node_id = generate_node_id()
     db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None)
-    db_utils.update_node_folder_path(cur, node_id, os.path.join(tmp_base_dir, node_id))
+    db_utils.update_folder_path_nodes(cur, node_id, os.path.join(tmp_base_dir, node_id))
     conn.commit()
 
-    node_folder_path = os.path.join(tmp_base_dir, node_id)
-    init_node_folder(node_folder_path, verbose=True)
-    data_folder = os.path.join(node_folder_path, "data")
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    init_node_folder(folder_path_nodes, verbose=True)
+    data_folder = os.path.join(folder_path_nodes, "data")
     os.makedirs(data_folder, exist_ok=True)
     # Create dummy files and subfolders
     file1 = os.path.join(data_folder, "file1.txt")
@@ -522,3 +522,62 @@ def test_delete_node_data_removes_data_contents(monkeypatch, in_memory_db_conn, 
     # Data folder should still exist, but be empty
     assert os.path.exists(data_folder)
     assert not any(os.scandir(data_folder)), "Data folder is not empty after deletion"
+
+def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, in_memory_db_conn, tmp_base_dir):
+    """
+    Test delete_node_from_pipeline_with_editable_logic for editable and non-editable nodes.
+    """
+    import os
+    import shutil
+    from fusionpipe.utils.pip_utils import (
+        generate_node_id, generate_pip_id, init_node_folder, delete_node_from_pipeline_with_editable_logic
+    )
+    from fusionpipe.utils import db_utils
+    import networkx as nx
+
+    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
+
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+    pipeline_id = generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
+
+    # Case 1: Editable node
+    node_id_editable = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id_editable, status="ready", editable=1, notes="editable node", folder_path=None)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id_editable, pipeline_id=pipeline_id, node_tag="editable", position_x=0, position_y=0)
+    db_utils.update_folder_path_nodes(cur, node_id_editable, os.path.join(tmp_base_dir, node_id_editable))
+    conn.commit()
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id_editable)
+    init_node_folder(folder_path_nodes, verbose=True)
+    assert os.path.exists(folder_path_nodes)
+    # Should delete node and folder
+    delete_node_from_pipeline_with_editable_logic(cur, pipeline_id, node_id_editable)
+    conn.commit()
+    assert not os.path.exists(folder_path_nodes)
+    assert node_id_editable not in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
+
+    # Case 2: Non-editable leaf node in non-editable subgraph
+    node_id_noneditable = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id_noneditable, status="ready", editable=0, notes="non-editable node", folder_path=None)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id_noneditable, pipeline_id=pipeline_id, node_tag="noneditable", position_x=1, position_y=1)
+    conn.commit()
+    # Should delete node from pipeline (no error)
+    delete_node_from_pipeline_with_editable_logic(cur, pipeline_id, node_id_noneditable)
+    conn.commit()
+    assert node_id_noneditable not in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
+
+    # Case 3: Non-editable node that is not a leaf in non-editable subgraph
+    parent_id = generate_node_id()
+    child_id = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=parent_id, status="ready", editable=0, notes="parent", folder_path=None)
+    db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", editable=0, notes="child", folder_path=None)
+    db_utils.add_node_to_pipeline(cur, node_id=parent_id, pipeline_id=pipeline_id, node_tag="parent", position_x=2, position_y=2)
+    db_utils.add_node_to_pipeline(cur, node_id=child_id, pipeline_id=pipeline_id, node_tag="child", position_x=3, position_y=3)
+    db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
+    conn.commit()
+    # Should raise ValueError because parent_id is not a leaf
+    import pytest
+    with pytest.raises(ValueError):
+        delete_node_from_pipeline_with_editable_logic(cur, pipeline_id, parent_id)

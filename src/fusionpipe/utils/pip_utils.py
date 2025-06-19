@@ -31,17 +31,17 @@ def generate_node_id():
 def generate_pip_id():
     return "p_" + generate_id()
 
-def init_node_folder(node_folder_path, verbose=False):
+def init_node_folder(folder_path_nodes, verbose=False):
     
     # Create the main node folder
-    os.makedirs(node_folder_path, exist_ok=True)
+    os.makedirs(folder_path_nodes, exist_ok=True)
 
-    code_folder_path = os.path.join(node_folder_path,"code")
+    code_folder_path = os.path.join(folder_path_nodes,"code")
     
     # Create subfolders 'code' and 'data'
     os.makedirs(f"{code_folder_path}", exist_ok=True)
-    os.makedirs(f"{node_folder_path}/data", exist_ok=True)
-    os.makedirs(f"{node_folder_path}/reports", exist_ok=True)
+    os.makedirs(f"{folder_path_nodes}/data", exist_ok=True)
+    os.makedirs(f"{folder_path_nodes}/reports", exist_ok=True)
 
     # Save the current working directory
     current_dir = os.getcwd()
@@ -68,7 +68,7 @@ def init_node_folder(node_folder_path, verbose=False):
                 pyproject_data = toml.load(file)
                 
             # Update the 'name' field
-            pyproject_data['project']['name'] = os.path.basename(node_folder_path)
+            pyproject_data['project']['name'] = os.path.basename(folder_path_nodes)
             
             # Write the updated data back to the file
             with open(pyproject_file_path, 'w') as file:
@@ -94,16 +94,13 @@ def init_node_folder(node_folder_path, verbose=False):
 
     
     if verbose:
-        print(f"Node folder created at: {node_folder_path}")
+        print(f"Node folder created at: {folder_path_nodes}")
 
-def delete_node_folder(node_folder_path, node_id, verbose=False):
-    
-    # Construct the node folder path
-    node_folder_path = f"{node_folder_path}/n_{node_id}"
+def delete_node_folder(node_folder_path, verbose=False):
     
     # Remove the node folder and its contents
     if os.path.exists(node_folder_path):
-        os.rmdir(node_folder_path)
+        shutil.rmtree(node_folder_path)
         if verbose:
             print(f"Node folder deleted: {node_folder_path}")
     else:
@@ -407,8 +404,9 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
 def delete_node_from_pipeline_with_editable_logic(cur,pipeline_id, node_id):
     # Check if the node is editable
     if db_utils.is_node_editable(cur, node_id=node_id):
-        # If not editable, delete the node directly
+        # If editable, delete the node directly from the pipeline database
         db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node_id)
+        delete_node_folder(db_utils.get_node_folder_path(cur, node_id=node_id))
         return
 
     # Get the pipeline graph from the database
@@ -471,19 +469,19 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
     db_utils.update_editable_status(cur, node_id=new_node_id, editable=True)
 
     # Copy the folder into the new node folder
-    new_node_folder_path = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"), new_node_id)
+    new_folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"), new_node_id)
     # Update database
-    db_utils.update_node_folder_path(cur, new_node_id, new_node_folder_path)
+    db_utils.update_folder_path_nodes(cur, new_node_id, new_folder_path_nodes)
 
-    old_node_folder_path = db_utils.get_node_folder_path(cur, node_id=source_node_id)
+    old_folder_path_nodes = db_utils.get_node_folder_path(cur, node_id=source_node_id)
 
-    if old_node_folder_path:
+    if old_folder_path_nodes:
         # Copy the entire folder
-        os.makedirs(new_node_folder_path, exist_ok=True)
-        shutil.copytree(old_node_folder_path, new_node_folder_path, dirs_exist_ok=True)
+        os.makedirs(new_folder_path_nodes, exist_ok=True)
+        shutil.copytree(old_folder_path_nodes, new_folder_path_nodes, dirs_exist_ok=True)
 
     # Load and update the project.toml file
-    project_toml_path = os.path.join(new_node_folder_path, "code", "pyproject.toml")
+    project_toml_path = os.path.join(new_folder_path_nodes, "code", "pyproject.toml")
     if os.path.exists(project_toml_path):
         with open(project_toml_path, 'r') as file:
             pyproject_data = toml.load(file)
@@ -496,7 +494,7 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
             toml.dump(pyproject_data, file)
 
     # Initialize the .venv using uv
-    code_folder_path = os.path.join(new_node_folder_path, "code")
+    code_folder_path = os.path.join(new_folder_path_nodes, "code")
     current_dir = os.getcwd()
     try:
         os.chdir(code_folder_path)

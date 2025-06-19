@@ -19,10 +19,10 @@ def test_run_node_creates_and_runs_node(in_memory_db_conn, tmp_base_dir, node_in
     pipeline_id = pip_utils.generate_pip_id()
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     node_id = pip_utils.generate_node_id()
-    node_folder_path = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=node_folder_path, status=node_init_status)
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status=node_init_status)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
-    pip_utils.init_node_folder(node_folder_path=node_folder_path)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
     conn.commit()
 
     error_message = None
@@ -75,9 +75,9 @@ def test_run_pipeline(in_memory_db_conn, tmp_path, last_node, expected_status_a,
     db_utils.add_node_to_pipeline(cur, node_id=node_c, pipeline_id=pipeline_id)    
     db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_a)
     db_utils.add_node_relation(cur, child_id=node_c, parent_id=node_b)
-    pip_utils.init_node_folder(node_folder_path=folder_a)
-    pip_utils.init_node_folder(node_folder_path=folder_b)
-    pip_utils.init_node_folder(node_folder_path=folder_c)    
+    pip_utils.init_node_folder(folder_path_nodes=folder_a)
+    pip_utils.init_node_folder(folder_path_nodes=folder_b)
+    pip_utils.init_node_folder(folder_path_nodes=folder_c)    
     conn.commit()
 
     if last_node is not None:

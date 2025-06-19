@@ -471,7 +471,7 @@ def update_node_position(cur, node_id, pipeline_id, position_x, position_y):
                (position_x, position_y, node_id, pipeline_id))
     return cur.rowcount
 
-def update_node_folder_path(cur, node_id, folder_path):
+def update_folder_path_nodes(cur, node_id, folder_path):
     cur.execute('UPDATE nodes SET folder_path = ? WHERE node_id = ?', (folder_path, node_id))
     return cur.rowcount
 
