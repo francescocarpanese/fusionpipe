@@ -207,6 +207,16 @@
       .filter((node) => node.selected)
       .map((node) => node.id);
 
+    if (!selectedNodeIds.length) {
+      alert("Please select at least one node to delete.");
+      return;
+    }
+
+    const confirmed = confirm(
+      `Are you sure you want to delete the selected node(s): ${selectedNodeIds.join(", ")}? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
     await Promise.all(
       selectedNodeIds.map(async (nodeId) => {
         try {
