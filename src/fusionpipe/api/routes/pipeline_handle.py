@@ -439,3 +439,17 @@ def add_pipeline_to_project_route(payload: dict, db_conn=Depends(get_db)):
         "message": f"Pipeline {pipeline_id} added to project {project_id}",
         "rows_affected": rows_affected
     }
+
+@router.get("/get_pipelines_in_project/{project_id}")
+def get_pipelines_in_project(project_id: str, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    try:
+        pipelines = db_utils.get_pipeline_ids_by_project(cur, project_id)
+        db_conn.commit()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    if not pipelines:
+        return {"message": f"No pipelines found in project {project_id}"}
+    
+    return {"pipelines": pipelines}

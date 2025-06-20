@@ -33,6 +33,7 @@
     NavLi,
   } from "flowbite-svelte";
   import { ChevronDownOutline } from "flowbite-svelte-icons";
+    import filter from "svelte-select/filter";
 
   //  --- Variables and state definitions ---
   let nodes = $state<Node[]>([]);
@@ -818,6 +819,38 @@
     }
   }
 
+  async function filterPipelinesByProject() {
+    let projectId;
+    if (radiostate_projects === 1) {
+      projectId = selectedProjectDropdown.value;
+    } else if (radiostate_projects === 2) {
+      // Dropdown contains tags, so find the project ID for the selected tag
+      projectId = Object.keys(ids_tags_dict_projects).find(
+        (key) => ids_tags_dict_projects[key] === selectedProjectDropdown.value
+      );
+    }
+    if (!projectId) {
+      pipelines_dropdown = [];
+      return;
+    }
+    try {
+      const response = await fetch(`http://localhost:8000/get_pipelines_in_project/${projectId}`);
+      if (!response.ok) await handleApiError(response);
+      const data = await response.json();
+      if (data.pipelines) {
+        // Filter ids_tags_dict_pipelines to only include these pipeline ids
+        pipelines_dropdown = data.pipelines
+          .map((id) => radiostate_pipeline === 1 ? id : ids_tags_dict_pipelines[id])
+          .filter(Boolean);
+      } else {
+        pipelines_dropdown = [];
+      }
+    } catch (error) {
+      console.error("Error filtering pipelines by project:", error);
+      pipelines_dropdown = [];
+    }
+  }
+
   // Add a function to update pipeline info
   async function updatePipelineInfo() {
     if (!pipelineDrawerForm || !currentPipelineId) {
@@ -1129,6 +1162,20 @@
     }
   });
 
+$effect(() => {
+  if (selectedProjectDropdown) {
+    filterPipelinesByProject();
+  } else {
+    // No project selected: show all pipelines
+    if (radiostate_pipeline === 1) {
+      pipelines_dropdown = Object.keys(ids_tags_dict_pipelines);
+    } else if (radiostate_pipeline === 2) {
+      pipelines_dropdown = Object.values(ids_tags_dict_pipelines);
+    }
+    currentProjectId = "";
+  }
+});
+
   $effect(fetchPipelines);
   $effect(fetchProjects);
 
@@ -1171,6 +1218,7 @@
               bind:value={selectedProjectDropdown}
               placeholder="Select a project..."
               maxItems={5}
+              on:select={filterPipelinesByProject}
             />
           </div>
         </DropdownItem>
@@ -1414,6 +1462,7 @@
       disableKeyboardA11y={true}
     >
       <Panel position="top-left">
+        Selected project: {currentProjectId || "None"}<br />
         Pipeline id: {currentPipelineId || "None"}<br />
         Pipeline tag: {ids_tags_dict_pipelines[currentPipelineId] || "None"}
       </Panel>
