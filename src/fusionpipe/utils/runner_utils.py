@@ -16,10 +16,22 @@ def run_node(conn, node_id, run_mode="local"):
         db_utils.update_node_status(cur, node_id, "running")
         conn.commit()
         try:
-            # Start the process and get the PID
-            proc = subprocess.Popen(
-                ["uv", "run", "python", os.path.join(node_path, "code", "main.py")]
-            )
+            log_file = os.path.join(node_path, f"logs.txt")
+            start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            # Start the process and redirect stdout/stderr to log file
+            with open(log_file, "a") as logf:  # Use "a" to append
+                # Write process info before starting
+                logf.write(f"\n---\nProcess starting\nTime: {start_time}\n")
+                # Temporarily write PID as 'TBD', will update after process starts
+                logf.flush()
+                proc = subprocess.Popen(
+                    ["uv", "run", "python", os.path.join(node_path, "code", "main.py")],
+                    stdout=logf,
+                    stderr=subprocess.STDOUT
+                )
+                # Now write the PID
+                logf.write(f"PID: {proc.pid}\n---\n")
+                logf.flush()
             # Insert process info into process table
             db_utils.add_process(cur, proc.pid, node_id=node_id, status="running")
             conn.commit()
