@@ -62,8 +62,16 @@
     notes: "",
   });
 
+  let projectDrawerForm = $state({
+    id: "",
+    tag: "",
+    notes: "",
+  });  
+
+
   let isHiddenPipelinePanel = $state(true);
   let isHiddenNodePanel = $state(true);
+  let isHiddenProjectPanel = $state(true);
   let ids_tags_dict_pipelines = $state<Record<string, string>>({});
   let ids_tags_dict_projects = $state<Record<string, string>>({});
   let pipelines_dropdown = $state<string[]>([]);
@@ -819,6 +827,25 @@
     }
   }
 
+  async function loadProjectInfo(projectId: string) {
+    try {
+      const response = await fetch(
+        `http://localhost:8000/get_project/${projectId}`,
+        { cache: "no-store" }
+      );
+      if (!response.ok) await handleApiError(response);
+      const project = await response.json();
+      projectDrawerForm = {
+        id: project.project_id || "",
+        tag: project.tag || "",
+        notes: project.notes || "",
+      };
+    } catch (error) {
+      console.error("Error loading project info:", error);
+      projectDrawerForm = { id: "", tag: "", notes: "" };
+    }
+  }
+
   async function filterPipelinesByProject() {
     let projectId;
     if (radiostate_projects === 1) {
@@ -887,6 +914,44 @@
       alert("Failed to update pipeline info.");
     }
   }
+
+  // Add a function to update project info
+  async function updateProjectInfo() {
+    if (!projectDrawerForm || !currentProjectId) {
+      console.error("No project selected");
+      return;
+    }
+    const projectId =
+      typeof currentProjectId === "string"
+        ? currentProjectId
+        : currentProjectId.value;
+    const newTag = projectDrawerForm.tag;
+    const newNotes = projectDrawerForm.notes;
+
+    try {
+      await fetch(`http://localhost:8000/update_project_tag/${projectId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tag: newTag }),
+      }).then(async (response) => {
+        if (!response.ok) await handleApiError(response);
+      });
+      await fetch(`http://localhost:8000/update_project_notes/${projectId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: newNotes }),
+      }).then(async (response) => {
+        if (!response.ok) await handleApiError(response);
+      });
+      await fetchProjects();
+      alert("Project info updated.");
+    } catch (error) {
+      console.error("Error updating project info:", error);
+      alert("Failed to update project info.");
+    }
+  }
+
+
 
   async function runSelectedNode() {
     const selectedNode = nodes.find((node) => node.selected);
@@ -1104,6 +1169,16 @@
     }
   });
 
+  $effect(() => {
+    if (!isHiddenProjectPanel && currentProjectId) {
+      let projectId =
+        typeof currentProjectId === "string"
+          ? currentProjectId
+          : currentProjectId.value;
+      loadProjectInfo(projectId);
+    }
+  });
+
   // Effect to load pipeline info when the panel is opened
   $effect(() => {
     if (!isHiddenPipelinePanel && currentPipelineId) {
@@ -1224,7 +1299,7 @@ $effect(() => {
         </DropdownItem>
 
         <DropdownDivider />
-        <DropdownItem onclick={() => (isHiddenPipelinePanel = false)} class="text-gray-400 cursor-not-allowed"
+        <DropdownItem onclick={() => (isHiddenProjectPanel = false)}
           >Open selected project panel</DropdownItem
         >
         <DropdownItem onclick={createProject}>Create Project</DropdownItem>
@@ -1365,12 +1440,11 @@ $effect(() => {
         <DropdownItem onclick={() => loadPipeline(currentPipelineId)}>
           Refresh pipeline
         </DropdownItem>
-        <DropdownItem>Vertical</DropdownItem>
-        <DropdownItem>Horizontal</DropdownItem>
         <DropdownItem onclick={refreshLayout}>Auto reshape</DropdownItem>
       </Dropdown>
     </NavUl>
   </Navbar>
+
 
   <Drawer
     bind:hidden={isHiddenNodePanel}
@@ -1449,6 +1523,42 @@ $effect(() => {
       <Button onclick={updatePipelineInfo} class="mt-4">Save Changes</Button>
     {/if}
   </Drawer>
+
+  <Drawer
+    bind:hidden={isHiddenProjectPanel}
+    id="projectsidebar"
+    aria-controls="projectsidebar"
+    aria-labelledby="projectsidebar"
+  >
+    <div class="flex items-center justify-between">
+      <CloseButton
+        onclick={() => (isHiddenProjectPanel = false)}
+        class="mb-4 dark:text-white"
+      />
+    </div>
+    {#if projectDrawerForm}
+      <Label class="mb-2 block">Project id:</Label>
+      <div class="mt-2 text-sm text-gray-500">
+        {projectDrawerForm.id}
+      </div>
+      <Label for="project_tag" class="mb-2 block">Project tag:</Label>
+      <Input
+        id="project_tag"
+        name="project_tag"
+        required
+        bind:value={projectDrawerForm.tag}
+      />
+      <Label for="project_notes" class="mb-2 block">Notes:</Label>
+      <Input
+        id="project_notes"
+        name="project_notes"
+        required
+        bind:value={projectDrawerForm.notes}
+      />
+      <Button class="mt-4" onclick={updateProjectInfo} >Save Changes</Button>
+    {/if}
+  </Drawer>
+
 
   <div class="main-content">
     <SvelteFlow

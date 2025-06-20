@@ -693,3 +693,16 @@ def get_project_id_by_pipeline(cur, pipeline_id):
     cur.execute('SELECT project_id FROM node_pipeline_relation WHERE pipeline_id = ? LIMIT 1', (pipeline_id,))
     row = cur.fetchone()
     return row[0] if row and row[0] is not None else ""
+
+def get_project_dict(cur, project_id):
+    """
+    Get a project's id, tag, and notes as a dictionary.
+    :param cur: Database cursor
+    :param project_id: ID of the project to query
+    :return: Dictionary with keys 'project_id', 'tag', 'notes', or None if not found
+    """
+    cur.execute('SELECT project_id, tag, notes FROM projects WHERE project_id = ?', (project_id,))
+    row = cur.fetchone()
+    if row:
+        return {'project_id': row[0], 'tag': row[1], 'notes': row[2]}
+    return None

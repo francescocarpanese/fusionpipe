@@ -82,6 +82,18 @@ def get_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
         headers={"Cache-Control": "no-store"}
     )
 
+@router.get("/get_project/{project_id}")
+def get_project(project_id: str, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    try:
+        project_dict = db_utils.get_project_dict(cur, project_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return JSONResponse(
+        content=project_dict,
+        headers={"Cache-Control": "no-store"}
+    )
+
 @router.post("/create_node_in_pipeline/{pipeline_id}")
 def add_node_to_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
     cur = db_conn.cursor()
@@ -211,6 +223,35 @@ def update_pipeline_tag(pipeline_id: str, payload: dict, db_conn=Depends(get_db)
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Pipeline tag updated for pipeline {pipeline_id}"}
+
+@router.post("/update_project_tag/{project_id}")
+def update_project_tag(project_id: str, payload: dict, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    tag = payload.get("tag")
+    if tag is None:
+        raise HTTPException(status_code=400, detail="Missing tag")
+    try:
+        db_utils.update_project_tag(cur, project_id=project_id, tag=tag)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Project tag updated for project {project_id}"}
+
+@router.post("/update_project_notes/{project_id}")
+def update_project_notes(project_id: str, payload: dict, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    notes = payload.get("notes")
+    if notes is None:
+        raise HTTPException(status_code=400, detail="Missing notes")
+    try:
+        db_utils.update_project_notes(cur, project_id=project_id, notes=notes)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Project notes updated for project {project_id}"}
+
 
 @router.post("/update_pipeline_notes/{pipeline_id}")
 def update_pipeline_notes(pipeline_id: str, payload: dict, db_conn=Depends(get_db)):
