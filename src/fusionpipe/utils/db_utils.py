@@ -52,8 +52,10 @@ def init_db(conn):
             node_tag TEXT,
             position_x REAL DEFAULT 0.,
             position_y REAL DEFAULT 0.,
+            project_id TEXT DEFAULT NULL,
             FOREIGN KEY (node_id) REFERENCES nodes(id),
             FOREIGN KEY (pipeline_id) REFERENCES pipelines(id),
+            FOREIGN KEY (project_id) REFERENCES projects(project_id),
             PRIMARY KEY (node_id, pipeline_id)
         )
     ''')
@@ -78,6 +80,15 @@ def init_db(conn):
         )
     ''')
     
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS projects (
+            project_id TEXT PRIMARY KEY,
+            tag TEXT DEFAULT NULL,
+            notes TEXT DEFAULT NULL,
+            owner TEXT DEFAULT NULL
+        )
+    ''')
+
     conn.commit()
     return cur
 
@@ -554,3 +565,131 @@ def get_process_ids_by_node(cur, node_id):
     """
     cur.execute('SELECT process_id FROM processes WHERE node_id = ?', (node_id,))
     return [row[0] for row in cur.fetchall()]  # Return only the process IDs
+
+def add_project(cur, project_id, tag=None, notes=None, owner=None):
+    if tag is None:
+        tag = project_id
+    cur.execute('INSERT INTO projects (project_id, tag, notes, owner) VALUES (?, ?, ?, ?)', (project_id, tag, notes, owner))
+    return cur.lastrowid
+
+def add_pipeline_to_project(cur, project_id, pipeline_id):
+    """
+    Add a project to a pipeline.
+    :param cur: Database cursor
+    :param project_id: ID of the project to add
+    :param pipeline_id: ID of the pipeline to associate with the project
+    :return: Number of rows affected
+    """
+    cur.execute('UPDATE node_pipeline_relation SET project_id = ? WHERE pipeline_id = ?', (project_id, pipeline_id))
+    return cur.rowcount
+
+def remove_project_from_pipeline(cur, project_id, pipeline_id):
+    """
+    Remove a project from a pipeline.
+    :param cur: Database cursor
+    :param project_id: ID of the project to remove
+    :param pipeline_id: ID of the pipeline to disassociate from the project
+    :return: Number of rows affected
+    """
+    cur.execute('UPDATE node_pipeline_relation SET project_id = NULL WHERE project_id = ? AND pipeline_id = ?', (project_id, pipeline_id))
+    return cur.rowcount
+
+def remove_project_from_all_pipelines(cur, project_id):
+    """
+    Remove a project from all pipelines.
+    :param cur: Database cursor
+    :param project_id: ID of the project to remove from all pipelines
+    :return: Number of rows affected
+    """
+    cur.execute('UPDATE node_pipeline_relation SET project_id = NULL WHERE project_id = ?', (project_id,))
+    return cur.rowcount
+
+def get_all_projects(cur):
+    """
+    Get all projects from the projects table.
+    :param cur: Database cursor
+    :return: List of all projects as dictionaries
+    """
+    cur.execute('SELECT * FROM projects')
+    return [dict(row) for row in cur.fetchall()]  # Convert rows to dictionaries for easier access
+
+def get_project_by_id(cur, project_id):
+    """
+    Get a specific project by its ID.
+    :param cur: Database cursor
+    :param project_id: ID of the project to query
+    :return: Project as a dictionary or None if not found
+    """
+    cur.execute('SELECT * FROM projects WHERE project_id = ?', (project_id,))
+    row = cur.fetchone()
+    return dict(row) if row else None  # Convert row to dictionary if found, else return None
+
+def remove_project(cur, project_id):
+    """
+    Remove a project from the projects table.
+    :param cur: Database cursor
+    :param project_id: ID of the project to remove
+    :return: Number of rows affected
+    """
+    cur.execute('DELETE FROM projects WHERE project_id = ?', (project_id,))
+    return cur.rowcount
+
+
+def update_project_tag(cur, project_id, tag):
+    """
+    Update the tag of a project.
+    :param cur: Database cursor
+    :param project_id: ID of the project to update
+    :param tag: New tag for the project
+    :return: Number of rows affected
+    """
+    cur.execute('UPDATE projects SET tag = ? WHERE project_id = ?', (tag, project_id))
+    return cur.rowcount
+
+def update_project_notes(cur, project_id, notes):
+    """
+    Update the notes of a project.
+    :param cur: Database cursor
+    :param project_id: ID of the project to update
+    :param notes: New notes for the project
+    :return: Number of rows affected
+    """
+    cur.execute('UPDATE projects SET notes = ? WHERE project_id = ?', (notes, project_id))
+    return cur.rowcount
+
+
+def get_pipeline_ids_by_project(cur, project_id):
+    """
+    Get all pipeline IDs associated with a specific project.
+    :param cur: Database cursor
+    :param project_id: ID of the project to query
+    :return: List of pipeline IDs associated with the project
+    """
+    cur.execute('SELECT DISTINCT pipeline_id FROM node_pipeline_relation WHERE project_id = ?', (project_id,))
+    return [row[0] for row in cur.fetchall()]  # Return only the pipeline IDs
+
+def get_all_project_ids_tags_dict(cur):
+    cur.execute('SELECT project_id, tag FROM projects ORDER BY project_id')
+    return {row[0]: row[1] for row in cur.fetchall()}
+
+def remove_project_from_everywhere(cur, project_id):
+    """
+    Remove a project from all tables.
+    :param cur: Database cursor
+    :param project_id: ID of the project to remove
+    :return: Number of rows affected
+    """
+    cur.execute('DELETE FROM projects WHERE project_id = ?', (project_id,))
+    cur.execute('UPDATE node_pipeline_relation SET project_id = NULL WHERE project_id = ?', (project_id,))
+    return cur.rowcount
+
+def get_project_id_by_pipeline(cur, pipeline_id):
+    """
+    Get the project ID associated with a specific pipeline.
+    :param cur: Database cursor
+    :param pipeline_id: ID of the pipeline to query
+    :return: Project ID associated with the pipeline, or empty string if not found
+    """
+    cur.execute('SELECT project_id FROM node_pipeline_relation WHERE pipeline_id = ? LIMIT 1', (pipeline_id,))
+    row = cur.fetchone()
+    return row[0] if row and row[0] is not None else ""

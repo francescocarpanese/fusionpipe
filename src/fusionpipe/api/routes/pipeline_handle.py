@@ -27,11 +27,38 @@ def create_pipeline(db_conn=Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
     return {"pipeline_id": pipeline_id, "message": "Pipeline created"}
 
+
+@router.post("/create_project")
+def create_project(db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    project_id = pip_utils.generate_project_id()
+    try:
+        db_utils.add_project(cur, project_id=project_id)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"project_id": project_id, "message": "Project created"}
+
 @router.get("/get_all_pipeline_ids_tags_dict")
 def get_pip_ids(db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     try:
         ids_tags_dict = db_utils.get_all_pipeline_ids_tags_dict(cur)
+        db_conn.commit()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    if not ids_tags_dict:
+        ids_tags_dict = {}
+    
+    return ids_tags_dict
+
+@router.get("/get_all_project_ids_tags_dict")
+def get_project_ids(db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    try:
+        ids_tags_dict = db_utils.get_all_project_ids_tags_dict(cur)
         db_conn.commit()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -119,6 +146,17 @@ def delete_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Pipeline {pipeline_id} deleted successfully"}
+
+@router.delete("/delete_project/{project_id}")
+def delete_project(project_id: str, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    try:
+        db_utils.remove_project_from_everywhere(cur, project_id=project_id)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Project {project_id} deleted successfully"}
 
 @router.get("/branch_pipeline/{pipeline_id}/{start_node_id}")
 def branch_pipeline(pipeline_id: str, start_node_id: str, db_conn=Depends(get_db)):
@@ -214,8 +252,6 @@ def update_node_position(pipeline_id: str, payload: dict, db_conn=Depends(get_db
     
     return {"message": f"Node positions updated in pipeline {pipeline_id}"}
 
-
-
 @router.post("/update_node_status/{node_id}")
 def update_node_status(node_id: str, payload: dict, db_conn=Depends(get_db)):
     cur = db_conn.cursor()
@@ -229,7 +265,6 @@ def update_node_status(node_id: str, payload: dict, db_conn=Depends(get_db)):
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Node status updated for node {node_id}"}
-
 
 @router.post("/run_pipeline/{pipeline_id}")
 def run_pipeline_route(pipeline_id: str, payload: dict = None, db_conn=Depends(get_db)):
@@ -254,7 +289,6 @@ def run_pipeline_route(pipeline_id: str, payload: dict = None, db_conn=Depends(g
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Pipeline {pipeline_id} run completed", "result": result}
 
-
 @router.post("/run_pipeline_up_to_node/{pipeline_id}/{node_id}")
 def run_pipeline_up_to_node_route(pipeline_id: str, node_id: str, payload: dict = None, db_conn=Depends(get_db)):
     run_mode = "local"
@@ -278,7 +312,6 @@ def run_pipeline_up_to_node_route(pipeline_id: str, node_id: str, payload: dict 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Pipeline {pipeline_id} run up to node {node_id} completed", "result": result}
-
 
 @router.post("/run_node/{node_id}")
 def run_node_route(node_id: str, payload: dict = None, db_conn=Depends(get_db)):
@@ -359,8 +392,6 @@ def delete_node_data_route(payload: dict, db_conn=Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Data for nodes {node_ids} deleted successfully"}
 
-
-
 @router.post("/manual_set_node_status/{node_id}/{status}")
 def manual_set_node_status(node_id: str, status: str, db_conn=Depends(get_db)):
     """
@@ -387,4 +418,24 @@ def kill_node_route(node_id: str, db_conn=Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Kill signal sent to node {node_id} (if running)"}
 
-
+@router.post("/move_pipeline_to_project")
+def add_pipeline_to_project_route(payload: dict, db_conn=Depends(get_db)):
+    """
+    Associate a pipeline with a project.
+    Payload example: {"project_id": "...", "pipeline_id": "..."}
+    """
+    project_id = payload.get("project_id")
+    pipeline_id = payload.get("pipeline_id")
+    if not project_id or not pipeline_id:
+        raise HTTPException(status_code=400, detail="Missing project_id or pipeline_id")
+    cur = db_conn.cursor()
+    try:
+        rows_affected = db_utils.add_pipeline_to_project(cur, project_id, pipeline_id)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {
+        "message": f"Pipeline {pipeline_id} added to project {project_id}",
+        "rows_affected": rows_affected
+    }

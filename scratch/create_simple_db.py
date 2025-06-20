@@ -1,5 +1,5 @@
 from fusionpipe.utils.db_utils import create_db
-from fusionpipe.utils.db_utils import add_pipeline
+from fusionpipe.utils.db_utils import add_pipeline, add_project
 
 path_to_db = "/home/cisko90/fusionpipe/bin/nodes/connection.db"
 #path_to_db = r"C:\Users\franc\Documents\fusionpipe\bin\connection.db"
@@ -16,12 +16,13 @@ conn = create_db(path_to_db)
 cur = conn.cursor()
 pipeline_id = "simple_pipeline"
 add_pipeline(cur, pipeline_id=pipeline_id, tag="v1.0", owner="user1", notes="This is a simple pipeline.")
+add_project(cur, project_id="simple_project", tag="v1.0", owner="user1", notes="This is a simple project.")
 conn.commit()
 print(f"Pipeline '{pipeline_id}' added to the database.")
 conn.close()
 
 from fusionpipe.utils.db_utils import add_node_to_nodes
-from fusionpipe.utils.db_utils import add_node_to_pipeline, add_node_relation
+from fusionpipe.utils.db_utils import add_node_to_pipeline, add_node_relation, add_pipeline_to_project
 
 # Add some nodes to the database
 conn = create_db(path_to_db)
@@ -44,6 +45,8 @@ node_ids = ["node1", "node2", "node3"]
 
 for node_id in node_ids:
     add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="user1")
+
+add_pipeline_to_project(cur, project_id="simple_project", pipeline_id=pipeline_id)
 
 conn.commit()
 print(f"Nodes added to pipeline '{pipeline_id}'.")

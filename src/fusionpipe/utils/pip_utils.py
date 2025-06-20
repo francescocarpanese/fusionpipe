@@ -31,6 +31,9 @@ def generate_node_id():
 def generate_pip_id():
     return "p_" + generate_id()
 
+def generate_project_id():
+    return "pr_" + generate_id()
+
 def init_node_folder(folder_path_nodes, verbose=False):
     
     # Create the main node folder
@@ -119,6 +122,7 @@ def graph_to_dict(graph):
         'notes': graph.graph.get('notes', None),  # Optional notes for the pipeline
         'tag': graph.graph.get('tag', None),  # Optional tag for the pipeline
         'owner': graph.graph.get('owner', None),  # Optional owner for the pipeline
+        'project_id': graph.graph.get('project_id', ""),  # Optional list of project IDs associated with the pipeline
     }
     for node in graph.nodes:
         parents = list(graph.predecessors(node))
@@ -149,6 +153,7 @@ def graph_dict_to_db(graph_dict, cur):
     tag = graph_dict["tag"]
     owner = graph_dict["owner"]
     notes = graph_dict["notes"]
+    project_id = graph_dict.get("project_id", "")
 
     if not db_utils.check_pipeline_exists(cur, pipeline_id):
         # If the pipeline does not exist, create it
@@ -171,6 +176,8 @@ def graph_dict_to_db(graph_dict, cur):
         for child_id, node_data in graph_dict["nodes"].items():
             for parent_id in node_data.get("parents", []):
                 db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
+
+        db_utils.add_pipeline_to_project(cur, project_id=project_id, pipeline_id=pipeline_id)
         return cur
 
 def graph_to_db(Gnx, cur):
@@ -221,6 +228,7 @@ def db_to_graph_from_pip_id(cur, pip_id):
     G.graph['notes'] = db_utils.get_pipeline_notes(cur, pipeline_id=pip_id)  # Optional notes for the pipeline
     G.graph['tag'] = db_utils.get_pipeline_tag(cur, pipeline_id=pip_id)  # Set the graph tag from the pipeline data
     G.graph['owner'] = db_utils.get_pipeline_owner(cur, pipeline_id=pip_id)  # Optional owner for the pipeline
+    G.graph['project_id'] = db_utils.get_project_id_by_pipeline(cur, pipeline_id=pip_id)  # Optional list of project IDs associated with the pipeline
 
     # Add nodes and their dependencies
     for node_id in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id=pip_id):

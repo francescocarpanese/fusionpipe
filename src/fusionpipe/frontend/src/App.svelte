@@ -38,9 +38,13 @@
   let nodes = $state<Node[]>([]);
   let edges = $state.raw<Edge[]>([]);
   let selectedPipelineDropdown = $state(null);
+  let selectedProjectDropdown = $state(null);
+
   let selectedPipelineTarget = $state(null);
+  let selectedProjectTarget = $state(null);
 
   let currentPipelineId = $state("");
+  let currentProjectId = $state("");
   const nodeWidth = 172;
   const nodeHeight = 36;
   let nodeDrawereForm = $state({
@@ -53,18 +57,22 @@
   let pipelineDrawerForm = $state({
     id: "",
     tag: "",
+    project_id: "",
     notes: "",
   });
 
   let isHiddenPipelinePanel = $state(true);
   let isHiddenNodePanel = $state(true);
-  let ids_tags_dict = $state<Record<string, string>>({});
+  let ids_tags_dict_pipelines = $state<Record<string, string>>({});
+  let ids_tags_dict_projects = $state<Record<string, string>>({});
   let pipelines_dropdown = $state<string[]>([]);
+  let projects_dropdown = $state<string[]>([]);
 
   let nodeTypes = { custom: CustomNode };
   const dagreGraph = new dagre.graphlib.Graph();
 
-  let radiostate = $state(2); // selector for what to display in pipeline list 1 for ids, 2 for tags
+  let radiostate_pipeline = $state(2); // selector for what to display in pipeline list 1 for ids, 2 for tags
+  let radiostate_projects = $state(2); // selector for what to display in projects list 1 for ids, 2 for tags
 
   // --  Definitions of functions ---
 
@@ -213,7 +221,7 @@
     }
 
     const confirmed = confirm(
-      `Are you sure you want to delete the selected node(s): ${selectedNodeIds.join(", ")}? This action cannot be undone.`
+      `Are you sure you want to delete the selected node(s): ${selectedNodeIds.join(", ")}? This action cannot be undone.`,
     );
     if (!confirmed) return;
 
@@ -367,6 +375,48 @@
     }
   }
 
+  async function moveSelectedPipelinetoProject() {
+    if (!selectedProjectTarget) {
+      console.error("No target project selected");
+      alert("Please select a target project to move the pipeline into.");
+      return;
+    }
+
+    const pipelineId =
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
+
+    if (!pipelineId) {
+      console.error("No pipeline selected");
+      return;
+    }
+    try {
+      const response = await fetch(
+        `http://localhost:8000/move_pipeline_to_project`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project_id: selectedProjectTarget.value,
+            pipeline_id: pipelineId,
+          }),
+        },
+      );
+      if (!response.ok) await handleApiError(response);
+      await fetchPipelines();
+      currentPipelineId = "";
+      nodes = [];
+      edges = [];
+      alert(`Pipeline ${pipelineId} moved to project ${selectedProjectTarget.value} successfully.`);
+      selectedProjectTarget = null;
+    } catch (error) {
+      console.error("Error moving pipeline to project:", error);
+      alert("Failed to move pipeline to project.");
+    }
+  }
+
+
   async function setNodeCompleted() {
     const selectedNode = nodes.find((node) => node.selected);
     if (!selectedNode) {
@@ -427,11 +477,25 @@
         "http://localhost:8000/get_all_pipeline_ids_tags_dict",
       );
       if (!response.ok) await handleApiError(response);
-      ids_tags_dict = await response.json();
+      ids_tags_dict_pipelines = await response.json();
     } catch (error) {
       console.error("Error fetching pipelines:", error);
     }
   }
+
+  async function fetchProjects() {
+    try {
+      const response = await fetch(
+        "http://localhost:8000/get_all_project_ids_tags_dict",
+      );
+      if (!response.ok) await handleApiError(response);
+      // Assuming the API returns a similar dict as pipelines
+      ids_tags_dict_projects = await response.json();
+    } catch (error) {
+      console.error("Error fetching projects:", error);
+    }
+  }
+
 
   async function handleConnect(event) {
     const source = event.source;
@@ -479,6 +543,24 @@
     }
   }
 
+  async function createProject() {
+    try {
+      const response = await fetch("http://localhost:8000/create_project", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) await handleApiError(response);
+      const data = await response.json();
+      const newProjectId = data.project_id;
+      currentProjectId = newProjectId;
+      await fetchProjects();
+    } catch (error) {
+      console.error("Error creating project:", error);
+    }
+  }
+
+
+
   async function deleteSelectedPipeline() {
     if (!currentPipelineId) {
       alert("No pipeline selected");
@@ -511,6 +593,51 @@
     } catch (error) {
       console.error("Error deleting pipeline:", error);
       alert("Failed to delete pipeline.");
+    }
+  }
+
+  async function deleteSelectedProject() {
+    if (!selectedProjectDropdown) {
+      alert("No project selected");
+      return;
+    }
+
+    let projectId;
+    if (radiostate_projects === 1) {
+      projectId = selectedProjectDropdown.value;
+    } else if (radiostate_projects === 2) {
+      // Dropdown contains tags, so find the project ID for the selected tag
+      projectId = Object.keys(ids_tags_dict_projects).find(
+        (key) => ids_tags_dict_projects[key] === selectedProjectDropdown.value
+      );
+    }
+
+    if (!projectId) {
+      alert("Could not determine project ID to delete.");
+      return;
+    }
+
+    const confirmed = confirm(
+      `Are you sure you want to delete project "${projectId}"? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(
+        `http://localhost:8000/delete_project/${projectId}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      if (!response.ok) await handleApiError(response);
+      await fetchProjects();
+      selectedProjectDropdown = null;
+      currentProjectId = "";
+      alert("Project deleted successfully.");
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      alert("Failed to delete project.");
     }
   }
 
@@ -683,10 +810,11 @@
         id: pipeline.pipeline_id || "",
         tag: pipeline.tag || "",
         notes: pipeline.notes || "",
+        project_id: pipeline.project_id || "",
       };
     } catch (error) {
       console.error("Error loading pipeline info:", error);
-      pipelineDrawerForm = { id: "", tag: "", notes: "" };
+      pipelineDrawerForm = { id: "", tag: "", notes: "", project_id: "" };
     }
   }
 
@@ -855,7 +983,10 @@
       const response = await fetch(`http://localhost:8000/delete_node_data/`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ node_ids: selectedNodeIds, pipeline_id: pipelineId }),
+        body: JSON.stringify({
+          node_ids: selectedNodeIds,
+          pipeline_id: pipelineId,
+        }),
       });
       if (!response.ok) await handleApiError(response);
       await loadPipeline(pipelineId);
@@ -881,36 +1012,36 @@
     throw new Error(errorMsg);
   }
 
-
-async function killSelectedNode() {
-  const selectedNode = nodes.find((node) => node.selected);
-  if (!selectedNode) {
-    alert("No node selected");
-    return;
-  }
-  const nodeId = selectedNode.id;
-  try {
-    const response = await fetch(`http://localhost:8000/kill_node/${nodeId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
-    if (!response.ok) await handleApiError(response);
-    alert(`Kill signal sent to node ${nodeId}.`);
-    // Optionally reload pipeline to update node status
-    if (currentPipelineId) {
-      const pipelineId =
-        typeof currentPipelineId === "string"
-          ? currentPipelineId
-          : currentPipelineId.value;
-      await loadPipeline(pipelineId);
+  async function killSelectedNode() {
+    const selectedNode = nodes.find((node) => node.selected);
+    if (!selectedNode) {
+      alert("No node selected");
+      return;
     }
-  } catch (error) {
-    console.error("Error killing node:", error);
-    alert("Failed to kill node.");
+    const nodeId = selectedNode.id;
+    try {
+      const response = await fetch(
+        `http://localhost:8000/kill_node/${nodeId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+      if (!response.ok) await handleApiError(response);
+      alert(`Kill signal sent to node ${nodeId}.`);
+      // Optionally reload pipeline to update node status
+      if (currentPipelineId) {
+        const pipelineId =
+          typeof currentPipelineId === "string"
+            ? currentPipelineId
+            : currentPipelineId.value;
+        await loadPipeline(pipelineId);
+      }
+    } catch (error) {
+      console.error("Error killing node:", error);
+      alert("Failed to kill node.");
+    }
   }
-}  
-
-
 
   // ------------ Collection of all reactive effects ---------------
   $effect(() => {
@@ -950,33 +1081,56 @@ async function killSelectedNode() {
       loadPipelineInfo(pipelineId);
     }
     if (isHiddenPipelinePanel) {
-      pipelineDrawerForm = { id: "", tag: "", notes: "" };
+      pipelineDrawerForm = { id: "", tag: "", notes: "", project_id: "" };
     }
   });
 
   $effect(() => {
-    if (radiostate === 1) {
-      pipelines_dropdown = Object.keys(ids_tags_dict);
-    } else if (radiostate === 2) {
-      pipelines_dropdown = Object.values(ids_tags_dict);
+    if (radiostate_pipeline === 1) {
+      pipelines_dropdown = Object.keys(ids_tags_dict_pipelines);
+    } else if (radiostate_pipeline === 2) {
+      pipelines_dropdown = Object.values(ids_tags_dict_pipelines);
     }
     selectedPipelineDropdown = null;
   });
 
   $effect(() => {
+    if (radiostate_projects === 1) {
+      projects_dropdown = Object.keys(ids_tags_dict_projects);
+    } else if (radiostate_projects === 2) {
+      projects_dropdown = Object.values(ids_tags_dict_projects);
+    }
+    selectedProjectDropdown = null;
+  });
+
+  $effect(() => {
     if (selectedPipelineDropdown) {
-      if (radiostate === 1) {
+      if (radiostate_pipeline === 1) {
         currentPipelineId = selectedPipelineDropdown.value;
-      } else if (radiostate === 2) {
+      } else if (radiostate_pipeline === 2) {
         // Dropdown contains tags, so find the pipeline ID for the selected tag
-        currentPipelineId = Object.keys(ids_tags_dict).find(
-          (key) => ids_tags_dict[key] === selectedPipelineDropdown.value,
+        currentPipelineId = Object.keys(ids_tags_dict_pipelines).find(
+          (key) => ids_tags_dict_pipelines[key] === selectedPipelineDropdown.value,
+        );
+      }
+    }
+  });
+
+  $effect(() => {
+    if (selectedProjectDropdown) {
+      if (radiostate_projects === 1) {
+        currentProjectId = selectedProjectDropdown.value;
+      } else if (radiostate_projects === 2) {
+        // Dropdown contains tags, so find the project ID for the selected tag
+        currentProjectId = Object.keys(ids_tags_dict_projects).find(
+          (key) => ids_tags_dict_projects[key] === selectedProjectDropdown.value,
         );
       }
     }
   });
 
   $effect(fetchPipelines);
+  $effect(fetchProjects);
 
   // Use effect to handle node drag end event and save positions
   $effect(() => {
@@ -993,6 +1147,44 @@ async function killSelectedNode() {
   <Navbar>
     <NavUl class="ms-3 pt-1">
       <NavLi class="cursor-pointer">
+        Project interaction<ChevronDownOutline
+          class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white"
+        />
+      </NavLi>      
+      <Dropdown simple>
+        <DropdownItem>
+          <li>
+            <Radio name="radio_state" bind:group={radiostate_projects} value={1}
+              >List ids</Radio
+            >
+          </li>
+          <li>
+            <Radio name="radio_state" bind:group={radiostate_projects} value={2}
+              >List tags</Radio
+            >
+          </li>
+        </DropdownItem>
+        <DropdownItem>
+          <div class="w-64">
+            <SvelteSelect
+              items={projects_dropdown}
+              bind:value={selectedProjectDropdown}
+              placeholder="Select a project..."
+              maxItems={5}
+            />
+          </div>
+        </DropdownItem>
+
+        <DropdownDivider />
+        <DropdownItem onclick={() => (isHiddenPipelinePanel = false)} class="text-gray-400 cursor-not-allowed"
+          >Open selected project panel</DropdownItem
+        >
+        <DropdownItem onclick={createProject}>Create Project</DropdownItem>
+        <DropdownItem class="text-red-600" onclick={deleteSelectedProject}
+          >Delete Project</DropdownItem
+        >
+      </Dropdown>
+      <NavLi class="cursor-pointer">
         Pipeline Interaction<ChevronDownOutline
           class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white"
         />
@@ -1000,12 +1192,12 @@ async function killSelectedNode() {
       <Dropdown simple>
         <DropdownItem>
           <li>
-            <Radio name="radio_state" bind:group={radiostate} value={1}
+            <Radio name="radio_state" bind:group={radiostate_pipeline} value={1}
               >List ids</Radio
             >
           </li>
           <li>
-            <Radio name="radio_state" bind:group={radiostate} value={2}
+            <Radio name="radio_state" bind:group={radiostate_pipeline} value={2}
               >List tags</Radio
             >
           </li>
@@ -1023,16 +1215,33 @@ async function killSelectedNode() {
         </DropdownItem>
 
         <DropdownDivider />
-        <DropdownItem onclick={() => (isHiddenPipelinePanel = false)}
+        <DropdownItem onclick={() => (isHiddenPipelinePanel = false)} 
           >Open selected pipeline panel</DropdownItem
         >
         <DropdownItem onclick={createPipeline}>Create Pipeline</DropdownItem>
         <DropdownItem onclick={branchPipelineFromNode}
           >Branch Pipeline from selected node</DropdownItem
         >
+        <DropdownItem
+          >Move pipeline to project
+          <Dropdown simple>
+            <div class="w-64">
+              <SvelteSelect
+                items={projects_dropdown}
+                bind:value={selectedProjectTarget}
+                placeholder="Select a project..."
+                maxItems={5}
+              />
+            </div>
+            <Button onclick={moveSelectedPipelinetoProject} class="mt-2"
+              >Move</Button
+            >
+          </Dropdown>
+        </DropdownItem>
         <DropdownItem class="text-red-600" onclick={deleteSelectedPipeline}
           >Delete Pipeline</DropdownItem
         >
+        
       </Dropdown>
       <NavLi class="cursor-pointer">
         Node interaction<ChevronDownOutline
@@ -1095,8 +1304,9 @@ async function killSelectedNode() {
         <DropdownItem class="text-gray-400 cursor-not-allowed"
           >Open run panel</DropdownItem
         >
-        <DropdownItem onclick={killSelectedNode} class="text-red-600"> Kill run selected node </DropdownItem
-        >        
+        <DropdownItem onclick={killSelectedNode} class="text-red-600">
+          Kill run selected node
+        </DropdownItem>
       </Dropdown>
       <NavLi class="cursor-pointer">
         Layout<ChevronDownOutline
@@ -1166,6 +1376,10 @@ async function killSelectedNode() {
       />
     </div>
     {#if pipelineDrawerForm}
+      <Label class="mb-2 block">Project ids:</Label>
+      <div class="mt-2 text-sm text-gray-500">
+        {pipelineDrawerForm.project_id}
+      </div>        
       <Label class="mb-2 block">Pipeline id:</Label>
       <div class="mt-2 text-sm text-gray-500">
         {pipelineDrawerForm.id}
@@ -1201,7 +1415,7 @@ async function killSelectedNode() {
     >
       <Panel position="top-left">
         Pipeline id: {currentPipelineId || "None"}<br />
-        Pipeline tag: {ids_tags_dict[currentPipelineId] || "None"}
+        Pipeline tag: {ids_tags_dict_pipelines[currentPipelineId] || "None"}
       </Panel>
       <Controls />
       <Background />

@@ -30,6 +30,7 @@ def dag_dummy_1():
     G.add_node("E")  # Add a node with no edges
     G.name = "12345"
     G.graph['pipeline_id'] = G.name
+    G.graph['project_id'] = "test_project"
     G.graph['notes'] = "A simple test DAG"
     G.graph['tag'] = "test_tag"
     G.graph['owner'] = "test_group"
@@ -61,6 +62,7 @@ def dict_dummy_1():
         "notes": "A simple test DAG",
         "tag": "test_tag",
         "owner": "test_group",
+        "project_id": "test_project",
         "nodes": {
             "A": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0], 'folder_path': 'dummy_folder_path'},
             "B": {"status": "running", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path'},
