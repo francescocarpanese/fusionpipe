@@ -855,7 +855,7 @@
       const response = await fetch(`http://localhost:8000/delete_node_data/`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ node_ids: selectedNodeIds }),
+        body: JSON.stringify({ node_ids: selectedNodeIds, pipeline_id: pipelineId }),
       });
       if (!response.ok) await handleApiError(response);
       await loadPipeline(pipelineId);
@@ -880,6 +880,37 @@
     alert("Error: " + errorMsg);
     throw new Error(errorMsg);
   }
+
+
+async function killSelectedNode() {
+  const selectedNode = nodes.find((node) => node.selected);
+  if (!selectedNode) {
+    alert("No node selected");
+    return;
+  }
+  const nodeId = selectedNode.id;
+  try {
+    const response = await fetch(`http://localhost:8000/kill_node/${nodeId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) await handleApiError(response);
+    alert(`Kill signal sent to node ${nodeId}.`);
+    // Optionally reload pipeline to update node status
+    if (currentPipelineId) {
+      const pipelineId =
+        typeof currentPipelineId === "string"
+          ? currentPipelineId
+          : currentPipelineId.value;
+      await loadPipeline(pipelineId);
+    }
+  } catch (error) {
+    console.error("Error killing node:", error);
+    alert("Failed to kill node.");
+  }
+}  
+
+
 
   // ------------ Collection of all reactive effects ---------------
   $effect(() => {
@@ -1064,6 +1095,8 @@
         <DropdownItem class="text-gray-400 cursor-not-allowed"
           >Open run panel</DropdownItem
         >
+        <DropdownItem onclick={killSelectedNode} class="text-red-600"> Kill run selected node </DropdownItem
+        >        
       </Dropdown>
       <NavLi class="cursor-pointer">
         Layout<ChevronDownOutline

@@ -583,9 +583,11 @@ def update_stale_status_for_pipeline_nodes(cur, pipeline_id):
         # Check all parents
         for parent_id in G.predecessors(node_id):
             parent_status = G.nodes[parent_id]["status"]
-            if parent_status in [NodeState.STALEDATA.value, NodeState.FAILED.value]:
-                db_utils.update_node_status(cur, node_id, NodeState.STALEDATA.value)
-                G.nodes[node_id]["status"] = NodeState.STALEDATA.value
+            if parent_status in [NodeState.STALEDATA.value, NodeState.FAILED.value, NodeState.READY.value]:
+                if G.nodes[node_id]["status"] not in [NodeState.READY.value]:
+                    # If the node is not already in 'staledata' or 'failed', update it
+                    db_utils.update_node_status(cur, node_id, NodeState.STALEDATA.value)
+                    G.nodes[node_id]["status"] = NodeState.STALEDATA.value
 
 def delete_edge_and_update_status(cur, pipeline_id, parent_id, child_id):
     # Check if the child node is editable

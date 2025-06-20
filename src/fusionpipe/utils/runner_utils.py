@@ -9,18 +9,32 @@ def run_node(conn, node_id, run_mode="local"):
         raise RuntimeError(f"Node {node_id} cannot be run.")
     
     node_path = db_utils.get_node_folder_path(cur, node_id)
+    if db_utils.get_node_status(cur, node_id) == "running":
+        raise RuntimeError(f"Node {node_id} is already running.")
     if run_mode == "local":
-        # Simulate running the node locally
         print(f"Running node {node_id} in local mode...")
         db_utils.update_node_status(cur, node_id, "running")
         conn.commit()
         try:
-            # Make sure this is run with uv in order to have access to the package manager
-            subprocess.run(["uv","run","python", os.path.join(node_path, "code", "main.py")], check=True)
-            db_utils.update_node_status(cur, node_id, "completed")
+            # Start the process and get the PID
+            proc = subprocess.Popen(
+                ["uv", "run", "python", os.path.join(node_path, "code", "main.py")]
+            )
+            # Insert process info into process table
+            db_utils.add_process(cur, proc.pid, node_id=node_id, status="running")
             conn.commit()
-        except subprocess.CalledProcessError as e:
+            proc.wait()
+            # Remove process from process table
+            db_utils.remove_process(cur, proc.pid)
+            if proc.returncode == 0:
+                db_utils.update_node_status(cur, node_id, "completed")                
+            else:
+                db_utils.update_node_status(cur, node_id, "failed")
+                db_utils.update_process_status(cur, proc.pid, status="failed")
+            conn.commit()
+        except Exception as e:
             db_utils.update_node_status(cur, node_id, "failed")
+            db_utils.update_process_status(cur, proc.pid, status="failed")
             conn.commit()
             print(f"Node {node_id} failed to run: {e}")
     elif run_mode == "ray":
@@ -90,3 +104,22 @@ def run_pipeline(conn, pipeline_id, last_node_id=None, run_mode="local", poll_in
 
         time.sleep(poll_interval)
 
+
+def kill_running_process(conn, node_id):
+    """
+    Kill the running process associated with a node, if any.
+    """
+    cur = conn.cursor()
+    proc_ids = db_utils.get_process_ids_by_node(cur, node_id)
+    if not proc_ids:
+        print(f"No running process found for node {node_id}.")
+        return
+    for pid in proc_ids:
+        try:
+            os.kill(int(pid), 9)
+            db_utils.update_node_status(cur, node_id, "failed")
+            db_utils.remove_process(cur, pid)
+            conn.commit()
+            print(f"Process {pid} for node {node_id} killed.")
+        except Exception as e:
+            print(f"Failed to kill process {pid} for node {node_id}: {e}")

@@ -67,6 +67,16 @@ def init_db(conn):
             FOREIGN KEY (parent_id) REFERENCES nodes(id)
         )
     ''')
+
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS processes (
+            process_id TEXT PRIMARY KEY,
+            node_id TEXT,
+            status TEXT CHECK(status IN ('pending', 'running', 'completed', 'failed')) DEFAULT 'pending',
+            start_time TIMESTAMP DEFAULT NULL,
+            end_time TIMESTAMP DEFAULT NULL
+        )
+    ''')
     
     conn.commit()
     return cur
@@ -488,3 +498,59 @@ def update_editable_status(cur, node_id, editable):
     
     cur.execute('UPDATE nodes SET editable = ? WHERE node_id = ?', (editable, node_id))
     return cur.rowcount
+
+def add_process(cur, process_id, node_id, status='pending', start_time=None, end_time=None):
+    """
+    Add a new process to the processes table.
+    :param cur: Database cursor
+    :param process_id: Unique ID for the process
+    :param node_id: ID of the node associated with the process
+    :param status: Status of the process (default is 'pending')
+    :param start_time: Start time of the process (default is None)
+    :param end_time: End time of the process (default is None)
+    :return: Last row ID inserted
+    """
+    cur.execute('INSERT INTO processes (process_id, node_id, status, start_time, end_time) VALUES (?, ?, ?, ?, ?)', 
+                (process_id, node_id, status, start_time, end_time))
+    return cur.lastrowid
+
+def remove_process(cur, process_id):
+    """
+    Remove a process from the processes table.
+    :param cur: Database cursor
+    :param process_id: ID of the process to remove
+    :return: Number of rows affected
+    """
+    cur.execute('DELETE FROM processes WHERE process_id = ?', (process_id,))
+    return cur.rowcount
+
+def get_processes_by_node(cur, node_id):
+    """
+    Get all processes associated with a specific node.
+    :param cur: Database cursor
+    :param node_id: ID of the node to query
+    :return: List of processes associated with the node
+    """
+    cur.execute('SELECT * FROM processes WHERE node_id = ?', (node_id,))
+    return [dict(row) for row in cur.fetchall()]  # Convert rows to dictionaries for easier access
+
+def update_process_status(cur, process_id, status):
+    """
+    Update the status of a process.
+    :param cur: Database cursor
+    :param process_id: ID of the process to update
+    :param status: New status for the process
+    :return: Number of rows affected
+    """
+    cur.execute('UPDATE processes SET status = ? WHERE process_id = ?', (status, process_id))
+    return cur.rowcount
+
+def get_process_ids_by_node(cur, node_id):
+    """
+    Get all process IDs associated with a specific node.
+    :param cur: Database cursor
+    :param node_id: ID of the node to query
+    :return: List of process IDs associated with the node
+    """
+    cur.execute('SELECT process_id FROM processes WHERE node_id = ?', (node_id,))
+    return [row[0] for row in cur.fetchall()]  # Return only the process IDs

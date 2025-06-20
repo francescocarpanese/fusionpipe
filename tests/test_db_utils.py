@@ -1212,3 +1212,40 @@ def test_duplicate_node_pipeline_relation(in_memory_db_conn):
         cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=? AND pipeline_id=?", (node_id, target_pipeline_id))
         result = cur.fetchone()
         assert result is not None, f"Node-pipeline relation for node {node_id} was not duplicated to target pipeline."
+
+def test_add_and_remove_process(in_memory_db_conn):
+    from fusionpipe.utils import db_utils
+    import datetime
+
+    conn = in_memory_db_conn
+    cur = db_utils.init_db(conn)
+
+    # Add a process
+    process_id = "proc_123"
+    node_id = "node_abc"
+    status = "running"
+    start_time = datetime.datetime.now().isoformat()
+    end_time = None
+
+    db_utils.add_process(cur, process_id, node_id, status, start_time, end_time)
+    conn.commit()
+
+    # Check that the process was added
+    cur.execute("SELECT * FROM processes WHERE process_id=?", (process_id,))
+    result = cur.fetchone()
+    assert result is not None, "Process was not added to the database."
+    assert result[0] == process_id, "Process ID does not match."
+    assert result[1] == node_id, "Node ID does not match."
+    assert result[2] == status, "Status does not match."
+    assert result[3] == start_time, "Start time does not match."
+    assert result[4] == end_time, "End time does not match."
+
+    # Remove the process
+    rows_deleted = db_utils.remove_process(cur, process_id)
+    conn.commit()
+    assert rows_deleted == 1, "Process was not removed from the database."
+
+    # Check that the process is gone
+    cur.execute("SELECT * FROM processes WHERE process_id=?", (process_id,))
+    result = cur.fetchone()
+    assert result is None, "Process was not removed from the database."

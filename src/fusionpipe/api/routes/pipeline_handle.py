@@ -345,11 +345,14 @@ def delete_node_data_route(payload: dict, db_conn=Depends(get_db)):
     Payload example: {"node_ids": ["n_123", "n_456"]}
     """
     node_ids = payload.get("node_ids")
+    pipeline_id = payload.get("pipeline_id")
     if not node_ids or not isinstance(node_ids, list):
         raise HTTPException(status_code=400, detail="Payload must contain a list of node_ids")
     try:
         cur = db_conn.cursor()
         pip_utils.delete_node_data(cur, node_ids)
+        for node_id in node_ids:
+            pip_utils.update_stale_status_for_pipeline_nodes(cur, pipeline_id=pipeline_id)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
@@ -375,3 +378,13 @@ def manual_set_node_status(node_id: str, status: str, db_conn=Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
     
     return {"message": f"Node {node_id} status set to {status}"}
+
+@router.post("/kill_node/{node_id}")
+def kill_node_route(node_id: str, db_conn=Depends(get_db)):
+    try:
+        runner_utils.kill_running_process(db_conn, node_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Kill signal sent to node {node_id} (if running)"}
+
+
