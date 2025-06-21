@@ -3,7 +3,6 @@ from fusionpipe.utils.db_utils import add_pipeline, add_project
 
 # Create a simple database
 # conn = create_db()
-# print(f"Database created at {path_to_db}")
 # conn.close()
 
 
