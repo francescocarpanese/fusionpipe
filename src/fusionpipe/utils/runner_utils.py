@@ -25,7 +25,8 @@ def run_node(conn, node_id, run_mode="local"):
                 # Temporarily write PID as 'TBD', will update after process starts
                 logf.flush()
                 proc = subprocess.Popen(
-                    ["uv", "run", "python", os.path.join(node_path, "code", "main.py")],
+                    ["uv", "run", "python", "main.py"],
+                    cwd=os.path.join(node_path, "code"),
                     stdout=logf,
                     stderr=subprocess.STDOUT
                 )

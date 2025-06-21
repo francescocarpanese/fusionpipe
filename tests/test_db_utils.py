@@ -1233,3 +1233,58 @@ def test_add_and_remove_process(pg_test_db):
     cur.execute("SELECT * FROM processes WHERE process_id=%s", (process_id,))
     result = cur.fetchone()
     assert result is None, "Process was not removed from the database."
+
+
+def test_clear_all_tables(pg_test_db):
+    from fusionpipe.utils import db_utils
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add data to all tables
+    pipeline_id = generate_pip_id()
+    node_id = generate_node_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_node_to_nodes(cur, node_id=node_id)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    db_utils.add_node_relation(cur, child_id=node_id, parent_id=node_id)
+    conn.commit()
+
+    # Call clear_all_tables
+    db_utils.clear_all_tables(conn)
+
+    # Check all tables are empty
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM pipelines")
+    assert cur.fetchone()[0] == 0
+    cur.execute("SELECT COUNT(*) FROM nodes")
+    assert cur.fetchone()[0] == 0
+    cur.execute("SELECT COUNT(*) FROM projects")
+    assert cur.fetchone()[0] == 0   
+    cur.execute("SELECT COUNT(*) FROM processes")
+    assert cur.fetchone()[0] == 0         
+    cur.execute("SELECT COUNT(*) FROM node_pipeline_relation")
+    assert cur.fetchone()[0] == 0
+    cur.execute("SELECT COUNT(*) FROM node_relation")
+    assert cur.fetchone()[0] == 0
+
+def test_get_all_tables_names(pg_test_db):
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    db_utils.init_db(conn)
+
+    # Get all table names
+    table_names = db_utils.get_all_tables_names(conn)
+
+    # Check that all expected tables are present
+    expected_tables = {
+        "pipelines",
+        "nodes",
+        "node_pipeline_relation",
+        "node_relation",
+        "projects",
+        "processes"
+    }
+    assert expected_tables.issubset(set(table_names)), f"Missing tables: {expected_tables - set(table_names)}"

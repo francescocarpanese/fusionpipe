@@ -19,6 +19,31 @@ def create_db(db_path=os.environ.get("DATABASE_URL")):
     init_db(conn)
     return conn
 
+def clear_all_tables(conn):
+    """
+    Clear all tables in the database in the correct order to avoid foreign key violations.
+    :param conn: Database connection
+    """
+    cur = conn.cursor()
+    # Clear all tables in the correct order
+    tables = ["node_relation", "node_pipeline_relation", "nodes", "projects", "processes", "pipelines"]
+    for table in tables:
+        cur.execute(f"DELETE FROM {table}")
+    conn.commit()
+    cur.close()
+
+def get_all_tables_names(conn):
+    """
+    Get the names of all tables in the database.
+    :param conn: Database connection
+    :return: List of table names
+    """
+    cur = conn.cursor()
+    cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+    tables = [row[0] for row in cur.fetchall()]
+    cur.close()
+    return tables
+
 def init_db(conn):
     cur = conn.cursor()
 
