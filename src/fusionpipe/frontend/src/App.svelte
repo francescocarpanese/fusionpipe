@@ -400,13 +400,28 @@
       return;
     }
     try {
+      let projectId;
+      if (radiostate_projects === 1) {
+        // Dropdown is showing IDs, so use directly
+        projectId = selectedProjectTarget.value;
+      } else if (radiostate_projects === 2) {
+        // Dropdown is showing tags, so lookup ID from dict
+        projectId = Object.keys(ids_tags_dict_projects).find(
+          (key) => ids_tags_dict_projects[key] === selectedProjectTarget.value
+        );
+      }
+      if (!projectId) {
+        alert("Could not determine project ID to move the pipeline into.");
+        return;
+      }
+
       const response = await fetch(
         `http://localhost:8000/move_pipeline_to_project`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            project_id: selectedProjectTarget.value,
+            project_id: projectId,
             pipeline_id: pipelineId,
           }),
         },
@@ -417,7 +432,7 @@
       nodes = [];
       edges = [];
       alert(
-        `Pipeline ${pipelineId} moved to project ${selectedProjectTarget.value} successfully.`,
+        `Pipeline ${pipelineId} moved to project ${projectId} successfully.`,
       );
       selectedProjectTarget = null;
     } catch (error) {
@@ -1574,6 +1589,7 @@
     >
       <Panel position="top-left">
         Selected project: {currentProjectId || "None"}<br />
+        Selected project tag: {ids_tags_dict_projects[currentProjectId] || "None"}<br />
         Pipeline id: {currentPipelineId || "None"}<br />
         Pipeline tag: {ids_tags_dict_pipelines[currentPipelineId] || "None"}
       </Panel>
