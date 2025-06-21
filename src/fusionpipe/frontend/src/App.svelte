@@ -33,7 +33,7 @@
     NavLi,
   } from "flowbite-svelte";
   import { ChevronDownOutline } from "flowbite-svelte-icons";
-    import filter from "svelte-select/filter";
+  import filter from "svelte-select/filter";
 
   //  --- Variables and state definitions ---
   let nodes = $state<Node[]>([]);
@@ -66,8 +66,7 @@
     id: "",
     tag: "",
     notes: "",
-  });  
-
+  });
 
   let isHiddenPipelinePanel = $state(true);
   let isHiddenNodePanel = $state(true);
@@ -417,14 +416,15 @@
       currentPipelineId = "";
       nodes = [];
       edges = [];
-      alert(`Pipeline ${pipelineId} moved to project ${selectedProjectTarget.value} successfully.`);
+      alert(
+        `Pipeline ${pipelineId} moved to project ${selectedProjectTarget.value} successfully.`,
+      );
       selectedProjectTarget = null;
     } catch (error) {
       console.error("Error moving pipeline to project:", error);
       alert("Failed to move pipeline to project.");
     }
   }
-
 
   async function setNodeCompleted() {
     const selectedNode = nodes.find((node) => node.selected);
@@ -505,7 +505,6 @@
     }
   }
 
-
   async function handleConnect(event) {
     const source = event.source;
     const target = event.target;
@@ -568,8 +567,6 @@
     }
   }
 
-
-
   async function deleteSelectedPipeline() {
     if (!currentPipelineId) {
       alert("No pipeline selected");
@@ -617,7 +614,7 @@
     } else if (radiostate_projects === 2) {
       // Dropdown contains tags, so find the project ID for the selected tag
       projectId = Object.keys(ids_tags_dict_projects).find(
-        (key) => ids_tags_dict_projects[key] === selectedProjectDropdown.value
+        (key) => ids_tags_dict_projects[key] === selectedProjectDropdown.value,
       );
     }
 
@@ -627,7 +624,7 @@
     }
 
     const confirmed = confirm(
-      `Are you sure you want to delete project "${projectId}"? This action cannot be undone.`
+      `Are you sure you want to delete project "${projectId}"? This action cannot be undone.`,
     );
     if (!confirmed) return;
 
@@ -637,7 +634,7 @@
         {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
       if (!response.ok) await handleApiError(response);
       await fetchProjects();
@@ -831,7 +828,7 @@
     try {
       const response = await fetch(
         `http://localhost:8000/get_project/${projectId}`,
-        { cache: "no-store" }
+        { cache: "no-store" },
       );
       if (!response.ok) await handleApiError(response);
       const project = await response.json();
@@ -853,7 +850,7 @@
     } else if (radiostate_projects === 2) {
       // Dropdown contains tags, so find the project ID for the selected tag
       projectId = Object.keys(ids_tags_dict_projects).find(
-        (key) => ids_tags_dict_projects[key] === selectedProjectDropdown.value
+        (key) => ids_tags_dict_projects[key] === selectedProjectDropdown.value,
       );
     }
     if (!projectId) {
@@ -861,13 +858,17 @@
       return;
     }
     try {
-      const response = await fetch(`http://localhost:8000/get_pipelines_in_project/${projectId}`);
+      const response = await fetch(
+        `http://localhost:8000/get_pipelines_in_project/${projectId}`,
+      );
       if (!response.ok) await handleApiError(response);
       const data = await response.json();
       if (data.pipelines) {
         // Filter ids_tags_dict_pipelines to only include these pipeline ids
         pipelines_dropdown = data.pipelines
-          .map((id) => radiostate_pipeline === 1 ? id : ids_tags_dict_pipelines[id])
+          .map((id) =>
+            radiostate_pipeline === 1 ? id : ids_tags_dict_pipelines[id],
+          )
           .filter(Boolean);
       } else {
         pipelines_dropdown = [];
@@ -950,8 +951,6 @@
       alert("Failed to update project info.");
     }
   }
-
-
 
   async function runSelectedNode() {
     const selectedNode = nodes.find((node) => node.selected);
@@ -1106,6 +1105,9 @@
     } catch (e) {
       // fallback if not JSON
     }
+    if (typeof errorMsg !== "string") {
+      errorMsg = JSON.stringify(errorMsg, null, 2);
+    }
     alert("Error: " + errorMsg);
     throw new Error(errorMsg);
   }
@@ -1218,7 +1220,8 @@
       } else if (radiostate_pipeline === 2) {
         // Dropdown contains tags, so find the pipeline ID for the selected tag
         currentPipelineId = Object.keys(ids_tags_dict_pipelines).find(
-          (key) => ids_tags_dict_pipelines[key] === selectedPipelineDropdown.value,
+          (key) =>
+            ids_tags_dict_pipelines[key] === selectedPipelineDropdown.value,
         );
       }
     }
@@ -1231,25 +1234,26 @@
       } else if (radiostate_projects === 2) {
         // Dropdown contains tags, so find the project ID for the selected tag
         currentProjectId = Object.keys(ids_tags_dict_projects).find(
-          (key) => ids_tags_dict_projects[key] === selectedProjectDropdown.value,
+          (key) =>
+            ids_tags_dict_projects[key] === selectedProjectDropdown.value,
         );
       }
     }
   });
 
-$effect(() => {
-  if (selectedProjectDropdown) {
-    filterPipelinesByProject();
-  } else {
-    // No project selected: show all pipelines
-    if (radiostate_pipeline === 1) {
-      pipelines_dropdown = Object.keys(ids_tags_dict_pipelines);
-    } else if (radiostate_pipeline === 2) {
-      pipelines_dropdown = Object.values(ids_tags_dict_pipelines);
+  $effect(() => {
+    if (selectedProjectDropdown) {
+      filterPipelinesByProject();
+    } else {
+      // No project selected: show all pipelines
+      if (radiostate_pipeline === 1) {
+        pipelines_dropdown = Object.keys(ids_tags_dict_pipelines);
+      } else if (radiostate_pipeline === 2) {
+        pipelines_dropdown = Object.values(ids_tags_dict_pipelines);
+      }
+      currentProjectId = "";
     }
-    currentProjectId = "";
-  }
-});
+  });
 
   $effect(fetchPipelines);
   $effect(fetchProjects);
@@ -1272,7 +1276,7 @@ $effect(() => {
         Project interaction<ChevronDownOutline
           class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white"
         />
-      </NavLi>      
+      </NavLi>
       <Dropdown simple>
         <DropdownItem>
           <li>
@@ -1338,7 +1342,7 @@ $effect(() => {
         </DropdownItem>
 
         <DropdownDivider />
-        <DropdownItem onclick={() => (isHiddenPipelinePanel = false)} 
+        <DropdownItem onclick={() => (isHiddenPipelinePanel = false)}
           >Open selected pipeline panel</DropdownItem
         >
         <DropdownItem onclick={createPipeline}>Create Pipeline</DropdownItem>
@@ -1364,7 +1368,6 @@ $effect(() => {
         <DropdownItem class="text-red-600" onclick={deleteSelectedPipeline}
           >Delete Pipeline</DropdownItem
         >
-        
       </Dropdown>
       <NavLi class="cursor-pointer">
         Node interaction<ChevronDownOutline
@@ -1445,7 +1448,6 @@ $effect(() => {
     </NavUl>
   </Navbar>
 
-
   <Drawer
     bind:hidden={isHiddenNodePanel}
     id="nodesidebar"
@@ -1501,7 +1503,7 @@ $effect(() => {
       <Label class="mb-2 block">Project ids:</Label>
       <div class="mt-2 text-sm text-gray-500">
         {pipelineDrawerForm.project_id}
-      </div>        
+      </div>
       <Label class="mb-2 block">Pipeline id:</Label>
       <div class="mt-2 text-sm text-gray-500">
         {pipelineDrawerForm.id}
@@ -1555,10 +1557,9 @@ $effect(() => {
         required
         bind:value={projectDrawerForm.notes}
       />
-      <Button class="mt-4" onclick={updateProjectInfo} >Save Changes</Button>
+      <Button class="mt-4" onclick={updateProjectInfo}>Save Changes</Button>
     {/if}
   </Drawer>
-
 
   <div class="main-content">
     <SvelteFlow

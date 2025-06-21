@@ -103,10 +103,15 @@ def run_pipeline(conn, pipeline_id, last_node_id=None, run_mode="local", poll_in
         # Start processes for runnable nodes.
         # For the moment this is run sequentially
         for node_id in runnable_nodes:
-            run_node(conn, node_id, run_mode=run_mode)
-            running_nodes.add(node_id)
-            if debug:
-                print(f"Started running node {node_id}")
+            try:
+                run_node(conn, node_id, run_mode=run_mode)
+                running_nodes.add(node_id)
+                if debug:
+                    print(f"Started running node {node_id}")
+            except RuntimeError as e:
+                print(f"Error running node {node_id}: {e}")
+                failed_nodes.add(node_id)
+                conn.rollback()
         
         # Stop if all nodes are completed or failed, or no more can be scheduled
         if len(completed_nodes | failed_nodes) == len(all_nodes):
