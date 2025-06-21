@@ -47,7 +47,7 @@ def run_node(conn, node_id, run_mode="local"):
         except Exception as e:
             db_utils.update_node_status(cur, node_id, "failed")
             db_utils.update_process_status(cur, proc.pid, status="failed")
-            conn.commit()
+            conn.rollback()
             print(f"Node {node_id} failed to run: {e}")
     elif run_mode == "ray":
         # To be implemented
@@ -123,15 +123,22 @@ def kill_running_process(conn, node_id):
     """
     cur = conn.cursor()
     proc_ids = db_utils.get_process_ids_by_node(cur, node_id)
+    node_path = db_utils.get_node_folder_path(cur, node_id)
+    log_file = os.path.join(node_path, "logs.txt")
     if not proc_ids:
         print(f"No running process found for node {node_id}.")
         return
     for pid in proc_ids:
         try:
             os.kill(int(pid), 9)
+            # Write to log file that the process was killed
+            with open(log_file, "a") as logf:
+                kill_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                logf.write(f"\n---\nProcess killed\nTime: {kill_time}\nPID: {pid}\n---\n")
             db_utils.update_node_status(cur, node_id, "failed")
             db_utils.remove_process(cur, pid)
             conn.commit()
             print(f"Process {pid} for node {node_id} killed.")
         except Exception as e:
+            conn.rollback()
             print(f"Failed to kill process {pid} for node {node_id}: {e}")

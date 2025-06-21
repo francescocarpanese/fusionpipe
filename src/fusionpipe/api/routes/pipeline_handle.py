@@ -8,7 +8,7 @@ from fusionpipe.utils import db_utils, pip_utils, runner_utils
 router = APIRouter()
 
 def get_db():
-    db_path = os.environ.get("FUSIONPIPE_DB_PATH")
+    db_path = os.environ.get("DATABASE_URL")
     db = db_utils.connect_to_db(db_path)
     try:
         yield db

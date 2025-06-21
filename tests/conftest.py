@@ -3,6 +3,41 @@ import os
 import tempfile
 import sqlite3
 
+import psycopg2
+import random
+import string
+
+DATABASE_URL = "dbname=fusionpipe_test user=fusionpipe_test password=testpassword host=localhost"
+
+
+@pytest.fixture(scope="function")
+def pg_test_db():
+    # Connect to the default database as the test user
+    admin_conn = psycopg2.connect(DATABASE_URL)
+    admin_conn.autocommit = True
+    admin_cur = admin_conn.cursor()
+
+    # Generate random db name
+    db_name = "test_fusionpipe_" + ''.join(random.choices(string.ascii_lowercase, k=8))
+    admin_cur.execute(f"CREATE DATABASE {db_name};")
+
+    # Connect to the new test database
+    test_db_url = f"dbname={db_name} user=fusionpipe_test password=testpassword host=localhost"
+    test_conn = psycopg2.connect(test_db_url)
+    yield test_conn
+
+    # Cleanup: close and drop the test database
+    test_conn.close()
+    # Reconnect to the original database to drop the test db
+    admin_conn2 = psycopg2.connect(DATABASE_URL)
+    admin_conn2.autocommit = True
+    admin_cur2 = admin_conn2.cursor()
+    admin_cur2.execute(f"DROP DATABASE {db_name};")
+    admin_cur2.close()
+    admin_conn2.close()
+    admin_cur.close()
+    admin_conn.close()
+
 
 @pytest.fixture
 def tmp_base_dir():

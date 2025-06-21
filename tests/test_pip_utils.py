@@ -77,12 +77,6 @@ def test_delete_node_folder_nonexistent_folder(tmp_base_dir, capsys):
     assert f"Node folder does not exist" in captured.out
 
 
-def test_create_db(tmp_database_path):
-    from fusionpipe.utils import db_utils
-    db_file_path = tmp_database_path
-    db_utils.create_db(db_file_path)
-    # Check if the database file was created
-    assert os.path.exists(db_file_path), f"Connection database {db_file_path} was not created."
 
 
 def test_graph_to_dict(dag_dummy_1, dict_dummy_1):
@@ -113,7 +107,7 @@ def test_graph_dict_to_json(tmp_base_dir, dict_dummy_1):
     assert loaded == dict_dummy_1, "JSON file content does not match the original dictionary."
 
 
-def test_graph_to_db_and_db_to_graph_roundtrip(in_memory_db_conn, dag_dummy_1):
+def test_graph_to_db_and_db_to_graph_roundtrip(pg_test_db, dag_dummy_1):
     """
     Test that a graph can be written to the database and then read back,
     and that the structure and attributes are preserved.
@@ -123,7 +117,7 @@ def test_graph_to_db_and_db_to_graph_roundtrip(in_memory_db_conn, dag_dummy_1):
     import networkx as nx
 
     # Setup database
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Write the dummy graph to the database
@@ -156,7 +150,7 @@ def test_graph_to_db_and_db_to_graph_roundtrip(in_memory_db_conn, dag_dummy_1):
         assert G_loaded.graph[attr] == dag_dummy_1.graph[attr]
 
 
-def test_graph_dict_to_db_and_db_to_graph_dict_roundtrip(in_memory_db_conn, dict_dummy_1):
+def test_graph_dict_to_db_and_db_to_graph_dict_roundtrip(pg_test_db, dict_dummy_1):
     """
     Test that a graph dictionary can be written to the database and then read back as a dictionary,
     and that the structure and attributes are preserved.
@@ -165,7 +159,7 @@ def test_graph_dict_to_db_and_db_to_graph_dict_roundtrip(in_memory_db_conn, dict
     from fusionpipe.utils import db_utils
 
     # Setup database
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Write the dummy graph dict to the database
@@ -223,7 +217,7 @@ def test_visualize_pip_static_runs_without_error(monkeypatch, dag_dummy_1):
     # Should not raise
     visualize_pip_static(dag_dummy_1)
 
-def test_get_all_children_nodes(in_memory_db_conn, dag_dummy_1):
+def test_get_all_children_nodes(pg_test_db, dag_dummy_1):
     """
     Test that get_all_children_nodes returns all descendants of a node in the pipeline.
     """
@@ -231,7 +225,7 @@ def test_get_all_children_nodes(in_memory_db_conn, dag_dummy_1):
     from fusionpipe.utils import db_utils
     import networkx as nx
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Add the dummy graph to the database
@@ -246,7 +240,7 @@ def test_get_all_children_nodes(in_memory_db_conn, dag_dummy_1):
 
 from conftest import PARENT_NODE_LIST
 @pytest.mark.parametrize("start_node", PARENT_NODE_LIST)
-def test_branch_pipeline_from_node(in_memory_db_conn, dag_dummy_1, start_node):
+def test_branch_pipeline_from_node(pg_test_db, dag_dummy_1, start_node):
     """
     Test that branch_pipeline_from_node creates a new pipeline where all nodes are preserved,
     except the provided node and all its descendants, which are replaced with new IDs.
@@ -255,7 +249,7 @@ def test_branch_pipeline_from_node(in_memory_db_conn, dag_dummy_1, start_node):
     from fusionpipe.utils import db_utils
     import networkx as nx
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Add the original graph to the database
@@ -309,7 +303,7 @@ def test_branch_pipeline_from_node(in_memory_db_conn, dag_dummy_1, start_node):
     assert len(replaced_nodes) == len(nodes_to_replace), "Each replaced node should have a new node ID in the new pipeline."
 
 #@pytest.mark.parametrize("start_node", PARENT_NODE_LIST)
-def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, in_memory_db_conn, tmp_base_dir):
+def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp_base_dir):
     """
     Test that duplicate_node_in_pipeline_w_code_and_data duplicates a node in the pipeline,
     including its code and data folder.
@@ -324,7 +318,7 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, in_memory_db_co
     monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
 
     # Setup: create a pipeline and a node with a folder
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
     pipeline_id = generate_pip_id()
     node_id = generate_node_id()
@@ -360,7 +354,7 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, in_memory_db_co
         pyproject_content = toml.load(f)
     assert new_node_id in pyproject_content["project"]["name"], "pyproject.toml does not contain 'dependencies' section."
 
-def test_duplicate_node_in_different_pipeline_w_code_and_data(monkeypatch, in_memory_db_conn, tmp_base_dir):
+def test_duplicate_node_in_different_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp_base_dir):
     """
     Test that duplicate_node_in_pipeline_w_code_and_data can duplicate a node from one pipeline into another,
     including its code and data folder.
@@ -374,7 +368,7 @@ def test_duplicate_node_in_different_pipeline_w_code_and_data(monkeypatch, in_me
     monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
 
     # Setup: create two pipelines and a node with a folder in the first pipeline
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
     pipeline_id_src = generate_pip_id()
     pipeline_id_dst = generate_pip_id()
@@ -421,7 +415,7 @@ def test_duplicate_node_in_different_pipeline_w_code_and_data(monkeypatch, in_me
                               ("B","D"),
                               ]
                           )
-def test_duplicate_duplicate_nodes_in_pipeline_with_relations(monkeypatch, in_memory_db_conn, dag_dummy_1, tmp_base_dir, selected_nodes):
+def test_duplicate_duplicate_nodes_in_pipeline_with_relations(monkeypatch, pg_test_db, dag_dummy_1, tmp_base_dir, selected_nodes):
     """
     Test that duplicate_subtree_in_pipeline duplicates a subtree rooted at a node,
     with new node IDs and correct parent-child relations.
@@ -436,7 +430,7 @@ def test_duplicate_duplicate_nodes_in_pipeline_with_relations(monkeypatch, in_me
     # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
     monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Add the dummy graph to the database
@@ -475,7 +469,7 @@ def test_duplicate_duplicate_nodes_in_pipeline_with_relations(monkeypatch, in_me
     for node_id in selected_nodes:
         assert node_id in graph.nodes
 
-def test_delete_node_data_removes_data_contents(monkeypatch, in_memory_db_conn, tmp_base_dir):
+def test_delete_node_data_removes_data_contents(monkeypatch, pg_test_db, tmp_base_dir):
     """
     Test that delete_node_data removes all contents of the node's data folder but not the folder itself.
     """
@@ -487,7 +481,7 @@ def test_delete_node_data_removes_data_contents(monkeypatch, in_memory_db_conn, 
     monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
 
     # Setup: create a node with a data folder and some files
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
     node_id = generate_node_id()
     db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None)
@@ -523,7 +517,7 @@ def test_delete_node_data_removes_data_contents(monkeypatch, in_memory_db_conn, 
     assert os.path.exists(data_folder)
     assert not any(os.scandir(data_folder)), "Data folder is not empty after deletion"
 
-def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, in_memory_db_conn, tmp_base_dir):
+def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, pg_test_db, tmp_base_dir):
     """
     Test delete_node_from_pipeline_with_editable_logic for editable and non-editable nodes.
     """
@@ -538,7 +532,7 @@ def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, in_memory_db
     # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
     monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
     pipeline_id = generate_pip_id()
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
@@ -582,7 +576,7 @@ def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, in_memory_db
     with pytest.raises(ValueError):
         delete_node_from_pipeline_with_editable_logic(cur, pipeline_id, parent_id)
 
-def test_set_children_stale_sets_descendants_to_staledata(in_memory_db_conn, dag_dummy_1):
+def test_set_children_stale_sets_descendants_to_staledata(pg_test_db, dag_dummy_1):
     """
     Test that set_children_stale sets all descendants of a node to 'staledata' status.
     """
@@ -590,7 +584,7 @@ def test_set_children_stale_sets_descendants_to_staledata(in_memory_db_conn, dag
     from fusionpipe.utils import db_utils
     import networkx as nx
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Add the dummy graph to the database
@@ -618,7 +612,7 @@ def test_set_children_stale_sets_descendants_to_staledata(in_memory_db_conn, dag
     status_self = db_utils.get_node_status(cur, node)
     assert status_self != "staledata", f"Node {node} itself should not be set to staledata"
 
-def test_update_stale_status_for_pipeline_nodes(in_memory_db_conn, dag_dummy_1):
+def test_update_stale_status_for_pipeline_nodes(pg_test_db, dag_dummy_1):
     """
     Test that update_stale_status_for_pipeline_nodes propagates 'staledata' from a parent to all descendants.
     """
@@ -626,7 +620,7 @@ def test_update_stale_status_for_pipeline_nodes(in_memory_db_conn, dag_dummy_1):
     from fusionpipe.utils import db_utils
     import networkx as nx
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Add the dummy graph to the database

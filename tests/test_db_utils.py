@@ -1,14 +1,13 @@
 import pytest
 import tempfile
 import os
-import sqlite3
 
 
-def test_add_pipeline(in_memory_db_conn):
+def test_add_pipeline(pg_test_db):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import generate_pip_id
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     pip_id = generate_pip_id()
@@ -19,7 +18,7 @@ def test_add_pipeline(in_memory_db_conn):
 
     # Check if the pipeline was added
     cur = conn.cursor()
-    cur.execute("SELECT * FROM pipelines WHERE pipeline_id=?", (pip_id,))
+    cur.execute("SELECT * FROM pipelines WHERE pipeline_id=%s", (pip_id,))
     result = cur.fetchone()
     
     assert result is not None, f"Pipeline {pip_id} was not added to the database."
@@ -27,33 +26,33 @@ def test_add_pipeline(in_memory_db_conn):
     assert result[2] == "test_user", "Pipeline owner does not match expected value."
     assert result[3] == "This is a test pipeline.", "Pipeline notes do not match expected value."
 
-def test_add_node(in_memory_db_conn):
+def test_add_node(pg_test_db):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import generate_node_id
-    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
 
-    # Initialize the in-memory database connection
-    conn = in_memory_db_conn
+    # Initialize the PostgreSQL test database connection
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     node_id = generate_node_id()
     db_utils.add_node_to_nodes(cur, node_id=node_id)
     
-    # Commit and close the connection
+    # Commit the transaction
     conn.commit()
 
     # Check if the node was added
     cur = conn.cursor()
-    cur.execute("SELECT * FROM nodes WHERE node_id=?", (node_id,))
+    cur.execute("SELECT * FROM nodes WHERE node_id=%s", (node_id,))
     result = cur.fetchone()
     
     assert result is not None, f"Node {node_id} was not added to the database."
 
-def test_add_node_to_pipline(in_memory_db_conn):
+
+def test_add_node_to_pipline(pg_test_db):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a node and a pipeline
@@ -63,27 +62,25 @@ def test_add_node_to_pipline(in_memory_db_conn):
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Add entry to node_pipeline_relation table
-    user = "test_user"
-    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
     # Check if the entry was added
     cur = conn.cursor()
-    cur.execute("SELECT node_id, pipeline_id, user, node_tag FROM node_pipeline_relation WHERE node_id=? and pipeline_id=?", (node_id,pipeline_id))
+    cur.execute("SELECT node_id, pipeline_id, node_tag FROM node_pipeline_relation WHERE node_id=%s and pipeline_id=%s", (node_id, pipeline_id))
     result = cur.fetchone()
     assert result is not None, "Entry was not added to the database."
     assert result[0] == node_id, "Node ID in entry does not match."
     assert result[1] == pipeline_id, "Pipeline ID in entry does not match."
-    assert result[2] == user, "User in entry does not match."
-    assert result[3] == node_id, "Tag in entry does not match expected value." # If not specified node tag needs to be the same as the node_id
+    assert result[2] == node_id, "Tag in entry does not match expected value." # If not specified node tag needs to be the same as the node_id
 
 
-def test_remove_node_from_pipeline(in_memory_db_conn):
+def test_remove_node_from_pipeline(pg_test_db):
     from fusionpipe.utils.db_utils import remove_node_from_pipeline, get_rows_with_node_id_in_entries, get_rows_node_id_in_nodes, is_node_editable
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a node and two pipelines
@@ -97,9 +94,8 @@ def test_remove_node_from_pipeline(in_memory_db_conn):
     tag = "test_tag"
 
     # Add entry to node_pipeline_relation table for both pipelines
-    user = "test_user"
-    entry_id1 = db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id1, user=user)
-    entry_id2 = db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id2, user=user)
+    entry_id1 = db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id1)
+    entry_id2 = db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id2)
     conn.commit()
 
     # Remove the entry from the first pipeline
@@ -111,12 +107,12 @@ def test_remove_node_from_pipeline(in_memory_db_conn):
     assert db_utils.get_rows_node_id_in_nodes(cur, node_id), "Node was unexpectedly removed from nodes table."
 
     # The node should still have an entry in node_pipeline_relation for the second pipeline
-    cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=? AND pipeline_id=?", (node_id, pipeline_id2))
+    cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=%s AND pipeline_id=%s", (node_id, pipeline_id2))
     assert cur.fetchone() is not None, "Node entry for second pipeline was removed unexpectedly."
 
     # The node should be editable only if it is present in one or zero pipelines
     editable = is_node_editable(cur, node_id)
-    cur.execute("SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id=?", (node_id,))
+    cur.execute("SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id=%s", (node_id,))
     count = cur.fetchone()[0]
     if count <= 1:
         assert editable is True, "Node should be editable when present in one or zero pipelines."
@@ -136,10 +132,10 @@ def test_remove_node_from_pipeline(in_memory_db_conn):
 
 
 
-def test_add_node_relation(in_memory_db_conn):
+def test_add_node_relation(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create two nodes
@@ -149,21 +145,21 @@ def test_add_node_relation(in_memory_db_conn):
     db_utils.add_node_to_nodes(cur, node_id=parent_id)
 
     # Add relation
-    relation_id = db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
+    db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
     conn.commit()
 
-    # Check that the relation exists
-    cur.execute("SELECT child_id, parent_id FROM node_relation WHERE id=?", (relation_id,))
-    result = cur.fetchone()
-    assert result is not None, "Node relation was not added to the database."
-    assert result[0] == child_id, "Child ID in node relation does not match."
-    assert result[1] == parent_id, "Parent ID in node relation does not match."
+    # Check that only one relation exists and it matches the inserted values
+    cur.execute("SELECT child_id, parent_id FROM node_relation")
+    results = cur.fetchall()
+    assert len(results) == 1, f"Expected only one relation, found {len(results)}"
+    assert results[0][0] == child_id, "Child ID in node relation does not match."
+    assert results[0][1] == parent_id, "Parent ID in node relation does not match."
 
-def test_get_node_parents(in_memory_db_conn):
+def test_get_node_parents(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create 3 nodes
@@ -191,11 +187,11 @@ def test_get_node_parents(in_memory_db_conn):
     assert parents_node3 == [], f"Expected no parents for node3, got {parents_node3}"
 
 
-def test_get_node_children(in_memory_db_conn):
+def test_get_node_children(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create 3 nodes
@@ -225,12 +221,12 @@ def test_get_node_children(in_memory_db_conn):
     assert children_node3 == [], f"Expected no children for node3, got {children_node3}"
 
 
-def test_update_node_status(in_memory_db_conn):
+def test_update_node_status(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, NodeState
     from fusionpipe.utils import db_utils
 
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a node
@@ -243,7 +239,7 @@ def test_update_node_status(in_memory_db_conn):
     conn.commit()
 
     # Check if the status was updated
-    cur.execute("SELECT status FROM nodes WHERE node_id=?", (node_id,))
+    cur.execute("SELECT status FROM nodes WHERE node_id=%s", (node_id,))
     result = cur.fetchone()
     assert result is not None, "Node not found in database."
     assert result[0] == NodeState.RUNNING.value, f"Expected status {NodeState.RUNNING.value}, got {result[0]}"
@@ -252,11 +248,11 @@ def test_update_node_status(in_memory_db_conn):
 
 
 
-def test_get_pipeline_tag(in_memory_db_conn):
+def test_get_pipeline_tag(pg_test_db):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import generate_pip_id
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Add a pipeline with a specific tag
@@ -277,11 +273,11 @@ def test_get_pipeline_tag(in_memory_db_conn):
 
 
 
-def test_get_all_nodes_from_pip_id(in_memory_db_conn):
+def test_get_all_nodes_from_pip_id(pg_test_db):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a pipeline and nodes
@@ -290,7 +286,7 @@ def test_get_all_nodes_from_pip_id(in_memory_db_conn):
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     for node_id in node_ids:
         db_utils.add_node_to_nodes(cur, node_id=node_id)
-        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
 
@@ -308,11 +304,11 @@ def test_get_all_nodes_from_pip_id(in_memory_db_conn):
 
 
 
-def test_get_nodes_without_pipeline(in_memory_db_conn):
+def test_get_nodes_without_pipeline(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create nodes
@@ -323,7 +319,7 @@ def test_get_nodes_without_pipeline(in_memory_db_conn):
     # Create a pipeline and associate one node with it
     pipeline_id = generate_pip_id()
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
-    db_utils.add_node_to_pipeline(cur, node_id=node_ids[0], pipeline_id=pipeline_id, user="test_user")
+    db_utils.add_node_to_pipeline(cur, node_id=node_ids[0], pipeline_id=pipeline_id)
     conn.commit()
 
     # Get nodes without a pipeline
@@ -333,12 +329,12 @@ def test_get_nodes_without_pipeline(in_memory_db_conn):
     expected_nodes = set(node_ids[1:])
     assert set(nodes_without_pipeline) == expected_nodes, f"Expected nodes without pipeline: {expected_nodes}, got: {nodes_without_pipeline}"
 
-def test_remove_node_from_relations(in_memory_db_conn):
+def test_remove_node_from_relations(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create nodes
@@ -357,15 +353,15 @@ def test_remove_node_from_relations(in_memory_db_conn):
     assert rows_deleted == 1, "Relation was not removed from the database."
 
     # Check if the relation was actually removed
-    cur.execute("SELECT * FROM node_relation WHERE child_id=? OR parent_id=?", (child_id, child_id))
+    cur.execute("SELECT * FROM node_relation WHERE child_id=%s OR parent_id=%s", (child_id, child_id))
     result = cur.fetchone()
     assert result is None, "Relation was not removed from the database."
 
-def test_remove_node_from_everywhere(in_memory_db_conn):
+def test_remove_node_from_everywhere(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a node and a pipeline
@@ -375,7 +371,7 @@ def test_remove_node_from_everywhere(in_memory_db_conn):
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Add the node to node_pipeline_relation
-    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
 
     # Add a relation involving the node
     parent_id = generate_node_id()
@@ -393,11 +389,11 @@ def test_remove_node_from_everywhere(in_memory_db_conn):
     assert db_utils.get_rows_node_id_in_nodes(cur, node_id) == [], "Node was not removed from nodes."
     assert db_utils.get_rows_with_node_id_relations(cur, node_id) == [], "Node was not removed from relations."
 
-def from_node_pipeline_relation(in_memory_db_conn):
+def from_node_pipeline_relation(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a node and a pipeline
@@ -407,8 +403,7 @@ def from_node_pipeline_relation(in_memory_db_conn):
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Add the node to node_pipeline_relation
-    user = "test_user"
-    entry_id = db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
+    entry_id = db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
     # Remove the node from node_pipeline_relation
@@ -417,16 +412,16 @@ def from_node_pipeline_relation(in_memory_db_conn):
     assert rows_deleted == 1, "Entry was not removed from the database."
 
     # Verify the entry is removed
-    cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=? AND pipeline_id=?", (node_id, pipeline_id))
+    cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=%s AND pipeline_id=%s", (node_id, pipeline_id))
     result = cur.fetchone()
     assert result is None, "Entry was not removed from the database."
 
 
-def test_get_rows_with_node_id_in_node_pipeline(in_memory_db_conn):
+def test_get_rows_with_node_id_in_node_pipeline(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a node and a pipeline
@@ -436,8 +431,7 @@ def test_get_rows_with_node_id_in_node_pipeline(in_memory_db_conn):
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Add the node to node_pipeline_relation
-    user = "test_user"
-    entry_id = db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user=user)
+    entry_id = db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
     # Get rows with the node ID in node_pipeline_relation
@@ -445,14 +439,13 @@ def test_get_rows_with_node_id_in_node_pipeline(in_memory_db_conn):
     assert len(rows) == 1, "Expected one entry with the node ID."
     assert rows[0][0] == node_id, "Node ID in entry does not match expected value."
     assert rows[0][1] == pipeline_id, "Pipeline ID in entry does not match expected value."
-    assert rows[0][3] == "test_user", "User in entry does not match expected value."
-    assert rows[0][4] == node_id, "Node tag in entry does not match expected value."  # If not specified node tag needs to be the same as the node_id
+    assert rows[0][3] == node_id, "Node tag in entry does not match expected value."  # If not specified node tag needs to be the same as the node_id
 
-def test_get_rows_node_id_in_nodes(in_memory_db_conn):
+def test_get_rows_node_id_in_nodes(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a node
@@ -466,13 +459,13 @@ def test_get_rows_node_id_in_nodes(in_memory_db_conn):
     assert rows[0][0] == node_id, "Node ID in row does not match expected value."
 
 
-def test_get_rows_with_node_id_relations(in_memory_db_conn):
+def test_get_rows_with_node_id_relations(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
 
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create two nodes and a relation
@@ -488,11 +481,11 @@ def test_get_rows_with_node_id_relations(in_memory_db_conn):
 
     assert len(rows) == 1, "Expected one row with the child node ID in relations."
 
-def test_get_rows_with_pipeline_id_in_node_pipeline(in_memory_db_conn):
+def test_get_rows_with_pipeline_id_in_node_pipeline(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a pipeline and nodes
@@ -501,7 +494,7 @@ def test_get_rows_with_pipeline_id_in_node_pipeline(in_memory_db_conn):
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     for node_id in node_ids:
         db_utils.add_node_to_nodes(cur, node_id=node_id)
-        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
     # Get rows with the pipeline ID in node_pipeline_relation
@@ -514,12 +507,12 @@ def test_get_rows_with_pipeline_id_in_node_pipeline(in_memory_db_conn):
         assert row[0] in node_ids, f"Node ID {row[3]} in row is not in the expected node IDs {node_ids}."
 
 
-def test_get_rows_with_pipeline_id_in_pipelines(in_memory_db_conn):
+def test_get_rows_with_pipeline_id_in_pipelines(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_pip_id
     from fusionpipe.utils import db_utils
 
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a pipeline
@@ -538,11 +531,11 @@ def test_get_rows_with_pipeline_id_in_pipelines(in_memory_db_conn):
 
 
 
-def test_duplicate_pipeline(in_memory_db_conn):
+def test_duplicate_pipeline(pg_test_db):
     from fusionpipe.utils import db_utils
-    from fusionpipe.utils.db_utils import add_pipeline, add_node_to_pipeline, duplicate_pipeline
+    from fusionpipe.utils.db_utils import add_pipeline, add_node_to_pipeline, duplicate_pipeline, add_node_to_nodes
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Add a source pipeline
@@ -555,8 +548,10 @@ def test_duplicate_pipeline(in_memory_db_conn):
                 )
 
     # Add nodes and node_pipeline_relation to the source pipeline
-    add_node_to_pipeline(cur, node_id="node1", pipeline_id=source_pipeline_id, user="user1", node_tag="node1_t")
-    add_node_to_pipeline(cur, node_id="node2", pipeline_id=source_pipeline_id, user="user2", node_tag="node2_t")
+    add_node_to_nodes(cur, node_id="node1")
+    add_node_to_nodes(cur, node_id="node2")
+    add_node_to_pipeline(cur, node_id="node1", pipeline_id=source_pipeline_id, node_tag="node1_t")
+    add_node_to_pipeline(cur, node_id="node2", pipeline_id=source_pipeline_id, node_tag="node2_t")
 
     # Commit changes
     conn.commit()
@@ -566,7 +561,7 @@ def test_duplicate_pipeline(in_memory_db_conn):
     duplicate_pipeline(cur, source_pipeline_id, new_pipeline_id)
 
     # Verify the new pipeline exists in the pipelines table
-    cur.execute("SELECT * FROM pipelines WHERE pipeline_id = ?", (new_pipeline_id,))
+    cur.execute("SELECT * FROM pipelines WHERE pipeline_id = %s", (new_pipeline_id,))
     new_pipeline = cur.fetchone()
     assert new_pipeline is not None, "New pipeline was not created."
     assert new_pipeline[0] == new_pipeline_id
@@ -575,39 +570,29 @@ def test_duplicate_pipeline(in_memory_db_conn):
     assert new_pipeline[3] == "This is the source pipeline."  # Notes should match the source pipeline
 
     # Verify the node_pipeline_relation table
-    cur.execute("SELECT * FROM node_pipeline_relation WHERE pipeline_id = ?", (new_pipeline_id,))
+    cur.execute("SELECT * FROM node_pipeline_relation WHERE pipeline_id = %s", (new_pipeline_id,))
     node_pipeline_relation = cur.fetchall()
     assert len(node_pipeline_relation) == 2, "Entries were not duplicated correctly."
     assert node_pipeline_relation[0][0] == "node1" # Check first node
     assert node_pipeline_relation[1][0] == "node2" # Check second node
 
     # Verify the new pipeline's nodes have the same tags as the source pipeline
-    cur.execute("SELECT node_id, node_tag FROM node_pipeline_relation WHERE pipeline_id = ?", (new_pipeline_id,))
+    cur.execute("SELECT node_id, node_tag FROM node_pipeline_relation WHERE pipeline_id = %s", (new_pipeline_id,))
     new_pipeline_nodes = cur.fetchall()
-    cur.execute("SELECT node_id, node_tag FROM node_pipeline_relation WHERE pipeline_id = ?", (source_pipeline_id,))
+    cur.execute("SELECT node_id, node_tag FROM node_pipeline_relation WHERE pipeline_id = %s", (source_pipeline_id,))
     source_pipeline_nodes = cur.fetchall()
     assert len(new_pipeline_nodes) == len(source_pipeline_nodes), "Node tags were not duplicated correctly."
     for new_node, source_node in zip(new_pipeline_nodes, source_pipeline_nodes):
         assert new_node[1] == source_node[1], f"Node tag mismatch: expected {source_node[1]}, got {new_node[1]}"
 
-    # Verify the new pipeline's nodes have the same user as the source pipeline
-    cur.execute("SELECT node_id, user FROM node_pipeline_relation WHERE pipeline_id = ?", (new_pipeline_id,))
-    new_pipeline_users = cur.fetchall()
-    cur.execute("SELECT node_id, user FROM node_pipeline_relation WHERE pipeline_id = ?", (source_pipeline_id,))
-    source_pipeline_users = cur.fetchall()
-    assert len(new_pipeline_users) == len(source_pipeline_users), "Node users were not duplicated correctly."
-    for new_user, source_user in zip(new_pipeline_users, source_pipeline_users):
-        assert new_user[1] == source_user[1], f"User mismatch: expected {source_user[1]}, got {new_user[1]}"
 
-
-
-def test_duplicate_pipeline_graph_comparison(in_memory_db_conn, dag_dummy_1):
+def test_duplicate_pipeline_graph_comparison(pg_test_db, dag_dummy_1):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import graph_to_db, db_to_graph_from_pip_id
     import networkx as nx
 
     # Setup database
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Add the original graph to the database
@@ -636,11 +621,11 @@ def test_duplicate_pipeline_graph_comparison(in_memory_db_conn, dag_dummy_1):
         "Pipeline IDs should be different between the original and duplicated graphs."
 
 
-def test_dupicate_node_in_pipeline_full_coverage(in_memory_db_conn):
+def test_dupicate_node_in_pipeline_full_coverage(pg_test_db):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create original node and another node (for relation)
@@ -657,8 +642,7 @@ def test_dupicate_node_in_pipeline_full_coverage(in_memory_db_conn):
     # Create a pipeline and add an entry connecting the pipeline to the node
     pipeline_id = generate_pip_id()
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
-    user = "test_user"
-    db_utils.add_node_to_pipeline(cur, node_id=original_node_id, pipeline_id=pipeline_id, user=user, node_tag="test_tag")
+    db_utils.add_node_to_pipeline(cur, node_id=original_node_id, pipeline_id=pipeline_id, node_tag="test_tag")
     conn.commit()
 
     # Duplicate the node
@@ -667,12 +651,12 @@ def test_dupicate_node_in_pipeline_full_coverage(in_memory_db_conn):
     conn.commit()
 
     # Check nodes table
-    cur.execute("SELECT * FROM nodes WHERE node_id = ?", (duplicated_node_id,))
+    cur.execute("SELECT * FROM nodes WHERE node_id = %s", (duplicated_node_id,))
     duplicated_node = cur.fetchone()
     assert duplicated_node is not None, "Duplicated node was not created."
 
     # Check node_pipeline_relation table
-    cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id = ? AND pipeline_id = ?", (duplicated_node_id, pipeline_id,))
+    cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id = %s AND pipeline_id = %s", (duplicated_node_id, pipeline_id,))
     duplicated_entry = cur.fetchone()
     assert duplicated_entry is not None, "Duplicated node entry was not created."
     assert duplicated_entry[1] == pipeline_id, "Duplicated entry pipeline_id does not match original."
@@ -684,11 +668,11 @@ def test_dupicate_node_in_pipeline_full_coverage(in_memory_db_conn):
              (False, True),  # Copy children only
             ]
 )
-def test_copy_node_relations(in_memory_db_conn, parents, childrens):
+def test_copy_node_relations(pg_test_db, parents, childrens):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create nodes
@@ -718,7 +702,7 @@ def test_copy_node_relations(in_memory_db_conn, parents, childrens):
 
     if parents:
         # Check parent relations for new_node_id (should match source_node_id's parents)
-        cur.execute("SELECT parent_id FROM node_relation WHERE child_id=?", (new_node_id,))
+        cur.execute("SELECT parent_id FROM node_relation WHERE child_id=%s", (new_node_id,))
         parent_rows = cur.fetchall()
         parent_ids = {row[0] for row in parent_rows}
         assert parent1_id in parent_ids and parent2_id in parent_ids, \
@@ -726,7 +710,7 @@ def test_copy_node_relations(in_memory_db_conn, parents, childrens):
         
     if childrens:
         # Check child relations for new_node_id (should match source_node_id's children)
-        cur.execute("SELECT child_id FROM node_relation WHERE parent_id=?", (new_node_id,))
+        cur.execute("SELECT child_id FROM node_relation WHERE parent_id=%s", (new_node_id,))
         child_rows = cur.fetchall()
         child_ids = {row[0] for row in child_rows}
         assert child1_id in child_ids and child2_id in child_ids, \
@@ -734,11 +718,11 @@ def test_copy_node_relations(in_memory_db_conn, parents, childrens):
 
 
 
-def test_duplicate_node_in_pipeline_with_relations(in_memory_db_conn):
+def test_duplicate_node_in_pipeline_with_relations(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create nodes
@@ -765,28 +749,28 @@ def test_duplicate_node_in_pipeline_with_relations(in_memory_db_conn):
     conn.commit()
 
     # Check that the new node exists
-    cur.execute("SELECT * FROM nodes WHERE node_id = ?", (new_node_id,))
+    cur.execute("SELECT * FROM nodes WHERE node_id = %s", (new_node_id,))
     assert cur.fetchone() is not None, "Duplicated node was not created."
 
     # Check parent relations for new node
-    cur.execute("SELECT parent_id FROM node_relation WHERE child_id = ?", (new_node_id,))
+    cur.execute("SELECT parent_id FROM node_relation WHERE child_id = %s", (new_node_id,))
     parent_rows = cur.fetchall()
     parent_ids = {row[0] for row in parent_rows}
     assert parent_id in parent_ids, "Parent relation was not copied to duplicated node."
 
     # Check child relations for new node
-    cur.execute("SELECT child_id FROM node_relation WHERE parent_id = ?", (new_node_id,))
+    cur.execute("SELECT child_id FROM node_relation WHERE parent_id = %s", (new_node_id,))
     child_rows = cur.fetchall()
     child_ids = {row[0] for row in child_rows}
     assert child_id in child_ids, "Child relation was not copied to duplicated node."
 
 
 
-def test_get_pipelines_with_node(in_memory_db_conn):
+def test_get_pipelines_with_node(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a node and multiple pipelines
@@ -795,7 +779,7 @@ def test_get_pipelines_with_node(in_memory_db_conn):
     db_utils.add_node_to_nodes(cur, node_id=node_id)
     for pipeline_id in pipeline_ids:
         db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag=f"pipeline_{pipeline_id}")
-        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
     # Call the function to get pipelines associated with the node
@@ -812,11 +796,11 @@ def test_get_pipelines_with_node(in_memory_db_conn):
     assert pipelines_with_new_node == [], f"Expected no pipelines for node {new_node_id}, got {pipelines_with_new_node}"
 
 
-def test_count_pipeline_with_node(in_memory_db_conn):
+def test_count_pipeline_with_node(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a node and multiple pipelines
@@ -825,7 +809,7 @@ def test_count_pipeline_with_node(in_memory_db_conn):
     db_utils.add_node_to_nodes(cur, node_id=node_id)
     for pipeline_id in pipeline_ids:
         db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag=f"pipeline_{pipeline_id}")
-        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
     # Call the function to count pipelines associated with the node
@@ -841,11 +825,11 @@ def test_count_pipeline_with_node(in_memory_db_conn):
     new_node_pipeline_count = db_utils.count_pipeline_with_node(cur, new_node_id)
     assert new_node_pipeline_count == 0, f"Expected 0 pipelines for node {new_node_id}, got {new_node_pipeline_count}"
 
-def test_is_node_editable(in_memory_db_conn):
+def test_is_node_editable(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a node
@@ -859,7 +843,7 @@ def test_is_node_editable(in_memory_db_conn):
     # Test case: Node belongs to one pipeline
     pipeline_id = generate_pip_id()
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
-    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
     editable = db_utils.is_node_editable(cur, node_id)
@@ -868,18 +852,18 @@ def test_is_node_editable(in_memory_db_conn):
     # Test case: Node belongs to more than one pipeline
     another_pipeline_id = generate_pip_id()
     db_utils.add_pipeline(cur, pipeline_id=another_pipeline_id, tag="another_test_pipeline")
-    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=another_pipeline_id, user="test_user")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=another_pipeline_id)
     conn.commit()
 
     editable = db_utils.is_node_editable(cur, node_id)
     assert editable is False, f"Expected node {node_id} to be non-editable when associated with more than one pipeline."
 
 
-def test_update_editable_status_for_all_nodes(in_memory_db_conn):
+def test_update_editable_status_for_all_nodes(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create nodes
@@ -897,9 +881,9 @@ def test_update_editable_status_for_all_nodes(in_memory_db_conn):
     db_utils.add_pipeline(cur, pipeline_id=pipeline2, tag="pipeline2")
 
     # Associate nodes with pipelines
-    db_utils.add_node_to_pipeline(cur, node_id=node1, pipeline_id=pipeline1, user="test_user")
-    db_utils.add_node_to_pipeline(cur, node_id=node2, pipeline_id=pipeline1, user="test_user")
-    db_utils.add_node_to_pipeline(cur, node_id=node2, pipeline_id=pipeline2, user="test_user")
+    db_utils.add_node_to_pipeline(cur, node_id=node1, pipeline_id=pipeline1)
+    db_utils.add_node_to_pipeline(cur, node_id=node2, pipeline_id=pipeline1)
+    db_utils.add_node_to_pipeline(cur, node_id=node2, pipeline_id=pipeline2)
     conn.commit()
 
     # Call the function to update editable status
@@ -917,11 +901,11 @@ def test_update_editable_status_for_all_nodes(in_memory_db_conn):
     assert editable_node3 is True, f"Expected node3 to be editable, got {editable_node3}"
 
 
-def test_get_pipeline_notes_existing_and_nonexistent(in_memory_db_conn):
+def test_get_pipeline_notes_existing_and_nonexistent(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_pip_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Add a pipeline with notes
@@ -945,11 +929,11 @@ def test_get_pipeline_notes_existing_and_nonexistent(in_memory_db_conn):
     non_existent_id = "nonexistent_id"
     assert db_utils.get_pipeline_notes(cur, non_existent_id) is None
 
-def test_get_pipeline_owner_existing_and_nonexistent(in_memory_db_conn):
+def test_get_pipeline_owner_existing_and_nonexistent(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_pip_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Add a pipeline with an owner
@@ -973,17 +957,17 @@ def test_get_pipeline_owner_existing_and_nonexistent(in_memory_db_conn):
     non_existent_id = "nonexistent_id"
     assert db_utils.get_pipeline_owner(cur, non_existent_id) is None
 
-def test_get_node_notes_existing_and_nonexistent(in_memory_db_conn):
+def test_get_node_notes_existing_and_nonexistent(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Add a node with notes
     node_id = generate_node_id()
     notes = "This is a test node note."
-    cur.execute("INSERT INTO nodes (node_id, notes) VALUES (?, ?)", (node_id, notes))
+    cur.execute("INSERT INTO nodes (node_id, notes) VALUES (%s, %s)", (node_id, notes))
     conn.commit()
 
     # Test: get notes for existing node
@@ -1002,11 +986,11 @@ def test_get_node_notes_existing_and_nonexistent(in_memory_db_conn):
     assert db_utils.get_node_notes(cur, non_existent_id) is None
 
 
-def test_remove_pipeline_removes_pipeline_and_leaves_related_data(in_memory_db_conn):
+def test_remove_pipeline_removes_pipeline_from_everywhere(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
     
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a pipeline and related data
@@ -1014,30 +998,30 @@ def test_remove_pipeline_removes_pipeline_and_leaves_related_data(in_memory_db_c
     node_id = generate_node_id()
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline", owner="owner", notes="notes")
     db_utils.add_node_to_nodes(cur, node_id=node_id)
-    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
     # Remove the pipeline
-    db_utils.remove_pipeline_from_pipeline(cur, pipeline_id)
+    db_utils.remove_pipeline_from_everywhere(cur, pipeline_id)
     conn.commit()
 
     # Check that the pipeline is removed
-    cur.execute("SELECT * FROM pipelines WHERE pipeline_id=?", (pipeline_id,))
+    cur.execute("SELECT * FROM pipelines WHERE pipeline_id=%s", (pipeline_id,))
     assert cur.fetchone() is None, "Pipeline was not removed from pipelines table."
 
-    # Check that related data is NOT automatically removed (no ON DELETE CASCADE)
-    cur.execute("SELECT * FROM node_pipeline_relation WHERE pipeline_id=?", (pipeline_id,))
-    assert cur.fetchone() is not None, "node_pipeline_relation entry was unexpectedly removed."
+    # # Check that related data is NOT automatically removed (no ON DELETE CASCADE)
+    # cur.execute("SELECT * FROM node_pipeline_relation WHERE pipeline_id=%s", (pipeline_id,))
+    # assert cur.fetchone() is not None, "node_pipeline_relation entry was unexpectedly removed."
 
     # Node should still exist
-    cur.execute("SELECT * FROM nodes WHERE node_id=?", (node_id,))
+    cur.execute("SELECT * FROM nodes WHERE node_id=%s", (node_id,))
     assert cur.fetchone() is not None, "Node was unexpectedly removed."
 
-def test_sanitize_node_relation(in_memory_db_conn):
+def test_sanitize_node_relation(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create nodes and pipeline
@@ -1057,9 +1041,9 @@ def test_sanitize_node_relation(in_memory_db_conn):
     db_utils.add_node_to_nodes(cur, node_id=node6, editable=False)  # Not editable
     db_utils.add_node_to_nodes(cur, node_id=node7)
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
-    db_utils.add_node_to_pipeline(cur, node_id=node1, pipeline_id=pipeline_id, user="user")
-    db_utils.add_node_to_pipeline(cur, node_id=node2, pipeline_id=pipeline_id, user="user")
-    db_utils.add_node_to_pipeline(cur, node_id=node7, pipeline_id=pipeline_id, user="user")
+    db_utils.add_node_to_pipeline(cur, node_id=node1, pipeline_id=pipeline_id)
+    db_utils.add_node_to_pipeline(cur, node_id=node2, pipeline_id=pipeline_id)
+    db_utils.add_node_to_pipeline(cur, node_id=node7, pipeline_id=pipeline_id)
     # node 1,2,3,7 are in the pipeline
     # node3, node4, node5, node6 are not in the pipeline
     # node5 and node6 are not editable
@@ -1089,11 +1073,11 @@ def test_sanitize_node_relation(in_memory_db_conn):
     assert (node6, node5) in relations, "Relation (node5, node6) should remain (not in pipeline)"
     assert (node7, node5) not in relations, "Relation (node7, node6) should be removed (parent nodes are not in the pipeline)"
 
-def test_remove_pipeline_from_everywhere(in_memory_db_conn):
+def test_remove_pipeline_from_everywhere(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a pipeline and related data
@@ -1101,7 +1085,7 @@ def test_remove_pipeline_from_everywhere(in_memory_db_conn):
     node_id = generate_node_id()
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline", owner="owner", notes="notes")
     db_utils.add_node_to_nodes(cur, node_id=node_id)
-    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="test_user")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
     # Remove the pipeline from everywhere
@@ -1109,18 +1093,18 @@ def test_remove_pipeline_from_everywhere(in_memory_db_conn):
     conn.commit()
 
     # Check that the pipeline is removed
-    cur.execute("SELECT * FROM pipelines WHERE pipeline_id=?", (pipeline_id,))
+    cur.execute("SELECT * FROM pipelines WHERE pipeline_id=%s", (pipeline_id,))
     assert cur.fetchone() is None, "Pipeline was not removed from pipelines table."
 
     # Check that related data is also removed
-    cur.execute("SELECT * FROM node_pipeline_relation WHERE pipeline_id=?", (pipeline_id,))
+    cur.execute("SELECT * FROM node_pipeline_relation WHERE pipeline_id=%s", (pipeline_id,))
     assert cur.fetchone() is None, "node_pipeline_relation entry was not removed."
 
     # Node should still exist
-    cur.execute("SELECT * FROM nodes WHERE node_id=?", (node_id,))
+    cur.execute("SELECT * FROM nodes WHERE node_id=%s", (node_id,))
     assert cur.fetchone() is not None, "Node was unexpectedly removed."
 
-def test_can_node_run_logic(in_memory_db_conn):
+def test_can_node_run_logic(pg_test_db):
     """
     Test logic for determining if a node can run based on its status.
     """
@@ -1128,7 +1112,7 @@ def test_can_node_run_logic(in_memory_db_conn):
     from fusionpipe.utils import pip_utils
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a node with default status ('ready') and editable True
@@ -1139,21 +1123,21 @@ def test_can_node_run_logic(in_memory_db_conn):
     canrun = pip_utils.can_node_run(cur, node_id)
     assert canrun is True, "Node should be able to run when status is 'ready' and editable is True."
     # Update node status to 'running' and check again
-    cur.execute("UPDATE nodes SET status='running' WHERE node_id=?", (node_id,))
+    cur.execute("UPDATE nodes SET status='running' WHERE node_id=%s", (node_id,))
     conn.commit()
     canrun = pip_utils.can_node_run(cur, node_id)
     assert canrun is False, "Node should not be able to run when status is 'running'."
     # Update node status to 'failed' and check again
-    cur.execute("UPDATE nodes SET status='failed' WHERE node_id=?", (node_id,))
+    cur.execute("UPDATE nodes SET status='failed' WHERE node_id=%s", (node_id,))
     conn.commit()
     canrun = pip_utils.can_node_run(cur, node_id)
     assert canrun is False, "Node should not be able to run when status is 'failed'."
 
-def test_update_editable_status(in_memory_db_conn):
+def test_update_editable_status(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create a node
@@ -1167,7 +1151,7 @@ def test_update_editable_status(in_memory_db_conn):
 
     # Verify the editable status was updated
     assert rows_updated == 1, "Editable status was not updated in the database."
-    cur.execute("SELECT editable FROM nodes WHERE node_id=?", (node_id,))
+    cur.execute("SELECT editable FROM nodes WHERE node_id=%s", (node_id,))
     result = cur.fetchone()
     assert result is not None, "Node not found in database."
     assert result[0] == 0, f"Expected editable status to be False, got {result[0]}"
@@ -1178,17 +1162,17 @@ def test_update_editable_status(in_memory_db_conn):
 
     # Verify the editable status was updated
     assert rows_updated == 1, "Editable status was not updated in the database."
-    cur.execute("SELECT editable FROM nodes WHERE node_id=?", (node_id,))
+    cur.execute("SELECT editable FROM nodes WHERE node_id=%s", (node_id,))
     result = cur.fetchone()
     assert result is not None, "Node not found in database."
     assert result[0] == 1, f"Expected editable status to be True, got {result[0]}"
 
 
-def test_duplicate_node_pipeline_relation(in_memory_db_conn):
+def test_duplicate_node_pipeline_relation(pg_test_db):
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create source pipeline and nodes
@@ -1199,7 +1183,7 @@ def test_duplicate_node_pipeline_relation(in_memory_db_conn):
     db_utils.add_pipeline(cur, pipeline_id=target_pipeline_id, tag="target_pipeline")
     for node_id in node_ids:
         db_utils.add_node_to_nodes(cur, node_id=node_id)
-        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=source_pipeline_id, user="test_user")
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=source_pipeline_id)
 
     conn.commit()
 
@@ -1209,29 +1193,29 @@ def test_duplicate_node_pipeline_relation(in_memory_db_conn):
 
     # Check that the relations exist in the target pipeline
     for node_id in node_ids:
-        cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=? AND pipeline_id=?", (node_id, target_pipeline_id))
+        cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=%s AND pipeline_id=%s", (node_id, target_pipeline_id))
         result = cur.fetchone()
         assert result is not None, f"Node-pipeline relation for node {node_id} was not duplicated to target pipeline."
 
-def test_add_and_remove_process(in_memory_db_conn):
+def test_add_and_remove_process(pg_test_db):
     from fusionpipe.utils import db_utils
     import datetime
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Add a process
     process_id = "proc_123"
     node_id = "node_abc"
     status = "running"
-    start_time = datetime.datetime.now().isoformat()
+    start_time = datetime.datetime.now()
     end_time = None
 
     db_utils.add_process(cur, process_id, node_id, status, start_time, end_time)
     conn.commit()
 
     # Check that the process was added
-    cur.execute("SELECT * FROM processes WHERE process_id=?", (process_id,))
+    cur.execute("SELECT * FROM processes WHERE process_id=%s", (process_id,))
     result = cur.fetchone()
     assert result is not None, "Process was not added to the database."
     assert result[0] == process_id, "Process ID does not match."
@@ -1246,6 +1230,6 @@ def test_add_and_remove_process(in_memory_db_conn):
     assert rows_deleted == 1, "Process was not removed from the database."
 
     # Check that the process is gone
-    cur.execute("SELECT * FROM processes WHERE process_id=?", (process_id,))
+    cur.execute("SELECT * FROM processes WHERE process_id=%s", (process_id,))
     result = cur.fetchone()
     assert result is None, "Process was not removed from the database."

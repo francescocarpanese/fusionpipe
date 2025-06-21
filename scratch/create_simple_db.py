@@ -1,19 +1,23 @@
-from fusionpipe.utils.db_utils import create_db
+from fusionpipe.utils.db_utils import create_db, connect_to_db
 from fusionpipe.utils.db_utils import add_pipeline, add_project
 
-path_to_db = "/home/cisko90/fusionpipe/bin/nodes/connection.db"
-#path_to_db = r"C:\Users\franc\Documents\fusionpipe\bin\connection.db"
-path_to_db = "/misc/carpanes/fusionpipe/bin/pipeline.db"
-
 # Create a simple database
-conn = create_db(path_to_db)
-print(f"Database created at {path_to_db}")
-conn.close()
+# conn = create_db()
+# print(f"Database created at {path_to_db}")
+# conn.close()
 
 
 # Add a simple pipeline
-conn = create_db(path_to_db)
+conn = connect_to_db()
 cur = conn.cursor()
+
+
+# Clear all tables in the database
+tables = ["node_relation", "node_pipeline_relation", "nodes", "projects", "processes","pipelines"]
+for table in tables:
+    cur.execute(f"DELETE FROM {table}")
+conn.commit()
+
 pipeline_id = "simple_pipeline"
 add_pipeline(cur, pipeline_id=pipeline_id, tag="v1.0", owner="user1", notes="This is a simple pipeline.")
 add_project(cur, project_id="simple_project", tag="v1.0", owner="user1", notes="This is a simple project.")
@@ -25,7 +29,7 @@ from fusionpipe.utils.db_utils import add_node_to_nodes
 from fusionpipe.utils.db_utils import add_node_to_pipeline, add_node_relation, add_pipeline_to_project
 
 # Add some nodes to the database
-conn = create_db(path_to_db)
+conn = connect_to_db()
 cur = conn.cursor()
 
 nodes = [
@@ -44,7 +48,7 @@ pipeline_id = "simple_pipeline"
 node_ids = ["node1", "node2", "node3"]
 
 for node_id in node_ids:
-    add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, user="user1")
+    add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
 
 add_pipeline_to_project(cur, project_id="simple_project", pipeline_id=pipeline_id)
 

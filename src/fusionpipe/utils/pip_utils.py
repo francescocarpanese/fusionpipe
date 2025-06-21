@@ -155,6 +155,10 @@ def graph_dict_to_db(graph_dict, cur):
     notes = graph_dict["notes"]
     project_id = graph_dict.get("project_id", "")
 
+    if not db_utils.check_project_exists(cur, project_id):
+        # If the project does not exist, create it
+        db_utils.add_project(cur, project_id=project_id)
+
     if not db_utils.check_pipeline_exists(cur, pipeline_id):
         # If the pipeline does not exist, create it
         db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag=tag, owner=owner, notes=notes)

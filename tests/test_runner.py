@@ -12,9 +12,9 @@ from fusionpipe.utils import db_utils, pip_utils, runner_utils
     ("failed", "failed"),
     ("completed", "completed"),
 ])
-def test_run_node_creates_and_runs_node(in_memory_db_conn, tmp_base_dir, node_init_status, expected_status):
+def test_run_node_creates_and_runs_node(pg_test_db, tmp_base_dir, node_init_status, expected_status):
 
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     pipeline_id = pip_utils.generate_pip_id()
@@ -35,6 +35,7 @@ def test_run_node_creates_and_runs_node(in_memory_db_conn, tmp_base_dir, node_in
     try:
         runner_utils.run_node(conn, node_id, run_mode="local")
     except Exception as e:
+        conn.rollback()
         error_message = str(e)
 
     status = db_utils.get_node_status(cur, node_id)
@@ -59,11 +60,11 @@ def test_run_node_creates_and_runs_node(in_memory_db_conn, tmp_base_dir, node_in
     (1, "completed", "completed", "ready"),
     (2, "completed", "completed", "completed"),
 ])
-def test_run_pipeline(in_memory_db_conn, tmp_path, last_node, expected_status_a, expected_status_b, expected_status_c):
+def test_run_pipeline(pg_test_db, tmp_path, last_node, expected_status_a, expected_status_b, expected_status_c):
     from fusionpipe.utils import db_utils, pip_utils, runner_utils
 
     # Setup DB
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Create pipeline and two nodes (A -> B)
@@ -108,9 +109,9 @@ def test_run_pipeline(in_memory_db_conn, tmp_path, last_node, expected_status_a,
     conn.close()
 
 
-def test_kill_running_process(in_memory_db_conn, tmp_base_dir):
+def test_kill_running_process(pg_test_db, tmp_base_dir):
     # This test is failing because of concurrency. It will be fixed when migrating the database
-    conn = in_memory_db_conn
+    conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     pipeline_id = pip_utils.generate_pip_id()
@@ -145,6 +146,8 @@ def test_kill_running_process(in_memory_db_conn, tmp_base_dir):
     assert processes, f"Expected process for node {node_id} to be running, found none"
     # Kill the running process
     runner_utils.kill_running_process(conn, node_id)
+    # Rollback to recover from any aborted transaction state
+    conn.rollback()
     # Check process is removed and node is failed
     processes_after = db_utils.get_processes_by_node(cur, node_id)
     assert not processes_after, f"Expected no process for node {node_id} after kill, found: {processes_after}"
