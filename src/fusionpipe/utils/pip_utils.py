@@ -54,6 +54,9 @@ def init_node_folder(folder_path_nodes, verbose=False):
         os.chdir(code_folder_path)
         os.system("uv init")
 
+        # Add some package to uv
+        os.system("uv add psycopg2-binary")
+
         # Copy the template file into the code folder
         template_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates', 'main_template.py')
         if os.path.exists(template_file_path):
@@ -62,7 +65,28 @@ def init_node_folder(folder_path_nodes, verbose=False):
                 with open(destination_file_path, 'w') as dest_file:
                     dest_file.write(template_file.read())
         else:
-            raise FileNotFoundError(f"Template file not found at {template_file_path}") 
+            raise FileNotFoundError(f"Template file not found at {template_file_path}")
+        
+        # Copy example files into the code folder
+        template_folder_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates')
+        example_python_path = os.path.join(template_folder_path, 'example_python.py')
+        example_matlab_path = os.path.join(template_folder_path, 'example_matlab.m')
+
+        if os.path.exists(example_python_path):
+            shutil.copy(example_python_path, code_folder_path)
+        else:
+            raise FileNotFoundError(f"Example Python file not found at {example_python_path}")
+
+        if os.path.exists(example_matlab_path):
+            shutil.copy(example_matlab_path, code_folder_path)
+        else:
+            raise FileNotFoundError(f"Example MATLAB file not found at {example_matlab_path}")
+
+        user_utils_folder_path =  os.path.join(os.path.dirname(os.path.dirname(__file__)), 'user_utils')
+        # Copy the user_utils folder into the code folder
+        if os.path.exists(user_utils_folder_path):
+            destination_user_utils_path = os.path.join(code_folder_path, 'user_utils')
+            shutil.copytree(user_utils_folder_path, destination_user_utils_path, dirs_exist_ok=True)
         
         # Update the name entry in pyproject.toml using the toml library
         pyproject_file_path = os.path.join(code_folder_path, 'pyproject.toml')

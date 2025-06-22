@@ -10,7 +10,7 @@ table_names = [
 ]
 
 def connect_to_db(db_url=os.environ.get("DATABASE_URL")):
-    # Example db_url: "dbname=yourdb user=youruser password=yourpassword host=localhost"
+    # Example db_url: "dbname=<yourdb> user=<youruser> password=<yourpassword> host=localhost port=<port>"
     conn = psycopg2.connect(db_url)
     return conn
 
