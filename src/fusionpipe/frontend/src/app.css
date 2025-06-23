@@ -127,3 +127,13 @@ html, body, #app {
 .svelte-flow__handle.connectingto {
   border-color: var(--xy-theme-edge-hover);
 }
+
+
+.custom-node {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.custom-node .line {
+  white-space: nowrap;
+}

@@ -718,7 +718,8 @@
         id,
         type: "custom",
         data: {
-          label: `TAG:${node.tag} ID:${id}`,
+          line1: `TAG: ${node.tag}`,
+          line2: `ID: ${id}`,
           editable: node.editable,
           notes: node.notes || "",
           folder_path: node.folder_path || "",
