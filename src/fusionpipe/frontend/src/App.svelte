@@ -34,12 +34,15 @@
   } from "flowbite-svelte";
   import { ChevronDownOutline } from "flowbite-svelte-icons";
   import filter from "svelte-select/filter";
+  import ContextMenu from "./ContextMenu.svelte";
 
   //  --- Variables and state definitions ---
   let nodes = $state<Node[]>([]);
   let edges = $state.raw<Edge[]>([]);
   let selectedPipelineDropdown = $state(null);
   let selectedProjectDropdown = $state(null);
+  let clientWidth: number = $state();
+  let clientHeight: number = $state();
 
   let selectedPipelineTarget = $state(null);
   let selectedProjectTarget = $state(null);
@@ -68,6 +71,12 @@
     notes: "",
   });
 
+  let menu: {
+    id: string;
+    top?: number;
+    left?: number;
+  } | null = $state(null);
+
   let isHiddenPipelinePanel = $state(true);
   let isHiddenNodePanel = $state(true);
   let isHiddenProjectPanel = $state(true);
@@ -87,6 +96,25 @@
   dagreGraph.setDefaultEdgeLabel(() => ({}));
 
   // Define functions
+
+const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
+  event.preventDefault();
+
+  // Optionally, update clientWidth/clientHeight here if window size can change
+  // clientWidth = window.innerWidth;
+  // clientHeight = window.innerHeight;
+
+  menu = {
+    id: node.id,
+    top: event.clientY < clientHeight - 200 ? event.clientY : undefined,
+    left: event.clientX < clientWidth - 200 ? event.clientX : undefined,
+  };
+};
+  // Close the context menu if it's open whenever the window is clicked.
+  function handlePaneClick() {
+    menu = null;
+  }
+
   function getLayoutedElements(nodes: Node[], edges: Edge[], direction = "TB") {
     const isHorizontal = direction === "LR";
 
@@ -407,7 +435,7 @@
       } else if (radiostate_projects === 2) {
         // Dropdown is showing tags, so lookup ID from dict
         projectId = Object.keys(ids_tags_dict_projects).find(
-          (key) => ids_tags_dict_projects[key] === selectedProjectTarget.value
+          (key) => ids_tags_dict_projects[key] === selectedProjectTarget.value,
         );
       }
       if (!projectId) {
@@ -1584,12 +1612,14 @@
     {/if}
   </Drawer>
 
-  <div class="main-content">
+  <div class="main-content" bind:clientWidth bind:clientHeight>
     <SvelteFlow
       bind:nodes
       bind:edges
       fitView
       onconnect={handleConnect}
+      onnodecontextmenu={handleContextMenu}
+      onpaneclick={handlePaneClick}
       onnodedragstop={saveNodePositions}
       {nodeTypes}
       style="height: 100%;"
@@ -1597,12 +1627,21 @@
     >
       <Panel position="top-left">
         Selected project: {currentProjectId || "None"}<br />
-        Selected project tag: {ids_tags_dict_projects[currentProjectId] || "None"}<br />
+        Selected project tag: {ids_tags_dict_projects[currentProjectId] ||
+          "None"}<br />
         Pipeline id: {currentPipelineId || "None"}<br />
         Pipeline tag: {ids_tags_dict_pipelines[currentPipelineId] || "None"}
       </Panel>
       <Controls />
       <Background />
+  {#if menu}
+    <ContextMenu
+      onclick={handlePaneClick}
+      id={menu.id}
+      top={menu.top}
+      left={menu.left}
+    />
+  {/if}
       <MiniMap />
     </SvelteFlow>
   </div>
