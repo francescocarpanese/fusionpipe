@@ -75,3 +75,36 @@ Before running the script make sure your environment variables are pointing to t
 ```bash
 uv run python src/fusionpipe/utils/init_database.py
 ```
+
+# Set up with local installation of postgres
+- Seek documentation to install postgres locally.
+
+
+# Set-up production server
+
+- Create the table 
+
+```bash
+psql -U postgres -d fusionpipe_prod1 -c "CREATE ROLE writers;"
+psql -U postgres -d fusionpipe_prod1 -c "GRANT CONNECT, TEMPORARY ON DATABASE fusionpipe_prod1 TO writers;"
+psql -U postgres -d fusionpipe_prod1 -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO writers;"
+psql -U postgres -d fusionpipe_prod1 -c "GRANT CREATE ON SCHEMA public TO writers;"
+psql -U postgres -d fusionpipe_prod1 -c "GRANT writers TO carpanes;"
+```
+
+- Grant access to the user.
+
+- Export the env variable
+`export $(grep -v '^#' something.env | xargs)`
+
+
+- Start the backend
+Making sure you are in a terminal where you have the right enviroment path.
+
+- Start the frontend
+
+Probably some of them needs to be read from env variables.
+`VITE_BACKEND_HOST=localhost VITE_BACKEND_PORT=8100 npm run dev -- --port 5174`
+
+
+# Create a new user

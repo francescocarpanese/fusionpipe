@@ -44,6 +44,10 @@
   let clientWidth: number = $state();
   let clientHeight: number = $state();
 
+  const BACKEND_HOST = import.meta.env.VITE_BACKEND_HOST || "localhost";
+  const BACKEND_PORT = import.meta.env.VITE_BACKEND_PORT || "8000";
+  const BACKEND_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}`;
+  
   let selectedPipelineTarget = $state(null);
   let selectedProjectTarget = $state(null);
 
@@ -213,7 +217,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/update_node_position/${pipelineId}`,
+        `${BACKEND_URL}/update_node_position/${pipelineId}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -242,7 +246,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       }
 
       const response = await fetch(
-        `http://localhost:8000/create_node_in_pipeline/${pipelineId}`,
+        `${BACKEND_URL}/create_node_in_pipeline/${pipelineId}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -286,7 +290,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       selectedNodeIds.map(async (nodeId) => {
         try {
           const response = await fetch(
-            `http://localhost:8000/delete_node_from_pipeline/${pipelineId}/${nodeId}`,
+            `${BACKEND_URL}/delete_node_from_pipeline/${pipelineId}/${nodeId}`,
             {
               method: "DELETE",
               headers: { "Content-Type": "application/json" },
@@ -323,7 +327,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
         if (!edge) return;
         try {
           const response = await fetch(
-            `http://localhost:8000/delete_edge/${pipelineId}/${edge.source}/${edge.target}`,
+            `${BACKEND_URL}/delete_edge/${pipelineId}/${edge.source}/${edge.target}`,
             {
               method: "DELETE",
               headers: { "Content-Type": "application/json" },
@@ -362,7 +366,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/duplicate_nodes_in_pipeline`,
+        `${BACKEND_URL}/duplicate_nodes_in_pipeline`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -412,7 +416,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/reference_nodes_into_pipeline`,
+        `${BACKEND_URL}/reference_nodes_into_pipeline`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -465,7 +469,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       }
 
       const response = await fetch(
-        `http://localhost:8000/move_pipeline_to_project`,
+        `${BACKEND_URL}/move_pipeline_to_project`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -498,7 +502,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
     try {
       const response = await fetch(
-        `http://localhost:8000/manual_set_node_status/${selectedNode.id}/completed`,
+        `${BACKEND_URL}/manual_set_node_status/${selectedNode.id}/completed`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -525,7 +529,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
     try {
       const response = await fetch(
-        `http://localhost:8000/manual_set_node_status/${selectedNode.id}/staledata`,
+        `${BACKEND_URL}/manual_set_node_status/${selectedNode.id}/staledata`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -547,7 +551,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
   async function fetchPipelines() {
     try {
       const response = await fetch(
-        "http://localhost:8000/get_all_pipeline_ids_tags_dict",
+        `${BACKEND_URL}/get_all_pipeline_ids_tags_dict`,
       );
       if (!response.ok) await handleApiError(response);
       ids_tags_dict_pipelines = await response.json();
@@ -559,7 +563,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
   async function fetchProjects() {
     try {
       const response = await fetch(
-        "http://localhost:8000/get_all_project_ids_tags_dict",
+        `${BACKEND_URL}/get_all_project_ids_tags_dict`,
       );
       if (!response.ok) await handleApiError(response);
       // Assuming the API returns a similar dict as pipelines
@@ -586,7 +590,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/connect_nodes`, {
+      const response = await fetch(`${BACKEND_URL}/connect_nodes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source, target }),
@@ -600,7 +604,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
   async function createPipeline() {
     try {
-      const response = await fetch("http://localhost:8000/create_pipeline", {
+      const response = await fetch(`${BACKEND_URL}/create_pipeline`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
@@ -617,7 +621,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
   async function createProject() {
     try {
-      const response = await fetch("http://localhost:8000/create_project", {
+      const response = await fetch(`${BACKEND_URL}/create_project`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
@@ -649,7 +653,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/delete_pipeline/${pipelineId}`,
+        `${BACKEND_URL}/delete_pipeline/${pipelineId}`,
         {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
@@ -694,7 +698,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/delete_project/${projectId}`,
+        `${BACKEND_URL}/delete_project/${projectId}`,
         {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
@@ -733,7 +737,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/branch_pipeline/${pipelineId}/${startNodeId}`,
+        `${BACKEND_URL}/branch_pipeline/${pipelineId}/${startNodeId}`,
         {
           method: "GET",
           headers: { "Content-Type": "application/json" },
@@ -757,7 +761,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
   async function loadPipeline(pipelineId: string) {
     try {
       const response = await fetch(
-        `http://localhost:8000/get_pipeline/${pipelineId}`,
+        `${BACKEND_URL}/get_pipeline/${pipelineId}`,
         { cache: "no-store" },
       );
       if (!response.ok) await handleApiError(response);
@@ -840,7 +844,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     try {
       // Update node tag
       await fetch(
-        `http://localhost:8000/update_node_tag/${pipelineId}/${nodeId}`,
+        `${BACKEND_URL}/update_node_tag/${pipelineId}/${nodeId}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -851,7 +855,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       });
       // Update node notes
       await fetch(
-        `http://localhost:8000/update_node_notes/${pipelineId}/${nodeId}`,
+        `${BACKEND_URL}/update_node_notes/${pipelineId}/${nodeId}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -872,7 +876,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
   async function loadPipelineInfo(pipelineId: string) {
     try {
       const response = await fetch(
-        `http://localhost:8000/get_pipeline/${pipelineId}`,
+        `${BACKEND_URL}/get_pipeline/${pipelineId}`,
         { cache: "no-store" },
       );
       if (!response.ok) await handleApiError(response);
@@ -892,7 +896,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
   async function loadProjectInfo(projectId: string) {
     try {
       const response = await fetch(
-        `http://localhost:8000/get_project/${projectId}`,
+        `${BACKEND_URL}/get_project/${projectId}`,
         { cache: "no-store" },
       );
       if (!response.ok) await handleApiError(response);
@@ -924,7 +928,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
     try {
       const response = await fetch(
-        `http://localhost:8000/get_pipelines_in_project/${projectId}`,
+        `${BACKEND_URL}/get_pipelines_in_project/${projectId}`,
       );
       if (!response.ok) await handleApiError(response);
       const data = await response.json();
@@ -958,14 +962,14 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     const newNotes = pipelineDrawerForm.notes;
 
     try {
-      await fetch(`http://localhost:8000/update_pipeline_tag/${pipelineId}`, {
+      await fetch(`${BACKEND_URL}/update_pipeline_tag/${pipelineId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tag: newTag }),
       }).then(async (response) => {
         if (!response.ok) await handleApiError(response);
       });
-      await fetch(`http://localhost:8000/update_pipeline_notes/${pipelineId}`, {
+      await fetch(`${BACKEND_URL}/update_pipeline_notes/${pipelineId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notes: newNotes }),
@@ -995,14 +999,14 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     const newNotes = projectDrawerForm.notes;
 
     try {
-      await fetch(`http://localhost:8000/update_project_tag/${projectId}`, {
+      await fetch(`${BACKEND_URL}/update_project_tag/${projectId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tag: newTag }),
       }).then(async (response) => {
         if (!response.ok) await handleApiError(response);
       });
-      await fetch(`http://localhost:8000/update_project_notes/${projectId}`, {
+      await fetch(`${BACKEND_URL}/update_project_notes/${projectId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notes: newNotes }),
@@ -1030,7 +1034,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     const nodeId = selectedNode.id;
     alert(`Node ${nodeId} is starting to run...`);
     try {
-      const response = await fetch(`http://localhost:8000/run_node/${nodeId}`, {
+      const response = await fetch(`${BACKEND_URL}/run_node/${nodeId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ run_mode: "local" }),
@@ -1067,7 +1071,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/run_pipeline/${pipelineId}`,
+        `${BACKEND_URL}/run_pipeline/${pipelineId}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1106,7 +1110,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/run_pipeline_up_to_node/${pipelineId}/${selectedNode.id}`,
+        `${BACKEND_URL}/run_pipeline_up_to_node/${pipelineId}/${selectedNode.id}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1149,7 +1153,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     if (!confirmed) return;
 
     try {
-      const response = await fetch(`http://localhost:8000/delete_node_data/`, {
+      const response = await fetch(`${BACKEND_URL}/delete_node_data/`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1193,7 +1197,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     const nodeId = selectedNode.id;
     try {
       const response = await fetch(
-        `http://localhost:8000/kill_node/${nodeId}`,
+        `${BACKEND_URL}/kill_node/${nodeId}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

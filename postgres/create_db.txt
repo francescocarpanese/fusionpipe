@@ -1,0 +1,5 @@
+psql -U postgres -d fusionpipe_prod1 -c "CREATE ROLE writers;"
+psql -U postgres -d fusionpipe_prod1 -c "GRANT CONNECT, TEMPORARY ON DATABASE fusionpipe_prod1 TO writers;"
+psql -U postgres -d fusionpipe_prod1 -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO writers;"
+psql -U postgres -d fusionpipe_prod1 -c "GRANT CREATE ON SCHEMA public TO writers;"
+psql -U postgres -d fusionpipe_prod1 -c "GRANT writers TO carpanes;"
