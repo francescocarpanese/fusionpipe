@@ -8,6 +8,6 @@ function parent_ids = get_node_parents(conn, node_id)
         parent_ids = {};
     else
         parent_ids = data{:,1};
-        parent_ids = cellstr(parent_ids);
+        parent_ids = string(parent_ids);
     end
 end

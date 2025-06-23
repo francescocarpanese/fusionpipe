@@ -2,18 +2,16 @@ clear all
 close all
 clc
 
+% Add user utils 
 addpath(genpath('user_utils/matlab'));
 
+% Set manually the string with the node id or read from the folder name
 [~,node_id] = fileparts(fileparts(pwd));
 
-conn = connect_to_db();
-
-get_node_folder_path(conn, node_id)
-
-get_node_parents(conn, node_id)
-
+% Get folder paths of all the parents of this node
 node_parents = get_all_parent_node_folder_paths(node_id);
 
+% Display the folder path of the parent nodes
 disp('Node Parents:');
 for i = 1:length(node_parents)
     disp(node_parents{i});
