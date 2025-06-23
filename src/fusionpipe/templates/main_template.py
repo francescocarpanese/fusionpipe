@@ -15,4 +15,4 @@ if __name__ == "__main__":
     print("Running matlab script")
     # Run matlab script as a subprocess
     from subprocess import run
-    run(["/home/carpanes/MATLAB/bin/matlab","-batch","example_matlab"], check=True, cwd=os.path.dirname(__file__), env=os.environ.copy())
+    run(["/usr/local/matlab-25.1/bin/matlab","-batch","example_matlab"], check=True, cwd=os.path.dirname(__file__), env=os.environ.copy())
