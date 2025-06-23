@@ -8,6 +8,7 @@
         right,
         bottom,
         onclick,
+        copySelectedNodeFolderPathToClipboard
     }: {
         id: string;
         top: number | undefined;
@@ -15,8 +16,8 @@
         right: number | undefined;
         bottom: number | undefined;
         onclick: () => void;
+        copySelectedNodeFolderPathToClipboard: () => void;
     } = $props();
-
 </script>
 
 <div
@@ -24,8 +25,7 @@
   class="context-menu"
   on:click={onclick}
 >
-  <button>duplicate</button>
-  <button>delete</button>
+  <button on:click|stopPropagation={copySelectedNodeFolderPathToClipboard}>Copy Folder Path</button>
 </div>
 
 <style>

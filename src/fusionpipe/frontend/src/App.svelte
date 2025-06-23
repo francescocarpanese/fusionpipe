@@ -170,6 +170,27 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
   }
 
+
+  async function copySelectedNodeFolderPathToClipboard() {
+    const selectedNode = nodes.find((node) => node.selected);
+    if (!selectedNode) {
+      alert("No node selected");
+      return;
+    }
+    const folderPath = selectedNode.data?.folder_path;
+    if (!folderPath) {
+      alert("No folder path available for the selected node.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(folderPath);
+      alert(`Folder path copied to clipboard:\n${folderPath}`);
+    } catch (error) {
+      console.error("Failed to copy folder path:", error);
+      alert("Failed to copy folder path.");
+    }
+  }
+
   async function refreshLayout() {
     const layouted = getLayoutedElements(nodes, edges);
     nodes = [...layouted.nodes];
@@ -1429,6 +1450,9 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
         <DropdownItem onclick={() => (isHiddenNodePanel = false)}
           >Open selected node panel</DropdownItem
         >
+        <DropdownItem onclick={copySelectedNodeFolderPathToClipboard}>
+          Copy selected node path to clipboard
+        </DropdownItem>        
         <DropdownItem onclick={addNode}>Create node</DropdownItem>
         <DropdownItem onclick={duplicateSelectedNodes}
           >Duplicate selected nodes into this pipeline</DropdownItem
@@ -1458,6 +1482,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
         <DropdownItem class="text-red-600" onclick={deleteNodeOutputs}
           >Delete output selected nodes</DropdownItem
         >
+
         <DropdownItem class="text-red-600" onclick={deleteNode}
           >Delete selected nodes</DropdownItem
         >
@@ -1640,6 +1665,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       id={menu.id}
       top={menu.top}
       left={menu.left}
+      copySelectedNodeFolderPathToClipboard={copySelectedNodeFolderPathToClipboard}
     />
   {/if}
       <MiniMap />
