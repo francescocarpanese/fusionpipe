@@ -978,6 +978,7 @@
       return;
     }
     const nodeId = selectedNode.id;
+    alert(`Node ${nodeId} is starting to run...`);
     try {
       const response = await fetch(`http://localhost:8000/run_node/${nodeId}`, {
         method: "POST",
@@ -1010,6 +1011,9 @@
       alert("No pipeline selected");
       return;
     }
+
+    // Notify user
+    alert(`Pipeline ${pipelineId} is starting to run...`);
 
     try {
       const response = await fetch(
@@ -1046,6 +1050,9 @@
       alert("No node selected");
       return;
     }
+
+    // Notify user
+    alert(`Pipeline ${pipelineId} will run up to node ${selectedNode.id}...`);
 
     try {
       const response = await fetch(
