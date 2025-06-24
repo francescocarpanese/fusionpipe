@@ -181,10 +181,17 @@ whoami
 ssh -L 5174:localhost:5174 -L 8100:localhost:8100 fbertini@spcpc636
 ```
 
-- Write the following line in the `.bashrc` ( maybe profile)
+- Write the following line in the `.profile`. This allows the user to have access to the database
 ```bash
 export DATABASE_URL="dbname=fusionpipe_prod1 user=fbertini password=coccolone host=localhost port=5432"
 ```
+
+- When switching to a node run the following command
+```bash
+uv run python -m ipykernel install --user --name n_20250624150209_5920 --display-name n_20250624150209_5920
+```
+To initialise the kernel for the node
+
 
 # Make the noteboo available to everybody
 # (This is not working yet)

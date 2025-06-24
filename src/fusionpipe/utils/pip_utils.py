@@ -62,6 +62,9 @@ def init_node_folder(folder_path_nodes, verbose=False):
         # Add the ipykernel package to the virtual environment
         os.system("uv add ipykernel")
 
+        # Add nbconvert for notebook conversion support
+        os.system("uv add nbconvert")
+
         # Install the current environment as a Jupyter kernel
         os.system("uv run python -m ipykernel install --user --name " + env_name + " --display-name " + env_name)
 

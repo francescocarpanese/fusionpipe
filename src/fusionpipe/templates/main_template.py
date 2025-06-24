@@ -20,12 +20,14 @@ if __name__ == "__main__":
     # run(["/usr/local/matlab-25.1/bin/matlab","-batch","example_matlab"], check=True, cwd=os.path.dirname(__file__), env=os.environ.copy())
 
     # -- Example run python notebook --
-    # Uncomment the following lines to run the notebook example
+    ## Uncomment the following lines to run the notebook example
     # print("Running python notebook")
     # # This will save the executed notebook into a different file.
+    # from subprocess import run
     # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # kernel_name = "python3" # This is the name of the kernel that you have been using during developement of this node. Usually the same is the same as the node_id
     # run([
-    #     "jupyter", "nbconvert", "--to", "notebook", "--execute", "example_notebook.ipynb",
+    #     "uv", "run", "jupyter", "nbconvert", "--to", "notebook", "--execute", "example_notebook.ipynb",
     #     "--output", f"executed_example_notebook_{timestamp}.ipynb",
-    #     "--ExecutePreprocessor.kernel_name=python3" # Usually you will have a kernel with the same name of the node
+    #     f"--ExecutePreprocessor.kernel_name={kernel_name}"  # Use the kernel_name variable
     # ], check=True, cwd=os.path.dirname(__file__), env=os.environ.copy())
