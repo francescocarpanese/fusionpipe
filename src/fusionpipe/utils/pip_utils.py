@@ -84,16 +84,19 @@ def init_node_folder(folder_path_nodes, verbose=False):
 
         if os.path.exists(example_python_path):
             shutil.copy(example_python_path, code_folder_path)
+            os.chmod(os.path.join(code_folder_path, "example_python.py"), 0o664)
         else:
             raise FileNotFoundError(f"Example Python file not found at {example_python_path}")
 
         if os.path.exists(example_matlab_path):
             shutil.copy(example_matlab_path, code_folder_path)
+            os.chmod(os.path.join(code_folder_path, "example_matlab.m"), 0o664)
         else:
             raise FileNotFoundError(f"Example MATLAB file not found at {example_matlab_path}")
         
         if os.path.exists(example_notebook_path):
             shutil.copy(example_notebook_path, code_folder_path)
+            os.chmod(os.path.join(code_folder_path, "example_notebook.ipynb"), 0o664)
         else:
             raise FileNotFoundError(f"Example Notebook file not found at {example_notebook_path}")
 
@@ -102,6 +105,12 @@ def init_node_folder(folder_path_nodes, verbose=False):
         if os.path.exists(user_utils_folder_path):
             destination_user_utils_path = os.path.join(code_folder_path, 'user_utils')
             shutil.copytree(user_utils_folder_path, destination_user_utils_path, dirs_exist_ok=True)
+            # Recursively set group-writable for all files in user_utils
+            for root, dirs, files in os.walk(destination_user_utils_path):
+                for d in dirs:
+                    os.chmod(os.path.join(root, d), 0o2775)  # setgid for directories
+                for f in files:
+                    os.chmod(os.path.join(root, f), 0o664)
         
         # Update the name entry in pyproject.toml using the toml library
         pyproject_file_path = os.path.join(code_folder_path, 'pyproject.toml')
