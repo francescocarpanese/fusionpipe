@@ -14,8 +14,8 @@ app = FastAPI()
 app.include_router(pipeline_handle.router)
 
 # Add CORS middleware
-frontend_host = os.getenv("FRONTEND_HOST", "localhost")
-frontend_port = os.getenv("FRONTEND_PORT", "3000")
+frontend_host = os.getenv("VITE_FRONTEND_HOST", "localhost")
+frontend_port = os.getenv("VITE_FRONTEND_PORT", "3000")
 frontend_url = f"http://{frontend_host}:{frontend_port}"
 
 app.add_middleware(

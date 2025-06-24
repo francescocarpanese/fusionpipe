@@ -82,29 +82,106 @@ uv run python src/fusionpipe/utils/init_database.py
 
 # Set-up production server
 
-- Create the table 
+- Create the database
 
 ```bash
 psql -U postgres -d fusionpipe_prod1 -c "CREATE ROLE writers;"
 psql -U postgres -d fusionpipe_prod1 -c "GRANT CONNECT, TEMPORARY ON DATABASE fusionpipe_prod1 TO writers;"
 psql -U postgres -d fusionpipe_prod1 -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO writers;"
 psql -U postgres -d fusionpipe_prod1 -c "GRANT CREATE ON SCHEMA public TO writers;"
-psql -U postgres -d fusionpipe_prod1 -c "GRANT writers TO carpanes;"
 ```
 
 - Grant access to the user.
 
+```bash
+psql -U postgres -d fusionpipe_prod1 -c "GRANT writers TO carpanes;"
+psql -U postgres -d fusionpipe_prod1 -c "GRANT writers TO fbertini;"
+```
+
+
+
+
 - Export the env variable
 `export $(grep -v '^#' something.env | xargs)`
 
+```bash
+set -a
+source production.env
+set +a
+```
 
 - Start the backend
 Making sure you are in a terminal where you have the right enviroment path.
 
+
 - Start the frontend
 
-Probably some of them needs to be read from env variables.
-`VITE_BACKEND_HOST=localhost VITE_BACKEND_PORT=8100 npm run dev -- --port 5174`
+```bash
+VITE_BACKEND_HOST=$VITE_BACKEND_HOST VITE_BACKEND_PORT=$VITE_BACKEND_PORT  npm run dev -- --port $VITE_FRONTEND_PORT
+```
 
 
-# Create a new user
+# R/W access to folder
+
+- Create the folder that will contain applicaiton data
+
+- Create a group
+```bash
+sudo groupadd fusionpipeusers
+```
+
+- Log out and log in again
+
+- Add user to the group
+```bash
+sudo usermod -aG fusionpipeusers carpanes
+```
+
+- Log out and log in every time you add a new user.
+
+- Set group permission permission to the shared data folder
+```bash
+sudo chown -R :fusionpipeusers /misc/fusionpipe_shared
+sudo chmod -R 2770 /misc/fusionpipe_shared
+```
+
+- (Optional) Enforce Permissions with ACLs. This will let other user write on user generated file, independently of the user mask
+```bash
+sudo setfacl -d -m g::rwx /misc/fusionpipe_shared
+sudo setfacl -d -m o::--- /misc/fusionpipe_shared
+```
+
+# Set up a new user 
+
+- Create new user in postgres
+
+`psql -U postgres -d fusionpipe_prod1 -c "CREATE USER fbertini WITH PASSWORD 'coccolone';"`
+
+- Grant user access to group
+
+`psql -U postgres -d fusionpipe_prod1 -c "GRANT writers TO fbertini;"`
+
+- Ask user to write the following line in the `.bashrc`, in order to persist the access to the database
+
+```bash
+export DATABASE_URL="dbname=fusionpipe_prod1 user=carpanes password=zidane90 host=localhost port=5432"
+```
+
+
+# User set-up
+- Communicate the username to the admin
+```bash
+whoami
+```
+
+- ssh to the machine and forward the port with the frontend and backend
+
+`ssh -L 5174:localhost:5174 -L 8100:localhost:8100 fbertini@spcpc636`
+
+- Write the following line in the `.bashrc`
+```bash
+export DATABASE_URL="dbname=fusionpipe_prod1 user=carpanes password=zidane90 host=localhost port=5432"
+```
+
+
+

@@ -52,10 +52,18 @@ def init_node_folder(folder_path_nodes, verbose=False):
     try:
         # Run the 'uv init' command inside the node folder
         os.chdir(code_folder_path)
-        os.system("uv init")
+        # Initialize the uv environment with a specific name (if supported)
+        env_name = os.path.basename(folder_path_nodes)
+        os.system(f"uv init --name {env_name}")
 
         # Add some package to uv
         os.system("uv add psycopg2-binary")
+
+        # Add the ipykernel package to the virtual environment
+        os.system("uv add ipykernel")
+
+        # Install the current environment as a Jupyter kernel
+        os.system("uv run python -m ipykernel install --user --name " + env_name + " --display-name " + env_name)
 
         # Copy the template file into the code folder
         template_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates', 'main_template.py')
@@ -71,6 +79,8 @@ def init_node_folder(folder_path_nodes, verbose=False):
         template_folder_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates')
         example_python_path = os.path.join(template_folder_path, 'example_python.py')
         example_matlab_path = os.path.join(template_folder_path, 'example_matlab.m')
+        example_notebook_path = os.path.join(template_folder_path, 'example_notebook.ipynb')
+
 
         if os.path.exists(example_python_path):
             shutil.copy(example_python_path, code_folder_path)
@@ -81,6 +91,11 @@ def init_node_folder(folder_path_nodes, verbose=False):
             shutil.copy(example_matlab_path, code_folder_path)
         else:
             raise FileNotFoundError(f"Example MATLAB file not found at {example_matlab_path}")
+        
+        if os.path.exists(example_notebook_path):
+            shutil.copy(example_notebook_path, code_folder_path)
+        else:
+            raise FileNotFoundError(f"Example Notebook file not found at {example_notebook_path}")
 
         user_utils_folder_path =  os.path.join(os.path.dirname(os.path.dirname(__file__)), 'user_utils')
         # Copy the user_utils folder into the code folder
