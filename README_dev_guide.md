@@ -89,6 +89,8 @@ psql -U postgres -d fusionpipe_prod1 -c "CREATE ROLE writers;"
 psql -U postgres -d fusionpipe_prod1 -c "GRANT CONNECT, TEMPORARY ON DATABASE fusionpipe_prod1 TO writers;"
 psql -U postgres -d fusionpipe_prod1 -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO writers;"
 psql -U postgres -d fusionpipe_prod1 -c "GRANT CREATE ON SCHEMA public TO writers;"
+psql -U postgres -d fusionpipe_prod1 -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO writers;"
+psql -U postgres -d fusionpipe_prod1 -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO writers;"
 ```
 
 - Grant access to the user.
@@ -97,7 +99,6 @@ psql -U postgres -d fusionpipe_prod1 -c "GRANT CREATE ON SCHEMA public TO writer
 psql -U postgres -d fusionpipe_prod1 -c "GRANT writers TO carpanes;"
 psql -U postgres -d fusionpipe_prod1 -c "GRANT writers TO fbertini;"
 ```
-
 
 
 
@@ -176,12 +177,19 @@ whoami
 
 - ssh to the machine and forward the port with the frontend and backend
 
-`ssh -L 5174:localhost:5174 -L 8100:localhost:8100 fbertini@spcpc636`
-
-- Write the following line in the `.bashrc`
 ```bash
-export DATABASE_URL="dbname=fusionpipe_prod1 user=carpanes password=zidane90 host=localhost port=5432"
+ssh -L 5174:localhost:5174 -L 8100:localhost:8100 fbertini@spcpc636
 ```
 
+- Write the following line in the `.bashrc` ( maybe profile)
+```bash
+export DATABASE_URL="dbname=fusionpipe_prod1 user=fbertini password=coccolone host=localhost port=5432"
+```
 
-
+# Make the noteboo available to everybody
+# (This is not working yet)
+sudo groupadd jupyterkernels
+sudo mkdir -p /usr/local/share/jupyter/kernels
+sudo chown -R root:jupyterkernels /usr/local/share/jupyter/kernels
+sudo chmod -R 2775 /usr/local/share/jupyter/kernels
+sudo usermod -aG jupyterkernels username
