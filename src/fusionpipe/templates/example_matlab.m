@@ -6,7 +6,7 @@ clc
 addpath(genpath('user_utils/matlab'));
 
 % Set manually the string with the node id or read from the folder name
-[~,node_id] = fileparts(fileparts(pwd));
+node_id = get_node_id();
 
 % Get folder paths of all the parents of this node
 node_parents = get_all_parent_node_folder_paths(node_id);
