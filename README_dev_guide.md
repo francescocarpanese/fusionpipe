@@ -175,6 +175,11 @@ export DATABASE_URL="dbname=fusionpipe_prod1 user=carpanes password=zidane90 hos
 whoami
 ```
 
+- Install `uv`
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
 - ssh to the machine and forward the port with the frontend and backend
 
 ```bash

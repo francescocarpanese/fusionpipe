@@ -31,3 +31,12 @@ def get_all_parent_node_folder_paths(node_id):
             parent_paths.append(path)
     
     return parent_paths
+
+def get_node_id():
+    """
+    Get the node id, which is the name of the folder two levels up from this file.
+    """
+    current_file = os.path.abspath(__file__)
+    two_levels_up = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))
+    node_id = os.path.basename(two_levels_up)
+    return node_id

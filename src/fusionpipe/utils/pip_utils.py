@@ -83,6 +83,7 @@ def init_node_folder(folder_path_nodes, verbose=False):
         example_python_path = os.path.join(template_folder_path, 'example_python.py')
         example_matlab_path = os.path.join(template_folder_path, 'example_matlab.m')
         example_notebook_path = os.path.join(template_folder_path, 'example_notebook.ipynb')
+        init_node_kernel_path = os.path.join(template_folder_path, 'init_node_kernel.py')
 
 
         if os.path.exists(example_python_path):
@@ -90,6 +91,12 @@ def init_node_folder(folder_path_nodes, verbose=False):
             os.chmod(os.path.join(code_folder_path, "example_python.py"), 0o664)
         else:
             raise FileNotFoundError(f"Example Python file not found at {example_python_path}")
+        
+        if os.path.exists(init_node_kernel_path):
+            shutil.copy(init_node_kernel_path, code_folder_path)
+            os.chmod(os.path.join(code_folder_path, "init_node_kernel.py"), 0o664)
+        else:
+            raise FileNotFoundError(f"Example Python file not found at {init_node_kernel_path}")
 
         if os.path.exists(example_matlab_path):
             shutil.copy(example_matlab_path, code_folder_path)
@@ -561,6 +568,8 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
     try:
         os.chdir(code_folder_path)
         os.system("uv run")
+        os.system("uv run python -m ipykernel install --user --name " + new_node_id + " --display-name " + new_node_id)
+
     finally:
         os.chdir(current_dir)
 

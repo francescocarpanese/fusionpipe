@@ -3,6 +3,7 @@
 # export DATABASE_URL="dbname=<yourdb> user=<youruser> password=<yourpassword> host=localhost port=<port>"
 import os
 from datetime import datetime
+from user_utils.python.node_api import get_node_id
 
 if __name__ == "__main__":
     # -- Example run simple python functions --
@@ -25,7 +26,7 @@ if __name__ == "__main__":
     # # This will save the executed notebook into a different file.
     # from subprocess import run
     # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    # kernel_name = "python3" # This is the name of the kernel that you have been using during developement of this node. Usually the same is the same as the node_id
+    # kernel_name = get_node_id() # This is the name of the kernel that you have been using during developement of this node. Usually the same is the same as the node_id
     # run([
     #     "uv", "run", "jupyter", "nbconvert", "--to", "notebook", "--execute", "example_notebook.ipynb",
     #     "--output", f"executed_example_notebook_{timestamp}.ipynb",
