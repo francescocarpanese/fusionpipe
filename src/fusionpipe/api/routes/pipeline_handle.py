@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 
 
 from fusionpipe.utils import db_utils, pip_utils, runner_utils
+import random
 
 router = APIRouter()
 
@@ -101,7 +102,9 @@ def add_node_to_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
         node_id = pip_utils.generate_node_id()
         folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"),node_id)
         db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path_nodes)
-        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+        position_x = random.randint(-10, 10)
+        position_y = random.randint(-10, 10)
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, position_x=position_x, position_y=position_y)
         pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
         db_conn.commit()
     except Exception as e:
