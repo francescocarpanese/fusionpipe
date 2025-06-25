@@ -673,3 +673,32 @@ def delete_edge_and_update_status(cur, pipeline_id, parent_id, child_id):
 
     # Remove the edge and update the pipeline using editable logic
     db_utils.remove_node_relation_with_editable_logic(cur, parent_id=parent_id, child_id=child_id)
+
+def add_node_relation_safe(cur, pipeline_id, parent_id, child_id):
+    """
+    Safely add a node relation (edge) to the pipeline graph.
+    - Checks that the child node is editable.
+    - Checks that adding the edge does not create a cycle.
+    - Adds the relation if all checks pass.
+    """
+    from fusionpipe.utils import db_utils
+    import networkx as nx
+
+    # Get the current pipeline graph
+    graph = db_to_graph_from_pip_id(cur, pipeline_id)
+
+    # Check if the child node is editable
+    if not db_utils.is_node_editable(cur, node_id=child_id):
+        raise ValueError(f"Child node {child_id} is not editable. Cannot add relation.")
+
+    # Check if adding the edge would create a cycle
+    temp_graph = graph.copy()
+    temp_graph.add_edge(parent_id, child_id)
+    if not nx.is_directed_acyclic_graph(temp_graph):
+        raise ValueError(f"Adding edge from {parent_id} to {child_id} would create a cycle.")
+
+    # Add the relation
+    db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
+    return True
+
+

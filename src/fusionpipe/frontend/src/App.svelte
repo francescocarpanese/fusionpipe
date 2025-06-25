@@ -574,34 +574,39 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
   }
 
-  async function handleConnect(event) {
-    const source = event.source;
-    const target = event.target;
+    async function handleConnect(event) {
+      const source = event.source;
+      const target = event.target;
 
-    console.log(`Connected nodes: ${source} → ${target}`);
+      console.log(`Connected nodes: ${source} → ${target}`);
 
-    const pipelineId =
-      typeof currentPipelineId === "string"
-        ? currentPipelineId
-        : currentPipelineId.value;
+      const pipelineId =
+        typeof currentPipelineId === "string"
+          ? currentPipelineId
+          : currentPipelineId.value;
 
-    if (!pipelineId) {
-      console.error("No pipeline selected");
-      return;
+      if (!pipelineId) {
+        console.error("No pipeline selected");
+        return;
+      }
+
+      try {
+        const response = await fetch(`${BACKEND_URL}/connect_nodes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source, target, pipelineId }),
+        });
+        if (!response.ok) {
+          await handleApiError(response);
+        }
+        await loadPipeline(pipelineId);
+      }
+      catch (error) {
+        console.error("Error connecting nodes:", error);
+        await loadPipeline(pipelineId);
+        return false; 
+      }
     }
-
-    try {
-      const response = await fetch(`${BACKEND_URL}/connect_nodes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source, target }),
-      });
-      if (!response.ok) await handleApiError(response);
-      await loadPipeline(pipelineId);
-    } catch (error) {
-      console.error("Error connecting nodes:", error);
-    }
-  }
 
   async function createPipeline() {
     try {

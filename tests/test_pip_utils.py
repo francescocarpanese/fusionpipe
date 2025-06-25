@@ -657,3 +657,45 @@ def test_update_stale_status_for_pipeline_nodes(pg_test_db, dag_dummy_1):
     for n in unaffected:
         status = db_utils.get_node_status(cur, n)
         assert status != "staledata", f"Unrelated node {n} should not be set to staledata"
+
+def test_add_node_relation_safe(pg_test_db):
+    """
+    Test add_node_relation_safe:
+    - Adds a valid relation.
+    - Fails if child is not editable.
+    - Fails if adding the edge would create a cycle.
+    """
+    from fusionpipe.utils.pip_utils import add_node_relation_safe, generate_node_id, generate_pip_id
+    from fusionpipe.utils.pip_utils import graph_to_db, db_to_graph_from_pip_id
+    from fusionpipe.utils import db_utils
+    import networkx as nx
+    import pytest
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Create a simple pipeline with two nodes
+    pipeline_id = generate_pip_id()
+    parent_id = generate_node_id()
+    child_id = generate_node_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id)
+    db_utils.add_node_to_nodes(cur, node_id=parent_id, status="ready", editable=True)
+    db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", editable=True)
+    db_utils.add_node_to_pipeline(cur, node_id=parent_id, pipeline_id=pipeline_id)
+    db_utils.add_node_to_pipeline(cur, node_id=child_id, pipeline_id=pipeline_id)
+    conn.commit()
+
+    # Should succeed: add parent -> child
+    assert add_node_relation_safe(cur, pipeline_id, parent_id, child_id) is True
+    conn.commit()
+    G = db_to_graph_from_pip_id(cur, pipeline_id)
+    assert (parent_id, child_id) in G.edges
+
+    # Should fail: adding child -> parent (would create a cycle)
+    with pytest.raises(ValueError, match="cycle"):
+        add_node_relation_safe(cur, pipeline_id, child_id, parent_id)
+
+    # Should fail: child not editable
+    db_utils.update_editable_status(cur, node_id=child_id, editable=False)
+    with pytest.raises(ValueError, match="not editable"):
+        add_node_relation_safe(cur, pipeline_id, parent_id, child_id)

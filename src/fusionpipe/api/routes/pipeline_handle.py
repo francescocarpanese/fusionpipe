@@ -137,11 +137,12 @@ def delete_edge(pipeline_id: str, source: str, target: str, db_conn=Depends(get_
 async def connect_nodes_in_pipeline(payload: dict, db_conn=Depends(get_db)):
     source = payload.get("source")
     target = payload.get("target")
+    pipeline_id = payload.get("pipelineId")
     if not source or not target:
         raise HTTPException(status_code=400, detail="Missing source or target node id")
     cur = db_conn.cursor()
     try:
-        db_utils.add_node_relation(cur, parent_id=source, child_id=target)
+        pip_utils.add_node_relation_safe(cur, pipeline_id=pipeline_id, parent_id=source, child_id=target)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
