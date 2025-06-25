@@ -579,7 +579,7 @@ def update_process_status(cur, process_id, status):
     :param status: New status for the process
     :return: Number of rows affected
     """
-    cur.execute('UPDATE processes SET status = %s WHERE process_id = %s', (status, process_id))
+    cur.execute('UPDATE processes SET status = %s WHERE process_id = %s', (status, str(process_id)))
     return cur.rowcount
 
 def get_process_ids_by_node(cur, node_id):

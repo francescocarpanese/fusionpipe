@@ -46,9 +46,10 @@ def run_node(conn, node_id, run_mode="local"):
                 db_utils.update_process_status(cur, proc.pid, status="failed")
             conn.commit()
         except Exception as e:
+            conn.rollback()
             db_utils.update_node_status(cur, node_id, "failed")
             db_utils.update_process_status(cur, proc.pid, status="failed")
-            conn.rollback()
+            conn.commit()    
             print(f"Node {node_id} failed to run: {e}")
     elif run_mode == "ray":
         # To be implemented
