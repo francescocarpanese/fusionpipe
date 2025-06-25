@@ -382,6 +382,8 @@ def duplicate_nodes_in_pipeline_route(payload: dict, db_conn=Depends(get_db)):
         id_map = pip_utils.duplicate_nodes_in_pipeline_with_relations(
             cur, source_pipeline_id, target_pipeline_id, node_ids
         )
+        for new_node_id in id_map.values():
+            db_utils.update_node_status(cur, node_id=new_node_id, status="staledata")
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
