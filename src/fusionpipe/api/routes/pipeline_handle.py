@@ -434,22 +434,30 @@ def delete_node_data_route(payload: dict, db_conn=Depends(get_db)):
     return {"message": f"Data for nodes {node_ids} deleted successfully"}
 
 @router.post("/manual_set_node_status/{node_id}/{status}")
-def manual_set_node_status(node_id: str, status: str, db_conn=Depends(get_db)):
+def manual_set_node_status(node_id: str, status: str, payload: dict = None, db_conn=Depends(get_db)):
     """
     Manually set the status of a node.
+    Expects payload: {"pipeline_id": "..."}
     """
     if status not in ["ready", "running", "completed", "failed", "staledata"]:
         raise HTTPException(status_code=400, detail="Invalid status")
     
+    pipeline_id = None
+    if payload:
+        pipeline_id = payload.get("pipeline_id")
+    if not pipeline_id:
+        raise HTTPException(status_code=400, detail="Missing pipeline_id in payload")
+    
     cur = db_conn.cursor()
     try:
         db_utils.update_node_status(cur, node_id=node_id, status=status)
+        pip_utils.update_stale_status_for_pipeline_nodes(cur, pipeline_id=pipeline_id)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     
-    return {"message": f"Node {node_id} status set to {status}"}
+    return {"message": f"Node {node_id} status set to {status} and stale status updated for pipeline {pipeline_id}"}
 
 @router.post("/kill_node/{node_id}")
 def kill_node_route(node_id: str, db_conn=Depends(get_db)):

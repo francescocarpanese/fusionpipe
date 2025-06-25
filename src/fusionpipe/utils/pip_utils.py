@@ -567,7 +567,9 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
     current_dir = os.getcwd()
     try:
         os.chdir(code_folder_path)
+        # Set up the virtual environment for the new node.
         os.system("uv run")
+        # Add the ipykernel package to the virtual environment of the core user, in order to be able to run the node in Jupyter
         os.system("uv run python -m ipykernel install --user --name " + new_node_id + " --display-name " + new_node_id)
 
     finally:
