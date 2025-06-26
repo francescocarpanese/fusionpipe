@@ -3,6 +3,10 @@
 # export DATABASE_URL="dbname=<yourdb> user=<youruser> password=<yourpassword> host=localhost port=<port>"
 import os
 from datetime import datetime
+import sys
+sys.path.insert(0, os.environ.get("USER_UTILS_FOLDER_PATH"))
+from python_user_utils.node_api import get_all_parent_node_folder_paths, get_node_id, get_folder_path_data, get_folder_path_reports
+
 
 if __name__ == "__main__":
     print("Running main template.py")
