@@ -40,11 +40,19 @@ def init_node_folder(folder_path_nodes, verbose=False):
     os.makedirs(folder_path_nodes, exist_ok=True)
 
     code_folder_path = os.path.join(folder_path_nodes,"code")
+    node_examples_folder_path = os.path.join(code_folder_path, "examples")
     
     # Create subfolders 'code' and 'data'
     os.makedirs(f"{code_folder_path}", exist_ok=True)
+    os.makedirs(node_examples_folder_path, exist_ok=True)
     os.makedirs(f"{folder_path_nodes}/data", exist_ok=True)
     os.makedirs(f"{folder_path_nodes}/reports", exist_ok=True)
+
+    # Add __init__.py files to the examples folder to make it a package
+    init_file_path = os.path.join(node_examples_folder_path, '__init__.py')
+    if not os.path.exists(init_file_path):
+        with open(init_file_path, 'w') as init_file:
+            init_file.write("# This file makes the examples folder a package\n")
 
     # Save the current working directory
     current_dir = os.getcwd()
@@ -87,8 +95,8 @@ def init_node_folder(folder_path_nodes, verbose=False):
 
 
         if os.path.exists(example_python_path):
-            shutil.copy(example_python_path, code_folder_path)
-            os.chmod(os.path.join(code_folder_path, "example_python.py"), 0o664)
+            shutil.copy(example_python_path, node_examples_folder_path)
+            os.chmod(os.path.join(node_examples_folder_path, "example_python.py"), 0o664)
         else:
             raise FileNotFoundError(f"Example Python file not found at {example_python_path}")
         
@@ -99,29 +107,17 @@ def init_node_folder(folder_path_nodes, verbose=False):
             raise FileNotFoundError(f"Example Python file not found at {init_node_kernel_path}")
 
         if os.path.exists(example_matlab_path):
-            shutil.copy(example_matlab_path, code_folder_path)
-            os.chmod(os.path.join(code_folder_path, "example_matlab.m"), 0o664)
+            shutil.copy(example_matlab_path, node_examples_folder_path)
+            os.chmod(os.path.join(node_examples_folder_path, "example_matlab.m"), 0o664)
         else:
             raise FileNotFoundError(f"Example MATLAB file not found at {example_matlab_path}")
         
         if os.path.exists(example_notebook_path):
-            shutil.copy(example_notebook_path, code_folder_path)
-            os.chmod(os.path.join(code_folder_path, "example_notebook.ipynb"), 0o664)
+            shutil.copy(example_notebook_path, node_examples_folder_path)
+            os.chmod(os.path.join(node_examples_folder_path, "example_notebook.ipynb"), 0o664)
         else:
             raise FileNotFoundError(f"Example Notebook file not found at {example_notebook_path}")
 
-        user_utils_folder_path =  os.path.join(os.path.dirname(os.path.dirname(__file__)), 'user_utils')
-        # Copy the user_utils folder into the code folder
-        if os.path.exists(user_utils_folder_path):
-            destination_user_utils_path = os.path.join(code_folder_path, 'user_utils')
-            shutil.copytree(user_utils_folder_path, destination_user_utils_path, dirs_exist_ok=True)
-            # Recursively set group-writable for all files in user_utils
-            for root, dirs, files in os.walk(destination_user_utils_path):
-                for d in dirs:
-                    os.chmod(os.path.join(root, d), 0o2775)  # setgid for directories
-                for f in files:
-                    os.chmod(os.path.join(root, f), 0o664)
-        
         # Update the name entry in pyproject.toml using the toml library
         pyproject_file_path = os.path.join(code_folder_path, 'pyproject.toml')
         if os.path.exists(pyproject_file_path):

@@ -3,13 +3,12 @@
 # export DATABASE_URL="dbname=<yourdb> user=<youruser> password=<yourpassword> host=localhost port=<port>"
 import os
 from datetime import datetime
-from user_utils.python.node_api import get_node_id
 
 if __name__ == "__main__":
     # -- Example run simple python functions --
 
     # Import example functions
-    from example_python import print_node_parents, save_dummy_output
+    from examples.example_python import print_node_parents, save_dummy_output
     print("Running python example from function")
     print_node_parents()
     save_dummy_output()
@@ -18,7 +17,7 @@ if __name__ == "__main__":
     # Uncomment the following lines to run the matlab example
     # print("Running matlab script")
     # from subprocess import run
-    # run(["/usr/local/matlab-25.1/bin/matlab","-batch","example_matlab"], check=True, cwd=os.path.dirname(__file__), env=os.environ.copy())
+    # run(["/usr/local/matlab-25.1/bin/matlab","-batch","examples/example_matlab"], check=True, cwd=os.path.dirname(__file__), env=os.environ.copy())
 
     # -- Example run python notebook --
     ## Uncomment the following lines to run the notebook example
@@ -28,7 +27,7 @@ if __name__ == "__main__":
     # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     # kernel_name = get_node_id() # This is the name of the kernel that you have been using during developement of this node. Usually the same is the same as the node_id
     # run([
-    #     "uv", "run", "jupyter", "nbconvert", "--to", "notebook", "--execute", "example_notebook.ipynb",
+    #     "uv", "run", "jupyter", "nbconvert", "--to", "notebook", "--execute", "examples/example_notebook.ipynb",
     #     "--output", f"executed_example_notebook_{timestamp}.ipynb",
     #     f"--ExecutePreprocessor.kernel_name={kernel_name}"  # Use the kernel_name variable
     # ], check=True, cwd=os.path.dirname(__file__), env=os.environ.copy())
