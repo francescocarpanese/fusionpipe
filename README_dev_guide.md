@@ -201,12 +201,3 @@ export USER_UTILS_FOLDER_PATH="/misc/carpanes/fusionpipe/src/fusionpipe/user_uti
 uv run python -m ipykernel install --user --name n_20250624150209_5920 --display-name n_20250624150209_5920
 ```
 To initialise the kernel for the node
-
-
-# Make the noteboo available to everybody
-# (This is not working yet)
-sudo groupadd jupyterkernels
-sudo mkdir -p /usr/local/share/jupyter/kernels
-sudo chown -R root:jupyterkernels /usr/local/share/jupyter/kernels
-sudo chmod -R 2775 /usr/local/share/jupyter/kernels
-sudo usermod -aG jupyterkernels username

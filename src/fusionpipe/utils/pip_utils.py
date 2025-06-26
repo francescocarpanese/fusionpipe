@@ -92,7 +92,12 @@ def init_node_folder(folder_path_nodes, verbose=False):
         example_matlab_path = os.path.join(template_folder_path, 'example_matlab.m')
         example_notebook_path = os.path.join(template_folder_path, 'example_notebook.ipynb')
         init_node_kernel_path = os.path.join(template_folder_path, 'init_node_kernel.py')
+        example_defuse_path = os.path.join(template_folder_path, 'DEFUSE_example.m')
 
+        # Copy and grand writing access to the example files
+        if os.path.exists(example_defuse_path):
+            shutil.copy(example_defuse_path, node_examples_folder_path)
+            os.chmod(os.path.join(node_examples_folder_path, "DEFUSE_example.m"), 0o664)
 
         if os.path.exists(example_python_path):
             shutil.copy(example_python_path, node_examples_folder_path)
