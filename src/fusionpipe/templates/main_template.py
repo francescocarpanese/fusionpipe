@@ -17,7 +17,8 @@ if __name__ == "__main__":
     # Uncomment the following lines to run the matlab example
     # print("Running matlab script")
     # from subprocess import run
-    # run(["/usr/local/matlab-25.1/bin/matlab","-batch","examples/example_matlab"], check=True, cwd=os.path.dirname(__file__), env=os.environ.copy())
+    # script_dir = os.path.join(os.path.dirname(__file__), "examples") # Matlab is set to run from the folder of the script
+    # run(["/usr/local/matlab-25.1/bin/matlab","-batch","example_matlab"], check=True, cwd=script_dir, env=os.environ.copy())
 
     # -- Example run python notebook --
     ## Uncomment the following lines to run the notebook example

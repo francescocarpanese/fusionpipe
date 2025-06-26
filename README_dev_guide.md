@@ -191,6 +191,11 @@ ssh -L 5174:localhost:5174 -L 8100:localhost:8100 fbertini@spcpc636
 export DATABASE_URL="dbname=fusionpipe_prod1 user=fbertini password=coccolone host=localhost port=5432"
 ```
 
+- Write the location of the user utils in the `.profile`
+```bash
+export USER_UTILS_FOLDER_PATH="/misc/carpanes/fusionpipe/src/fusionpipe/user_utils"
+```
+
 - When switching to a node run the following command
 ```bash
 uv run python -m ipykernel install --user --name n_20250624150209_5920 --display-name n_20250624150209_5920

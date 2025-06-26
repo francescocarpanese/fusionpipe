@@ -1,4 +1,4 @@
-function parent_ids = get_node_parents(conn, node_id)
+function parent_ids = get_node_parents_db(conn, node_id)
     % Retrieve the parent IDs of a given node from the database.
     % conn: Database connection object
     % node_id: ID of the node whose parents are to be retrieved

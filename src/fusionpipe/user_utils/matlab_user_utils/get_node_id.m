@@ -1,14 +1,16 @@
 function node_id = get_node_id()
-%GET_NODE_ID Get the node id, which is the name of the folder two levels up from this file.
+%GET_NODE_ID Get the node id by searching the current working directory path
+% for a folder name matching the pattern: n_<14 digits>_<4 digits>.
 
-current_file = mfilename('fullpath');
-two_levels_up = fileparts(fileparts(fileparts(fileparts(current_file))));
-node_id = get_basename(two_levels_up);
+cwd = pwd;
+% Pattern: n_ followed by 14 digits, underscore, 4 digits
+expr = 'n_\d{14}_\d{4}';
+tokens = regexp(cwd, expr, 'match');
 
+if ~isempty(tokens)
+    node_id = tokens{1};
+else
+    node_id = [];
 end
 
-function name = get_basename(pathstr)
-% Helper to get the last part of a path (basename)
-[~, name, ext] = fileparts(pathstr);
-name = [name ext];
 end
