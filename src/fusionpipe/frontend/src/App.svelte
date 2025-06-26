@@ -53,6 +53,7 @@
 
   let currentPipelineId = $state("");
   let currentProjectId = $state("");
+  let currentTargetPipelineId = $state("");
   const nodeWidth = 172;
   const nodeHeight = 36;
   let nodeDrawereForm = $state({
@@ -397,7 +398,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       return;
     }
 
-    if (!selectedPipelineTarget) {
+    if (!currentTargetPipelineId) {
       console.error("No target pipeline selected");
       alert("Please select a target pipeline to duplicate nodes into.");
       return;
@@ -422,14 +423,15 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             source_pipeline_id: pipelineId,
-            target_pipeline_id: selectedPipelineTarget.value,
+            target_pipeline_id: currentTargetPipelineId,
             node_ids: selectedNodeIds,
           }),
         },
       );
       if (!response.ok) await handleApiError(response);
-      await loadPipeline(selectedPipelineTarget.value);
+      await loadPipeline(currentTargetPipelineId);
       alert(`Nodes ${selectedNodeIds.join(", ")} duplicated successfully.`);
+      currentTargetPipelineId = "";
     } catch (error) {
       console.error("Error duplicating nodes:", error);
       alert("Failed to duplicate nodes.");
@@ -1309,6 +1311,21 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       }
     }
   });
+
+  $effect(() => {
+    if (selectedPipelineTarget) {
+      if (radiostate_pipeline === 1) {
+        currentTargetPipelineId = selectedPipelineTarget.value;
+      } else if (radiostate_pipeline === 2) {
+        // Dropdown contains tags, so find the pipeline ID for the selected tag
+        currentTargetPipelineId = Object.keys(ids_tags_dict_pipelines).find(
+          (key) =>
+            ids_tags_dict_pipelines[key] === selectedPipelineTarget.value,
+        );
+      }
+    }
+  });
+
 
   $effect(() => {
     if (selectedProjectDropdown) {
