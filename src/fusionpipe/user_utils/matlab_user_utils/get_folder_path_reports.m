@@ -1,5 +1,18 @@
 function reports_folder_path = get_folder_path_reports()
 %GET_FOLDER_PATH_REPORTS Get the reports folder path of the current node.
+%   reports_folder_path = GET_FOLDER_PATH_REPORTS() returns the full path to the
+%   'reports' subfolder within the current node's folder. The function first
+%   determines the node folder path using get_folder_path_node(). If the node
+%   folder path cannot be determined or the 'reports' folder does not exist,
+%   an error is thrown.
+%
+%   Output:
+%       reports_folder_path - Full path to the 'reports' folder (char array)
+%
+%   Example:
+%       path = get_folder_path_reports();
+%
+%   See also: get_folder_path_node, fullfile, exist
 
     node_folder_path = get_folder_path_node();
     if isempty(node_folder_path)
