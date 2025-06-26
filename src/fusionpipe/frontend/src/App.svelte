@@ -501,18 +501,19 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       return;
     }
     try {
+      const pipelineId =
+        typeof currentPipelineId === "string"
+          ? currentPipelineId
+          : currentPipelineId.value;
       const response = await fetch(
         `${BACKEND_URL}/manual_set_node_status/${selectedNode.id}/completed`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pipeline_id: pipelineId }),
         },
       );
       if (!response.ok) await handleApiError(response);
-      const pipelineId =
-        typeof currentPipelineId === "string"
-          ? currentPipelineId
-          : currentPipelineId.value;
       await loadPipeline(pipelineId);
       alert(`Node ${selectedNode.id} status set to completed.`);
     } catch (error) {
