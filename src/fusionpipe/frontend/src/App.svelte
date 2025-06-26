@@ -1493,13 +1493,12 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
         <DropdownItem class="text-red-600" onclick={deleteNodeOutputs}
           >Delete output selected nodes</DropdownItem
         >
-
-        <DropdownItem class="text-red-600" onclick={deleteNode}
-          >Delete selected nodes</DropdownItem
-        >
         <DropdownItem class="text-red-600" onclick={deleteEdge}
           >Delete selected edge</DropdownItem
         >
+        <DropdownItem class="text-red-600" onclick={deleteNode}
+          >Delete selected nodes</DropdownItem
+        >        
       </Dropdown>
       <NavLi class="cursor-pointer">
         Actions<ChevronDownOutline
