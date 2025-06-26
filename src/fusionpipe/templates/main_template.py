@@ -5,13 +5,13 @@ import os
 from datetime import datetime
 
 if __name__ == "__main__":
+    print("Running main template.py")
     # -- Example run simple python functions --
-
     # Import example functions
-    from examples.example_python import print_node_parents, save_dummy_output
-    print("Running python example from function")
-    print_node_parents()
-    save_dummy_output()
+    # from examples.example_python import print_node_parents, save_dummy_output
+    # print("Running python example from function")
+    # print_node_parents()
+    # save_dummy_output()
 
     # -- Example run matlab script --
     # Uncomment the following lines to run the matlab example

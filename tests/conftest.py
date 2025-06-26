@@ -74,7 +74,7 @@ def dag_dummy_1():
     for node in G.nodes:
         G.nodes[node]['editable'] = True
         G.nodes[node]['tag'] = 'test_tag'
-        G.nodes[node]['folder_path'] = 'dummy_folder_path'
+        G.nodes[node]['folder_path'] = f'dummy_folder_path_{node}'
         G.nodes[node]['notes'] = 'test notes'
         G.nodes[node]['position'] = [0, 0]  # Default position
         if node == "A":
@@ -99,18 +99,13 @@ def dict_dummy_1():
         "owner": "test_group",
         "project_id": "test_project",
         "nodes": {
-            "A": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0], 'folder_path': 'dummy_folder_path'},
-            "B": {"status": "running", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path'},
-            "C": {"status": "completed", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path'},
-            "D": {"status": "staledata", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C'], 'position': [0, 0], 'folder_path': 'dummy_folder_path'},
-            "E": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0,], 'folder_path': 'dummy_folder_path'}
+            "A": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0], 'folder_path': 'dummy_folder_path_A'},
+            "B": {"status": "running", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_B'},
+            "C": {"status": "completed", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_C'},
+            "D": {"status": "staledata", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_D'},
+            "E": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0,], 'folder_path': 'dummy_folder_path_E'}
         }
     }
 
-@pytest.fixture
-def in_memory_db_conn():
-    conn = sqlite3.connect(":memory:")
-    yield conn
-    conn.close()
 
 PARENT_NODE_LIST =  ["A", "B", "C", "D", "E"]

@@ -261,14 +261,11 @@ def graph_to_db(Gnx, cur):
         node_notes = Gnx.nodes[node].get('notes', "")  # Optional notes for the node
         node_tag = Gnx.nodes[node].get('tag', None)  # Optional tag for the node
         position = Gnx.nodes[node].get('position', None)  # Node position
-
-        db_utils.get_all_nodes_from_nodes(cur)
-        db_utils.get_node_parents(cur, node_id=node_id)
-
+        folder_path = Gnx.nodes[node].get('folder_path', None)  # Optional folder path for the node
 
         # Add the node to the database
         if not db_utils.check_if_node_exists(cur, node):
-            db_utils.add_node_to_nodes(cur, node_id=node_id, status=status, editable=editable, notes=node_notes)
+            db_utils.add_node_to_nodes(cur, node_id=node_id, status=status, editable=editable, notes=node_notes, folder_path=folder_path)
             # If node already existed, parants cannot have change. Children can and will be added later
             for parent in Gnx.predecessors(node):
                 db_utils.add_node_relation(cur, child_id=node_id, parent_id=parent)

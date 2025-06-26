@@ -130,7 +130,7 @@ def test_graph_to_db_and_db_to_graph_roundtrip(pg_test_db, dag_dummy_1):
     # Use networkx's is_isomorphic to compare structure and attributes
     def node_match(n1, n2):
         # Compare relevant node attributes
-        for attr in ['status', 'editable', 'tag', 'notes']:
+        for attr in ['status', 'editable', 'tag', 'notes', 'folder_path']:
             if n1.get(attr) != n2.get(attr):
                 return False
         return True
