@@ -699,3 +699,43 @@ def test_add_node_relation_safe(pg_test_db):
     db_utils.update_editable_status(cur, node_id=child_id, editable=False)
     with pytest.raises(ValueError, match="not editable"):
         add_node_relation_safe(cur, pipeline_id, parent_id, child_id)
+
+def test_merge_pipelines(pg_test_db):
+    """
+    Test that merge_pipelines creates a new pipeline containing all nodes from the source pipelines.
+    """
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id, merge_pipelines
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Create two source pipelines with different nodes
+    pipeline_id1 = generate_pip_id()
+    pipeline_id2 = generate_pip_id()
+    node_ids1 = [generate_node_id() for _ in range(2)]
+    node_ids2 = [generate_node_id() for _ in range(2)]
+
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id1)
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id2)
+    for node_id in node_ids1:
+        db_utils.add_node_to_nodes(cur, node_id=node_id)
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id1)
+    for node_id in node_ids2:
+        db_utils.add_node_to_nodes(cur, node_id=node_id)
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id2)
+    conn.commit()
+
+    # Merge the pipelines
+    merged_pipeline_id = merge_pipelines(cur, [pipeline_id1, pipeline_id2])
+    conn.commit()
+
+    # Get all nodes in the merged pipeline
+    merged_nodes = set(db_utils.get_all_nodes_from_pip_id(cur, merged_pipeline_id))
+
+    # All original nodes should be present in the merged pipeline
+    for node_id in node_ids1 + node_ids2:
+        assert node_id in merged_nodes
+
+    # The merged pipeline should be a new pipeline
+    assert merged_pipeline_id not in [pipeline_id1, pipeline_id2]

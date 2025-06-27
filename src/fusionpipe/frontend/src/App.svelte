@@ -16,11 +16,13 @@
 
   import "@xyflow/svelte/dist/style.css";
   import SvelteSelect from "svelte-select";
+  import Select from 'svelte-select';
   import TextUpdaterNode from "./TextUpdaterNode.svelte";
   import CustomNode from "./CustomNode.svelte";
   import { Drawer, Button, CloseButton, Label, Input } from "flowbite-svelte";
   import { InfoCircleSolid, ArrowRightOutline } from "flowbite-svelte-icons";
   import { sineIn } from "svelte/easing";
+  import {  ChevronRightOutline } from "flowbite-svelte-icons";
   import {
     Dropdown,
     DropdownItem,
@@ -35,6 +37,7 @@
   import { ChevronDownOutline } from "flowbite-svelte-icons";
   import filter from "svelte-select/filter";
   import ContextMenu from "./ContextMenu.svelte";
+  import { MultiSelect } from "flowbite-svelte";
 
   //  --- Variables and state definitions ---
   let nodes = $state<Node[]>([]);
@@ -50,6 +53,7 @@
   
   let selectedPipelineTarget = $state(null);
   let selectedProjectTarget = $state(null);
+  let selectedMergeDropdown = $state<string[]>([]);
 
   let currentPipelineId = $state("");
   let currentProjectId = $state("");
@@ -95,6 +99,8 @@
 
   let radiostate_pipeline = $state(2); // selector for what to display in pipeline list 1 for ids, 2 for tags
   let radiostate_projects = $state(2); // selector for what to display in projects list 1 for ids, 2 for tags
+
+  let currentPipelineIdsMerge = $state<string[]>([]); // Store current pipeline IDs for merging
 
   // --  Definitions of functions ---
 
@@ -1228,6 +1234,64 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
   }
 
+  function getCurrentPipelineIdsMerge(selectedMergeDropdown: string[]): string[] {
+    if (!selectedMergeDropdown || selectedMergeDropdown.length === 0) {
+      return [];
+    }
+
+    if (radiostate_pipeline === 1) {
+      return selectedMergeDropdown.map((item) => item.value);
+    } else if (radiostate_pipeline === 2) {
+      return selectedMergeDropdown
+        .map((tag) =>
+          Object.keys(ids_tags_dict_pipelines).find(
+            (key) => ids_tags_dict_pipelines[key] === tag.value
+          )
+        )
+        .filter(Boolean) as string[];
+    }
+
+    return [];
+  }
+
+  async function mergePipeline() {
+    const pipelineIdsToMerge = getCurrentPipelineIdsMerge(selectedMergeDropdown);
+
+    if (!pipelineIdsToMerge || pipelineIdsToMerge.length < 2) {
+      alert("Please select at least two pipelines to merge.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/merge_pipelines`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source_pipeline_ids: pipelineIdsToMerge }),
+      });
+
+      if (!response.ok) {
+        await handleApiError(response);
+      }
+
+      const data = await response.json();
+      alert(
+        `Pipelines ${pipelineIdsToMerge.join(", ")} merged into new pipeline ${
+          data.target_pipeline_id
+        }.`
+      );
+
+      await fetchPipelines();
+      currentPipelineId = data.target_pipeline_id;
+      await loadPipeline(data.target_pipeline_id);
+    } catch (error) {
+      console.error("Error merging pipelines:", error);
+      alert("Failed to merge pipelines.");
+    }
+  }
+
+
+
+
   // ------------ Collection of all reactive effects ---------------
   $effect(() => {
     if (!isHiddenNodePanel) {
@@ -1311,6 +1375,8 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       }
     }
   });
+
+
 
   $effect(() => {
     if (selectedPipelineTarget) {
@@ -1449,9 +1515,10 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
         <DropdownItem onclick={branchPipelineFromNode}
           >Branch Pipeline from selected node</DropdownItem
         >
-        <DropdownItem
-          >Move pipeline to project
-          <Dropdown simple>
+        <DropdownItem class="flex items-center justify-between">
+          Move Pipeline to project<ChevronRightOutline class="text-primary-700 ms-2 h-6 w-6 dark:text-white" />
+        </DropdownItem>
+          <Dropdown simple placement="right-start">
             <div class="w-64">
               <SvelteSelect
                 items={projects_dropdown}
@@ -1464,7 +1531,24 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
               >Move</Button
             >
           </Dropdown>
+
+
+        <DropdownItem class="flex items-center justify-between">
+          Merge pipelines<ChevronRightOutline class="text-primary-700 ms-2 h-6 w-6 dark:text-white" />
         </DropdownItem>
+        
+        <Dropdown simple placement="right-start">
+          <div class="w-70">
+            <SvelteSelect
+              items={pipelines_dropdown}
+              bind:value={selectedMergeDropdown}
+              placeholder="Select multiple pipelines..."
+              multiple={true}
+            />
+          </div>
+          <Button class="mt-2" onclick={mergePipeline}> Merge</Button>
+        </Dropdown>        
+
         <DropdownItem class="text-red-600" onclick={deleteSelectedPipeline}
           >Delete Pipeline</DropdownItem
         >
@@ -1485,9 +1569,10 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
         <DropdownItem onclick={duplicateSelectedNodes}
           >Duplicate selected nodes into this pipeline</DropdownItem
         >
-        <DropdownItem
-          >Duplicate selected nodes into another pipeline
-          <Dropdown simple>
+        <DropdownItem class="flex items-center justify-between">
+          Duplicate selected nodes into another pipeline<ChevronRightOutline class="text-primary-700 ms-2 h-6 w-6 dark:text-white" />
+        </DropdownItem>
+          <Dropdown simple placement="right-start">
             <div class="w-64">
               <SvelteSelect
                 items={pipelines_dropdown}
@@ -1500,7 +1585,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
               >Duplicate nodes</Button
             >
           </Dropdown>
-        </DropdownItem>
+
         <DropdownItem class="text-yellow-600" onclick={setNodeCompleted}
           >Manual set node "completed"</DropdownItem
         >

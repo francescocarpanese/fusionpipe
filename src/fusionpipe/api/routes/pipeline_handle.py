@@ -508,3 +508,23 @@ def get_pipelines_in_project(project_id: str, db_conn=Depends(get_db)):
         return {"message": f"No pipelines found in project {project_id}"}
     
     return {"pipelines": pipelines}
+
+@router.post("/merge_pipelines")
+def merge_pipelines_route(payload: dict, db_conn=Depends(get_db)):
+    """
+    Merge multiple pipelines into a new pipeline by copying all their nodes.
+    Payload example: {"source_pipeline_ids": ["pipeline_1", "pipeline_2"]}
+    """
+    source_pipeline_ids = payload.get("source_pipeline_ids")
+    if not source_pipeline_ids or not isinstance(source_pipeline_ids, list):
+        raise HTTPException(status_code=400, detail="Payload must contain a list of source_pipeline_ids")
+    
+    cur = db_conn.cursor()
+    try:
+        target_pipeline_id = pip_utils.merge_pipelines(cur, source_pipeline_ids)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    return {"message": f"Pipelines {source_pipeline_ids} merged into new pipeline {target_pipeline_id}", "target_pipeline_id": target_pipeline_id}

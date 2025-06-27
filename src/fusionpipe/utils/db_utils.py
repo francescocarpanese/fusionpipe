@@ -270,9 +270,9 @@ def duplicate_pipeline_in_pipelines(cur, source_pipeline_id, new_pipeline_id):
     return new_pipeline_id
 
 def duplicate_node_pipeline_relation(cur, source_pipeline_id, node_ids, new_pipeline_id):
-    # Given a source pipeline, and a node_id list, insert each node in a target
+    # Given a source pipeline, and a node_id list, insert each node in a target pipeline
     # This is used when branching a pipeline. A new pipeline is created with a subgraph of the original one.
-    # Then only the node_pipeline_relation is updated to releate a node to the new pipeline.
+    # Only node_pipeline_relation is updated to releate a node to the new pipeline.
     if isinstance(node_ids, str):
         node_ids = [node_ids]
 

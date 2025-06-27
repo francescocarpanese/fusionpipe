@@ -384,7 +384,6 @@ def generate_data_folder(base_path):
         "nodes": os.path.join(base_path, "nodes"),
     }
 
-
 def visualize_pip_interactive(graph, output_file="pipeline_visualization.html"):
     from pyvis.network import Network 
     """
@@ -415,7 +414,6 @@ def visualize_pip_interactive(graph, output_file="pipeline_visualization.html"):
 
     # Generate and save the interactive visualization
     net.write_html(output_file)
-
 
 def branch_pipeline_from_node(cur, pipeline_id, node_id):
     """
@@ -468,7 +466,6 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
 
     return new_pip_id
 
-
 def delete_node_from_pipeline_with_editable_logic(cur,pipeline_id, node_id):
     # Check if the node is editable
     if db_utils.is_node_editable(cur, node_id=node_id):
@@ -492,7 +489,6 @@ def delete_node_from_pipeline_with_editable_logic(cur,pipeline_id, node_id):
     # Delete the node from the pipeline
     db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node_id)
 
-
 def can_node_run(cur, node_id):
     # Check if the node is in 'ready' state
     status = db_utils.get_node_status(cur, node_id=node_id)
@@ -515,7 +511,6 @@ def get_all_children_nodes(cur, pipeline_id, node_id):
     """
     graph = db_to_graph_from_pip_id(cur, pipeline_id)
     return list(nx.descendants(graph, node_id))
-
 
 def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_pipeline_id, source_node_id, new_node_id, parents=False, childrens=False):
     """
@@ -573,7 +568,6 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
     finally:
         os.chdir(current_dir)
 
-
 def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_pipeline_id, source_node_ids):
     """
     Duplicate a list of nodes including their relation inside a pipeline.
@@ -604,7 +598,6 @@ def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_p
             parent_id=id_map[old_parent]
         )
     return id_map
-
 
 def delete_node_data(cur, node_ids):
     """
@@ -699,4 +692,30 @@ def add_node_relation_safe(cur, pipeline_id, parent_id, child_id):
     db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
     return True
 
+def merge_pipelines(cur, source_pipeline_ids):
+    """
+    Merge multiple pipelines into a new pipeline by copying all their nodes.
+    Duplicate nodes are copied only once.
+    :param cur: Database cursor
+    :param source_pipeline_ids: List of pipeline IDs to merge
+    :return: The new target pipeline ID
+    """
+    # Generate a new pipeline ID
+    target_pipeline_id = generate_pip_id()
+    # Create the new pipeline in the database
+    db_utils.add_pipeline(cur, pipeline_id=target_pipeline_id, tag=target_pipeline_id)
 
+    # Keep track of already duplicated nodes
+    duplicated_nodes = {}
+
+    # Loop through all source pipelines
+    for source_pipeline_id in source_pipeline_ids:
+        # Get all node IDs from the source pipeline
+        node_ids = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id=source_pipeline_id)
+
+        for node_id in node_ids:
+            if node_id not in duplicated_nodes:
+                db_utils.duplicate_node_pipeline_relation(cur, source_pipeline_id, node_id, target_pipeline_id)
+
+
+    return target_pipeline_id
