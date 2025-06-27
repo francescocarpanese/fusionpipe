@@ -706,16 +706,16 @@ def merge_pipelines(cur, source_pipeline_ids):
     db_utils.add_pipeline(cur, pipeline_id=target_pipeline_id, tag=target_pipeline_id)
 
     # Keep track of already duplicated nodes
-    duplicated_nodes = {}
+    duplicated_nodes = set()
 
     # Loop through all source pipelines
     for source_pipeline_id in source_pipeline_ids:
         # Get all node IDs from the source pipeline
         node_ids = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id=source_pipeline_id)
-
         for node_id in node_ids:
             if node_id not in duplicated_nodes:
                 db_utils.duplicate_node_pipeline_relation(cur, source_pipeline_id, node_id, target_pipeline_id)
+        duplicated_nodes.update(node_ids)
 
 
     return target_pipeline_id

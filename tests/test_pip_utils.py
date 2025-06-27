@@ -739,3 +739,56 @@ def test_merge_pipelines(pg_test_db):
 
     # The merged pipeline should be a new pipeline
     assert merged_pipeline_id not in [pipeline_id1, pipeline_id2]
+
+
+def test_merge_pipelines_with_duplicate_nodes(pg_test_db):
+    """
+    Test that merge_pipelines handles duplicate nodes correctly:
+    - If a node exists in multiple source pipelines, it is only added once to the merged pipeline.
+    - The merge operation does not fail due to duplicate node IDs.
+    """
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id, merge_pipelines
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Create two source pipelines with overlapping nodes
+    pipeline_id1 = generate_pip_id()
+    pipeline_id2 = generate_pip_id()
+    common_node_id = generate_node_id()
+    unique_node_id1 = generate_node_id()
+    unique_node_id2 = generate_node_id()
+
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id1)
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id2)
+
+    # Add nodes to the first pipeline
+    db_utils.add_node_to_nodes(cur, node_id=common_node_id)
+    db_utils.add_node_to_nodes(cur, node_id=unique_node_id1)
+    db_utils.add_node_to_pipeline(cur, node_id=common_node_id, pipeline_id=pipeline_id1)
+    db_utils.add_node_to_pipeline(cur, node_id=unique_node_id1, pipeline_id=pipeline_id1)
+
+    # Add nodes to the second pipeline
+    db_utils.add_node_to_nodes(cur, node_id=unique_node_id2)
+    db_utils.add_node_to_pipeline(cur, node_id=common_node_id, pipeline_id=pipeline_id2)
+    db_utils.add_node_to_pipeline(cur, node_id=unique_node_id2, pipeline_id=pipeline_id2)
+
+    conn.commit()
+
+    # Merge the pipelines
+    merged_pipeline_id = merge_pipelines(cur, [pipeline_id1, pipeline_id2])
+    conn.commit()
+
+    # Get all nodes in the merged pipeline
+    merged_nodes = set(db_utils.get_all_nodes_from_pip_id(cur, merged_pipeline_id))
+
+    # Check that all unique nodes are present in the merged pipeline
+    expected_nodes = {common_node_id, unique_node_id1, unique_node_id2}
+    assert merged_nodes == expected_nodes, f"Merged pipeline nodes do not match expected nodes: {expected_nodes}"
+
+    # Check that the merged pipeline does not contain duplicate nodes
+    assert len(merged_nodes) == len(expected_nodes), "Merged pipeline contains duplicate nodes"
+
+    # The merged pipeline should be a new pipeline
+    assert merged_pipeline_id not in [pipeline_id1, pipeline_id2]

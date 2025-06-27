@@ -1283,9 +1283,12 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       await fetchPipelines();
       currentPipelineId = data.target_pipeline_id;
       await loadPipeline(data.target_pipeline_id);
+      selectedMergeDropdown = [];
+
     } catch (error) {
       console.error("Error merging pipelines:", error);
       alert("Failed to merge pipelines.");
+      selectedMergeDropdown = [];
     }
   }
 
