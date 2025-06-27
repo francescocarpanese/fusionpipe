@@ -14,6 +14,8 @@
     type OnConnect,
   } from "@xyflow/svelte";
 
+  
+  import { Textarea } from "flowbite-svelte";
   import "@xyflow/svelte/dist/style.css";
   import SvelteSelect from "svelte-select";
   import Select from 'svelte-select';
@@ -55,6 +57,9 @@
   let selectedProjectTarget = $state(null);
   let selectedMergeDropdown = $state<string[]>([]);
 
+
+  let nodeParametersYaml = $state(""); // Holds the YAML content for the selected node
+
   let currentPipelineId = $state("");
   let currentProjectId = $state("");
   let currentTargetPipelineId = $state("");
@@ -65,6 +70,7 @@
     tag: "",
     notes: "",
     folder_path: "",
+    node_parameters_yaml: "",
   });
 
   let pipelineDrawerForm = $state({
@@ -838,6 +844,39 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
     await loadPipeline(pipelineId);
   }
+  // Fetch node_parameters for a node
+  async function fetchNodeParametersYaml(nodeId: string) {
+    if (!nodeId) {
+      nodeDrawereForm.node_parameters_yaml = "";
+      return;
+    }
+    try {
+      const response = await fetch(`${BACKEND_URL}/get_node_parameters_yaml/${nodeId}`);
+      if (!response.ok) {
+        nodeDrawereForm.node_parameters_yaml = "";
+        return;
+      }
+      const data = await response.json();
+      nodeDrawereForm.node_parameters_yaml = data.content || "";
+    } catch (error) {
+      nodeDrawereForm.node_parameters_yaml = "";
+    }
+  }
+
+  // Save node_parameters for a node
+  async function saveNodeParametersYaml(nodeId: string) {
+    try {
+      const response = await fetch(`${BACKEND_URL}/update_node_parameters_yaml/${nodeId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: nodeDrawereForm.node_parameters_yaml }),
+      });
+      if (!response.ok) await handleApiError(response);
+      alert("Node parameters saved.");
+    } catch (error) {
+      alert("Failed to save node parameters.");
+    }
+  }
 
   // Add refs for the input fields
 
@@ -879,6 +918,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       ).then(async (response) => {
         if (!response.ok) await handleApiError(response);
       });
+      await saveNodeParametersYaml(nodeId); // Save YAML content
       await loadPipeline(pipelineId);
       alert("Node info updated.");
     } catch (error) {
@@ -1307,19 +1347,24 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
           notes: selectedNode.data?.notes || "",
           folder_path: selectedNode.data?.folder_path || "",
         };
+        fetchNodeParametersYaml(selectedNode.id);
       } else {
         nodeDrawereForm = {
           id: "",
           tag: "",
           notes: "",
+          node_parameters_yaml: "",
         };
+        nodeParametersYaml = "";
       }
     } else {
       nodeDrawereForm = {
         id: "",
         tag: "",
         notes: "",
+        node_parameters_yaml: "",
       };
+      nodeParametersYaml = "";
     }
   });
 
@@ -1664,13 +1709,24 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
         bind:value={nodeDrawereForm.tag}
       />
       <Label for="node_notes" class="mb-2 block">Notes:</Label>
-      <Input
+      <Textarea
         id="node_notes"
         name="node_notes"
-        required
         bind:value={nodeDrawereForm.notes}
+        rows={4}
+        placeholder="Enter notes here..."
       />
-      <Label for="node_tag" class="mb-2 block">Node tag:</Label>
+
+      <Label for="node_parameters_yaml" class="mb-2 block">Node Parameters (YAML):</Label>
+      <Textarea
+        id="node_parameters_yaml"
+        name="node_parameters_yaml"
+        bind:value={nodeDrawereForm.node_parameters_yaml}
+        rows={10}
+        placeholder="Enter YAML parameters here..."
+      />
+
+      <Label for="node_tag" class="mb-2 block">Node Folder path:</Label>
       <div class="mt-2 text-sm text-gray-500">
         {nodeDrawereForm.folder_path || "No folder path"}
       </div>

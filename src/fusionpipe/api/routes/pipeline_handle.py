@@ -528,3 +528,38 @@ def merge_pipelines_route(payload: dict, db_conn=Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
     
     return {"message": f"Pipelines {source_pipeline_ids} merged into new pipeline {target_pipeline_id}", "target_pipeline_id": target_pipeline_id}
+
+@router.get("/get_node_parameters_yaml/{node_id}")
+def get_node_parameters_yaml(node_id: str, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    folder_path = None
+    try:
+        folder_path = db_utils.get_node_folder_path(cur, node_id=node_id)
+        if not folder_path:
+            raise HTTPException(status_code=404, detail="Node folder path not found")
+        yaml_path = os.path.join(folder_path, "code", "node_parameters.yaml")
+        if not os.path.exists(yaml_path):
+            raise HTTPException(status_code=404, detail="node_parameters.yaml not found")
+        with open(yaml_path, "r") as f:
+            content = f.read()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"content": content}
+
+@router.post("/update_node_parameters_yaml/{node_id}")
+def update_node_parameters_yaml(node_id: str, payload: dict, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    folder_path = None
+    try:
+        folder_path = db_utils.get_node_folder_path(cur, node_id=node_id)
+        if not folder_path:
+            raise HTTPException(status_code=404, detail="Node folder path not found")
+        yaml_path = os.path.join(folder_path, "code", "node_parameters.yaml")
+        content = payload.get("content")
+        if content is None:
+            raise HTTPException(status_code=400, detail="Missing content")
+        with open(yaml_path, "w") as f:
+            f.write(content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"node_parameters.yaml updated for node {node_id}"}
