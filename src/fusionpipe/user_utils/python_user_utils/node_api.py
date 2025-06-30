@@ -3,15 +3,43 @@ import os
 import re
 
 def connect_to_db(db_url=os.environ.get("DATABASE_URL")):
-    # Example db_url: "dbname=<yourdb> user=<youruser> password=<yourpassword> host=localhost port=<port>"
+    """
+    Establish a connection to the PostgreSQL database using the provided database URL.
+
+    Args:
+        db_url (str): The database connection URL. Defaults to the 'DATABASE_URL' environment variable.
+
+    Returns:
+        psycopg2.extensions.connection: A connection object to the database.
+    """
     conn = psycopg2.connect(db_url)
     return conn
 
 def get_node_parents_db(cur, node_id):
+    """
+    Retrieve the parent node IDs for a given node from the database.
+
+    Args:
+        cur (psycopg2.extensions.cursor): Database cursor.
+        node_id (str): The node ID whose parents are to be fetched.
+
+    Returns:
+        list: A list of parent node IDs.
+    """
     cur.execute('SELECT parent_id FROM node_relation WHERE child_id = %s', (node_id,))
     return [row[0] for row in cur.fetchall()]
 
 def get_node_folder_path_db(cur, node_id):
+    """
+    Retrieve the folder path for a given node ID from the database.
+
+    Args:
+        cur (psycopg2.extensions.cursor): Database cursor.
+        node_id (str): The node ID whose folder path is to be fetched.
+
+    Returns:
+        str or None: The folder path if found, else None.
+    """
     cur.execute('SELECT folder_path FROM nodes WHERE node_id = %s', (node_id,))
     row = cur.fetchone()
     return row[0] if row else None
@@ -19,6 +47,12 @@ def get_node_folder_path_db(cur, node_id):
 def get_all_parent_node_folder_paths(node_id):
     """
     Get all parent node folder paths for a given node_id.
+
+    Args:
+        node_id (str): The node ID whose parent folder paths are to be fetched.
+
+    Returns:
+        list: A list of folder paths for all parent nodes.
     """
     conn = connect_to_db()
     cur = conn.cursor()
@@ -37,6 +71,9 @@ def get_node_id():
     """
     Get the node id by searching the current working directory path for a folder
     name matching the pattern: n_<14 digits>_<4 digits>.
+
+    Returns:
+        str or None: The node ID if found, else None.
     """
     pwd = os.getcwd()
     # Pattern: n_ followed by 14 digits, underscore, 4 digits
@@ -49,6 +86,9 @@ def get_node_id():
 def get_folder_path_node():
     """
     Get the folder path of the current node.
+
+    Returns:
+        str: The folder path of the current node.
     """
     node_id = get_node_id()
     if not node_id:
@@ -67,6 +107,9 @@ def get_folder_path_node():
 def get_folder_path_code():
     """
     Get the code folder path of the current node.
+
+    Returns:
+        str: The path to the code folder.
     """
     node_folder_path = get_folder_path_node()
     if not node_folder_path:
@@ -83,6 +126,9 @@ def get_folder_path_code():
 def get_folder_path_data():
     """
     Get the data folder path of the current node.
+
+    Returns:
+        str: The path to the data folder.
     """
     node_folder_path = get_folder_path_node()
     if not node_folder_path:
@@ -99,6 +145,9 @@ def get_folder_path_data():
 def get_folder_path_reports():
     """
     Get the reports folder path of the current node.
+
+    Returns:
+        str: The path to the reports folder.
     """
     node_folder_path = get_folder_path_node()
     if not node_folder_path:
