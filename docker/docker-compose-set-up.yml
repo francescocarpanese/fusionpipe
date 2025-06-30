@@ -1,0 +1,12 @@
+# This is the docker to set up the databse for testing purposes
+services:
+  db:
+    image: postgres:16
+    environment: # This are the enviroment variable used within the container
+    - POSTGRES_DB=<database_name> # Replace <database_name> with your name of the database. Default fusionpipe_prod.
+    - POSTGRES_USER=<psg_admin_user> # Provide a name for admin user of the database <psg_user>. The same user will need to be used for the backend and frontend.
+    - POSTGRES_PASSWORD=<psg_admin_password> # Provide password for the admin user of the database <psg_admin_password>. The same password will need to be used for the backend and frontend.
+    ports:
+      - "5542:5432" # Expose port 5432 of the container to the host as 5542. Host will be able to reach the port 5542 as localhost:5542
+    volumes:
+      - "<local_path_db>:/var/lib/postgresql/data" # Replace <local_path_db> with the path on your local machine where you want to store the database data. This will persist the data even if the container is removed.
