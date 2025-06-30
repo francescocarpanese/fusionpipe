@@ -23,7 +23,23 @@ PostgreSQL is used in order to keep track of the pipeline database. As a develop
 It is recommended to use docker, as it will allow you to have the same environment in dev and prod.
 
 
-### Set up postgres with docker
+### local installation
+
+- Install postgres
+
+- Initialise postgtes
+`sudo /usr/bin/postgresql-setup --initdb`
+
+Usually postgres is initialised creating the admin postgres user called `postgres`.
+
+The default set-up for postgres to check the name of the user, to grant access to the database (`peer` option). 
+In this condition, in order to perform admin operation on the databaset, you need to log as `postgres` user (requires sudo access).
+
+It is possibile to change the postgres authentication defualt mechanism, changing the file `pg_hba.conf` usually found in the location
+`/var/lib/pgsql/data/pg_hba.conf`. Changing `peer` to `md5` will ask for password authentication at the login.
+
+
+### docker installation
 
 Set the env variable.
 
@@ -47,39 +63,42 @@ Test connection
 psql -h localhost -p 5542 -U <user> -d <database>
 ```
 
+
+# Set-up database
+
+- Create a new database `fusionpipe_prod1`.
+```bash
+sudo -u postgres createdb fusionpipe_prod1
+```
+
+- Create the role `fusionpipeusers` which will allow to read and write to `
+```bash
+psql -U postgres -c "CREATE ROLE fusionpipeusers;"
+```
+
+- Allow users to in role to connect to databaset
+```bash
+psql -U postgres -d fusionpipe_prod1 -c "GRANT CONNECT ON DATABASE fusionpipe_prod1 TO fusionpipeusers;"
+```
+
+- Grant all provilidges to user on datbase `fusionpipe_prod1`.
+```bash
+psql -U postgres -d fusionpipe_prod1 -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO fusionpipeusers;"
+psql -U postgres -d fusionpipe_prod1 -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO fusionpipeusers;"
+```
+
+- Add `fusionpipeadmin` to the group.
+```bash
+psql -U postgres -d fusionpipe_prod1 -c "GRANT fusionpipeusers TO fusionpipeadmin;"
+```
+
+# Create and initialise the required tables for the database
+
 - If you are working with a dev database, initialise the databse or clear the databse with the script.
 Before running the script make sure your environment variables are pointing to the right dev database.
 ```bash
 uv run python src/fusionpipe/utils/init_database.py
 ```
-
-## Set up with local installation of postgres
-- Seek documentation to install postgres locally.
-
-
-# Set-up production server
-
-- Create the database
-
-```bash
-psql -U postgres -d fusionpipe_prod1 -c "CREATE ROLE writers;"
-psql -U postgres -d fusionpipe_prod1 -c "GRANT CONNECT, TEMPORARY ON DATABASE fusionpipe_prod1 TO writers;"
-psql -U postgres -d fusionpipe_prod1 -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO writers;"
-psql -U postgres -d fusionpipe_prod1 -c "GRANT CREATE ON SCHEMA public TO writers;"
-psql -U postgres -d fusionpipe_prod1 -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO writers;"
-psql -U postgres -d fusionpipe_prod1 -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO writers;"
-```
-
-- Grant access to the user.
-
-```bash
-psql -U postgres -d fusionpipe_prod1 -c "GRANT writers TO carpanes;"
-psql -U postgres -d fusionpipe_prod1 -c "GRANT writers TO fbertini;"
-```
-
-
-- Export the env variable
-`export $(grep -v '^#' something.env | xargs)`
 
 ```bash
 set -a
@@ -128,28 +147,36 @@ sudo setfacl -d -m g::rwx /misc/fusionpipe_shared
 sudo setfacl -d -m o::--- /misc/fusionpipe_shared
 ```
 
-# Set up a new user 
+TODO grant reading access to the user utils folder.
 
-- Create new user in postgres
 
-`psql -U postgres -d fusionpipe_prod1 -c "CREATE USER fbertini WITH PASSWORD 'coccolone';"`
+### Onboard new user
 
-- Grant user access to group
+- Create new user with `<newusername>` in postgres 
 
-`psql -U postgres -d fusionpipe_prod1 -c "GRANT writers TO fbertini;"`
+`psql -U postgres -d fusionpipe_prod1 -c "CREATE USER <newusername>;"`
 
-- Ask user to write the following line in the `.profile`, in order to persist the access to the database
+- Grant user access to role in postgres database
+
+`psql -U postgres -d fusionpipe_prod1 -c "GRANT fusionpipeusers TO <newusername>;"`
+
+- Ask user to write the following line in the `.profile` or `.bashrc_profile`, in order to persist the access to the database
 
 ```bash
-export DATABASE_URL="dbname=fusionpipe_prod1 user=carpanes password=zidane90 host=localhost port=5432"
+export DATABASE_URL="dbname=fusionpipe_prod1 port=5432"
 ```
 
-- Write the location of the user utils in the `.profile`
+- Write the location of the user utils in the `.profile`, `.bashrc_profile`.
 ```bash
-export USER_UTILS_FOLDER_PATH="/misc/carpanes/fusionpipe/src/fusionpipe/user_utils"
+export USER_UTILS_FOLDER_PATH="/home/fusionpipeadmin/Documents/fusionpipe/src/fusionpipe/user_utils"
 ```
 
-# User set-up
+- Add group user to the group in the server, in order for him to have access to the shared repository
+```bash
+sudo usermod -aG fusionpipeusers username
+```
+
+### User set-up
 - Communicate the username to the admin
 ```bash
 whoami
@@ -163,12 +190,12 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 - ssh to the machine and forward the port with the frontend and backend
 
 ```bash
-ssh -L 5174:localhost:5174 -L 8100:localhost:8100 fbertini@spcpc636
+ssh -L 5176:localhost:5176 -L 8101:localhost:8101 <username>@spcdefuse01
 ```
 
 - Write the following line in the `.profile`. This allows the user to have access to the database
 ```bash
-export DATABASE_URL="dbname=fusionpipe_prod1 user=fbertini password=coccolone host=localhost port=5432"
+export DATABASE_URL="dbname=fusionpipe_prod1 port=5432"
 ```
 
 - Write the location of the user utils in the `.profile`
@@ -186,15 +213,17 @@ uv run python init_node_kernel.py
 Or ask your admin to do that for you.
 
 ```bash
-sudo zypper refresh
-sudo zypper install docker
+sudo apt-get update
+sudo apt-get install docker.io
+```
 
+Start docker service at system level
+```bash
 sudo systemctl enable docker
 sudo systemctl start docker
 ```
 
 Add your user to docker
-
 ```bash
 sudo usermod -aG docker $USER
 ```
