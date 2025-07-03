@@ -355,7 +355,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     await loadPipeline(pipelineId);
   }
 
-  async function duplicateSelectedNodes() {
+  async function duplicateSelectedNodes(withdata: boolean) {
     const pipelineId =
       typeof currentPipelineId === "string"
         ? currentPipelineId
@@ -387,6 +387,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
             source_pipeline_id: pipelineId,
             target_pipeline_id: pipelineId,
             node_ids: selectedNodeIds,
+            withdata: withdata, // Pass the withdata flag
           }),
         },
       );
@@ -1614,9 +1615,17 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
           Copy selected node path to clipboard
         </DropdownItem>        
         <DropdownItem onclick={addNode}>Create node</DropdownItem>
-        <DropdownItem onclick={duplicateSelectedNodes}
-          >Duplicate selected nodes into this pipeline</DropdownItem
-        >
+        <DropdownItem  class="flex items-center justify-between">
+          Duplicate selected nodes into this pipeline <ChevronRightOutline class="text-primary-700 ms-2 h-6 w-6 dark:text-white" />
+        </DropdownItem>
+          <Dropdown simple placement="right-start">
+            <DropdownItem  onclick={() => duplicateSelectedNodes(true)}>
+              with data
+            </DropdownItem>
+            <DropdownItem  onclick={() => duplicateSelectedNodes(false)}>
+              without data
+            </DropdownItem>            
+          </Dropdown>          
         <DropdownItem class="flex items-center justify-between">
           Duplicate selected nodes into another pipeline<ChevronRightOutline class="text-primary-700 ms-2 h-6 w-6 dark:text-white" />
         </DropdownItem>

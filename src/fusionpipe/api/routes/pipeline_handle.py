@@ -378,15 +378,19 @@ def duplicate_nodes_in_pipeline_route(payload: dict, db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     source_pipeline_id = payload.get("source_pipeline_id")
     target_pipeline_id = payload.get("target_pipeline_id")
+    withdata = payload.get("withdata", False)
     node_ids = payload.get("node_ids")
     if not source_pipeline_id or not target_pipeline_id or not node_ids or not isinstance(node_ids, list):
         raise HTTPException(status_code=400, detail="Payload must contain source_pipeline_id, target_pipeline_id, and a list of node_ids")
     try:
         id_map = pip_utils.duplicate_nodes_in_pipeline_with_relations(
-            cur, source_pipeline_id, target_pipeline_id, node_ids
+            cur, source_pipeline_id, target_pipeline_id, node_ids, withdata=withdata
         )
         for new_node_id in id_map.values():
-            db_utils.update_node_status(cur, node_id=new_node_id, status="staledata")
+            if withdata:
+              db_utils.update_node_status(cur, node_id=new_node_id, status="staledata")
+            else:
+              db_utils.update_node_status(cur, node_id=new_node_id, status="ready")
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
