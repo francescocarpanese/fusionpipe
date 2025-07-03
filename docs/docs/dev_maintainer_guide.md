@@ -21,15 +21,17 @@ Some operation during the installation process will require to have sudo access.
 - Extend permission r/w permission if setting up the deployment for multiple users.
 - Networking in case you are deploying the solution on a server which firewall and port restriction.
 
-In summary `fusionpipe` has the following things to be set-up: 
+In summary `fusionpipe` has the following things to be set-up:
+
 - Svelte application
 - FAST-API backend
 - PostgresSQL database
 
-In case of multiple users, also the following needs to be set-up.
+In case of multiple users installation, also the following needs to be set-up.
+
 - Shared access folder for the data.
-- Shared access folder for the `uv` environment.
-- Shared access folder for the user utilities.
+- Shared access folder for the `uv` caching folder environment.
+- Shared access for the user API utilities folder.
 
 ## Prerequistes
 
@@ -53,6 +55,10 @@ In this condition, in order to perform admin operation on the database, you need
 It is possibile to change the postgres authentication defualt, changing the file `pg_hba.conf` usually found in the location
 `/var/lib/pgsql/data/pg_hba.conf`. Changing `peer` to `md5` will ask for password authentication at the login instead of 
 
+After changing the authorisatio, reload postgres
+```bash
+sudo systemctl reload postgresql
+```
 
 #### docker installation 
 * TO BE UPDATED *

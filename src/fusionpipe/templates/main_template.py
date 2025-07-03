@@ -1,6 +1,6 @@
 # This script provides example on how to run a python script, matlab script, python notebook
-# Warning you must set up the following enviroment variable to get access to the database:
-# export DATABASE_URL="dbname=<yourdb> user=<youruser> password=<yourpassword> host=localhost port=<port>"
+# Warning you must set up the following enviroment variable to get access to the database unless not already set in your .bash_profile:
+# export DATABASE_URL="dbname=<yourdb> port=<port>" 
 import os
 from datetime import datetime
 import sys

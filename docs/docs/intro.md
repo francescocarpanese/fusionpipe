@@ -4,7 +4,6 @@
 
 - **Node**
 - **Pipeline**
-- **Project**
 
 # Node
 A node is a directory with a unique `<node_id>` that adheres to the following minimal structure:
@@ -29,5 +28,10 @@ A pipeline is a directed acyclic graph (DAG) that connects multiple nodes. Each 
 
 ![Pipeline Example](../../images/pipeline_example.jpg)
 
-# Project
-A project is simply a collection of pipelines to help you organise your work.
+# Start using it
+Depending on your role there are several way to can get started with fusionpipe:
+
+- **user on managed instance**: In this case `fusionpipe` is already availabe as a service in your machine/VM. Ask your maintainer how access and follow [user guide](user_guide/develop_node.md) to develop your first node.
+- **user with local installation/developer**: In this case you are going to install `fusionpipe` on your machine to either use it personally or contribute to it.
+Follow the [single user installation guidelines](installation_single.md)
+- **maintainer**: In this case your are installing `fusionpipe` your your barematal cluster as administrator for multiple to allow access to multiple users. Follow the [multiple users installation guidelines](dev_maintainer_guide.md)
