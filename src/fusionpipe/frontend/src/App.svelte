@@ -400,7 +400,57 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
   }
 
-  async function duplicateSelectedNodesIntoPipeline() {
+  async function duplicateSelectedNodesIntoPipeline(withdata: boolean) {
+    const pipelineId =
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
+
+    if (!pipelineId) {
+      console.error("No pipeline selected");
+      return;
+    }
+
+    if (!currentTargetPipelineId) {
+      console.error("No target pipeline selected");
+      alert("Please select a target pipeline to duplicate nodes into.");
+      return;
+    }
+
+    // Collect all selected node IDs
+    const selectedNodeIds = nodes
+      .filter((node) => node.selected)
+      .map((node) => node.id);
+
+    if (!selectedNodeIds.length) {
+      console.error("No nodes selected");
+      alert("Please select at least one node to duplicate.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/duplicate_nodes_in_pipeline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_pipeline_id: pipelineId,
+          target_pipeline_id: currentTargetPipelineId,
+          node_ids: selectedNodeIds,
+          withdata: withdata, // Pass the withdata flag
+        }),
+      });
+      if (!response.ok) await handleApiError(response);
+      await loadPipeline(currentTargetPipelineId);
+      alert(`Nodes ${selectedNodeIds.join(", ")} duplicated successfully.`);
+      currentTargetPipelineId = "";
+    } catch (error) {
+      console.error("Error duplicating nodes:", error);
+      alert("Failed to duplicate nodes.");
+    }
+  }
+
+
+  async function referenceSelectedNodesIntoPipeline() {
     const pipelineId =
       typeof currentPipelineId === "string"
         ? currentPipelineId
@@ -1619,12 +1669,12 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
           Duplicate selected nodes into this pipeline <ChevronRightOutline class="text-primary-700 ms-2 h-6 w-6 dark:text-white" />
         </DropdownItem>
           <Dropdown simple placement="right-start">
-            <DropdownItem  onclick={() => duplicateSelectedNodes(true)}>
-              with data
-            </DropdownItem>
-            <DropdownItem  onclick={() => duplicateSelectedNodes(false)}>
-              without data
-            </DropdownItem>            
+            <Button  onclick={() => duplicateSelectedNodes(true)}>
+              Duplicate with data
+            </Button>
+            <Button  onclick={() => duplicateSelectedNodes(false)}>
+              Duplicate without data
+            </Button>            
           </Dropdown>          
         <DropdownItem class="flex items-center justify-between">
           Duplicate selected nodes into another pipeline<ChevronRightOutline class="text-primary-700 ms-2 h-6 w-6 dark:text-white" />
@@ -1638,11 +1688,29 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
                 maxItems={5}
               />
             </div>
-            <Button onclick={duplicateSelectedNodesIntoPipeline} class="mt-2"
-              >Duplicate nodes</Button
+            <Button onclick={() => duplicateSelectedNodesIntoPipeline(true)} class="mt-2"
+              >Duplicate with data</Button
             >
+            <Button onclick={() => duplicateSelectedNodesIntoPipeline(false)} class="mt-2"
+              >Duplicate without data</Button
+            >            
           </Dropdown>
-
+          <DropdownItem class="flex items-center justify-between">
+            Reference selected nodes into another pipeline<ChevronRightOutline class="text-primary-700 ms-2 h-6 w-6 dark:text-white" />
+          </DropdownItem>
+            <Dropdown simple placement="right-start">
+              <div class="w-64">
+                <SvelteSelect
+                  items={pipelines_dropdown}
+                  bind:value={selectedPipelineTarget}
+                  placeholder="Select a pipeline..."
+                  maxItems={5}
+                />
+              </div>
+              <Button onclick={referenceSelectedNodesIntoPipeline} class="mt-2"
+                >Reference nodes</Button
+              >
+            </Dropdown>          
         <DropdownItem class="text-yellow-600" onclick={setNodeCompleted}
           >Manual set node "completed"</DropdownItem
         >

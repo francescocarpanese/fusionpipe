@@ -7,8 +7,8 @@ import psycopg2
 import random
 import string
 
-DATABASE_URL = "dbname=fusionpipe_test user=fusionpipe_test password=testpassword host=localhost"
 
+DATABASE_URL = f"dbname=fusionpipe_test"
 
 @pytest.fixture(scope="function")
 def pg_test_db():
@@ -22,7 +22,7 @@ def pg_test_db():
     admin_cur.execute(f"CREATE DATABASE {db_name};")
 
     # Connect to the new test database
-    test_db_url = f"dbname={db_name} user=fusionpipe_test password=testpassword host=localhost"
+    test_db_url = f"dbname={db_name}"
     test_conn = psycopg2.connect(test_db_url)
     yield test_conn
 
