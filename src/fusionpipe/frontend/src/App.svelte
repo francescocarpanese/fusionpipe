@@ -877,6 +877,10 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
         nodes = [...rawNodes];
         edges = [...rawEdges];
       }
+
+      currentPipelineId = pipelineId;
+      currentProjectId = pipeline.project_id || "";
+
     } catch (error) {
       console.error("Error loading selected pipeline:", error);
     }
