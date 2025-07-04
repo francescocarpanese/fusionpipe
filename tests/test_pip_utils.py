@@ -605,7 +605,7 @@ def test_set_children_stale_sets_descendants_to_staledata(pg_test_db, dag_dummy_
     import networkx as nx
 
     conn = pg_test_db
-    cur = db_utils.init_db(cur)
+    cur = db_utils.init_db(conn)
 
     # Add the dummy graph to the database
     graph_to_db(dag_dummy_1, cur)
