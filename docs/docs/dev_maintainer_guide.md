@@ -299,8 +299,10 @@ If your are developing the application and your environment variables are not ch
 ## Compile the frontend and serve
 If you want to compile the frontend 
 
+
+You need to set the environment variable before building the app as the environemtn variable will be backed in the app
 ```bash
-npm build
+npm run build
 ```
 
 ```bash

@@ -1,6 +1,8 @@
 site_name: fusionpipe
 theme:
   name: material
+  features:
+    - content.code.copy
 
 nav:
   - Getting Started: intro.md
@@ -10,8 +12,22 @@ nav:
   - User Guide:
       - Develop a Node: user_guide/develop_node.md
       - Pipeline Interaction: pipeline_interation.md
+      - Package Management and versioning: package_management.md
 
 
 plugins:
   - search
   - mkdocstrings
+
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences  
