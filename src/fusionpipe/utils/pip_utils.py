@@ -545,13 +545,23 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
     old_folder_path_nodes = db_utils.get_node_folder_path(cur, node_id=source_node_id)
 
     if old_folder_path_nodes:
-        # Copy only the 'code' and 'reports' subfolders
+        # Copy only the 'code' and 'reports' subfolders, skipping '.venv'
         os.makedirs(new_folder_path_nodes, exist_ok=True)
+
+        # Initise the new node folder
+        init_node_folder(new_folder_path_nodes, verbose=False)
+
         for subfolder in ['code', 'reports']:
             old_subfolder_path = os.path.join(old_folder_path_nodes, subfolder)
             new_subfolder_path = os.path.join(new_folder_path_nodes, subfolder)
             if os.path.exists(old_subfolder_path):
-                shutil.copytree(old_subfolder_path, new_subfolder_path, dirs_exist_ok=True)
+                # Use ignore to skip .venv if present in subfolder
+                shutil.copytree(
+                    old_subfolder_path,
+                    new_subfolder_path,
+                    dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns('.venv', '__pycache__', '*.pyc', '*.pyo', '*.pyd', '*.ipynb_checkpoints', '.git')
+                )
         if withdata:
             old_data_folder = os.path.join(old_folder_path_nodes, "data")
             new_data_folder = os.path.join(new_folder_path_nodes, "data")
