@@ -6,6 +6,7 @@ nav:
   - Getting Started: intro.md
   - User Guide:
       - Develop a Node: user_guide/develop_node.md
+      - Pipeline Interaction: user_guide/pipeline_interaction.md
   - Developer/Maintainer Guide: dev_maintainer_guide.md
 
 
