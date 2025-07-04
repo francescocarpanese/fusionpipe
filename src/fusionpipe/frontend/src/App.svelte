@@ -442,7 +442,8 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       if (!response.ok) await handleApiError(response);
       await loadPipeline(currentTargetPipelineId);
       alert(`Nodes ${selectedNodeIds.join(", ")} duplicated successfully.`);
-      currentTargetPipelineId = "";
+      selectedPipelineTarget = null;
+
     } catch (error) {
       console.error("Error duplicating nodes:", error);
       alert("Failed to duplicate nodes.");
