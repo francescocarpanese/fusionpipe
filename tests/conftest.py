@@ -6,6 +6,7 @@ import sqlite3
 import psycopg2
 import random
 import string
+import re
 
 
 DATABASE_URL_TEST = os.getenv('DATABASE_URL_TEST')
@@ -21,8 +22,8 @@ def pg_test_db():
     db_name = "test_fusionpipe_" + ''.join(random.choices(string.ascii_lowercase, k=8))
     admin_cur.execute(f"CREATE DATABASE {db_name};")
 
-    # Connect to the new test database
-    test_db_url = f"dbname={db_name}"
+    # Build the test database URL by replacing dbname in DATABASE_URL_TEST
+    test_db_url = re.sub(r"(dbname=)[^ ]+", rf"\1{db_name}", DATABASE_URL_TEST)
     test_conn = psycopg2.connect(test_db_url)
     yield test_conn
 
