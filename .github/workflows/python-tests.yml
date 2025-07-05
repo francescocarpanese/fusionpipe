@@ -1,0 +1,39 @@
+name: Python package CI
+
+on:
+    push:
+        branches: [ "*" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fusionpipe_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: "dbname=fusionpipe_test user=postgres password=postgres host=localhost port=5432"
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libpq-dev
+    - name: Install uv
+      run: |
+        pip install uv
+    - name: Sync dependencies with uv
+      run: |
+        uv sync
+    - name: Wait for PostgreSQL
+      run: |
+        until pg_isready -h localhost -p 5432; do sleep 1; done
+    - name: Run tests
+      run: uv run pytest
