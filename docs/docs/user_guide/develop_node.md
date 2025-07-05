@@ -79,7 +79,7 @@ Thi command set-up a Jupyter kernel with the same name as your `node_id`, in you
 ## Managing External Python Dependencies
 If the Python dependencies are available as PyPI packages or locally on your system, you can add them using:
 ```bash
-uv add <package_name>
+uv add --editable <package_name>
 ```
 This records the package requirements in the `project.toml` file and installs the package in the node's `.venv`. The package will then be available to the node when it runs as part of the pipeline.
 
