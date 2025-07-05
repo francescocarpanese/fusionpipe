@@ -1,15 +1,38 @@
 site_name: fusionpipe
 theme:
   name: material
+  features:
+    - content.code.copy
 
 nav:
   - Getting Started: intro.md
+  - Installation:
+      - Single User (bare metal): installation_single.md
+      - Multiple Users (bare metal): dev_maintainer_guide.md
   - User Guide:
       - Develop a Node: user_guide/develop_node.md
       - Pipeline Interaction: user_guide/pipeline_interaction.md
-  - Developer/Maintainer Guide: dev_maintainer_guide.md
+      - External Dependencies:
+          - python: package_management_python.md
+          - matlab: package_management_matlab.md
+      - Best practices:
+          - Set up new package and develop a pipeline: best_practices_pipeline_package.md
+
 
 
 plugins:
   - search
   - mkdocstrings
+
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences  

@@ -519,7 +519,7 @@ def get_all_children_nodes(cur, pipeline_id, node_id):
     graph = db_to_graph_from_pip_id(cur, pipeline_id)
     return list(nx.descendants(graph, node_id))
 
-def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_pipeline_id, source_node_id, new_node_id, parents=False, childrens=False):
+def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_pipeline_id, source_node_id, new_node_id, parents=False, childrens=False, withdata=False):
     """
     Duplicate a node in the pipeline, including its code and data.
     """
@@ -545,9 +545,32 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
     old_folder_path_nodes = db_utils.get_node_folder_path(cur, node_id=source_node_id)
 
     if old_folder_path_nodes:
-        # Copy the entire folder
+        # Copy only the 'code' and 'reports' subfolders, skipping '.venv'
         os.makedirs(new_folder_path_nodes, exist_ok=True)
-        shutil.copytree(old_folder_path_nodes, new_folder_path_nodes, dirs_exist_ok=True)
+
+        # Initise the new node folder
+        init_node_folder(new_folder_path_nodes, verbose=False)
+
+        for subfolder in ['code', 'reports']:
+            old_subfolder_path = os.path.join(old_folder_path_nodes, subfolder)
+            new_subfolder_path = os.path.join(new_folder_path_nodes, subfolder)
+            if os.path.exists(old_subfolder_path):
+                # Use ignore to skip .venv if present in subfolder
+                shutil.copytree(
+                    old_subfolder_path,
+                    new_subfolder_path,
+                    dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns('.venv', '__pycache__', '*.pyc', '*.pyo', '*.pyd', '*.ipynb_checkpoints', '.git')
+                )
+        if withdata:
+            old_data_folder = os.path.join(old_folder_path_nodes, "data")
+            new_data_folder = os.path.join(new_folder_path_nodes, "data")
+            if os.path.exists(old_data_folder):
+                shutil.copytree(old_data_folder, new_data_folder, dirs_exist_ok=True)
+            else:
+                os.makedirs(new_data_folder, exist_ok=True)
+        else:
+            os.makedirs(os.path.join(new_folder_path_nodes, "data"), exist_ok=True)
 
     # Load and update the project.toml file
     project_toml_path = os.path.join(new_folder_path_nodes, "code", "pyproject.toml")
@@ -575,7 +598,7 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
     finally:
         os.chdir(current_dir)
 
-def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_pipeline_id, source_node_ids):
+def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_pipeline_id, source_node_ids, withdata=False):
     """
     Duplicate a list of nodes including their relation inside a pipeline.
     """
@@ -596,7 +619,7 @@ def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_p
         new_id = id_map[old_id]
         # Duplicate node in DB (without parents/children relations)
         duplicate_node_in_pipeline_w_code_and_data(
-            cur, source_pipeline_id,target_pipeline_id, old_id, new_id, parents=False, childrens=False)
+            cur, source_pipeline_id,target_pipeline_id, old_id, new_id, parents=False, childrens=False, withdata=withdata)
     # Set parent-child relations in the duplicated subtree
     for old_parent, old_child in subtree.edges:
         db_utils.add_node_relation(

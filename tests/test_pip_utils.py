@@ -306,7 +306,7 @@ def test_branch_pipeline_from_node(pg_test_db, dag_dummy_1, start_node):
 def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp_base_dir):
     """
     Test that duplicate_node_in_pipeline_w_code_and_data duplicates a node in the pipeline,
-    including its code and data folder.
+    including its code and data folder, depending on the withdata argument.
     """
     import os
     import shutil
@@ -331,8 +331,14 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp
     folder_path_nodes = os.path.join(tmp_base_dir, node_id)
     init_node_folder(folder_path_nodes, verbose=True)
 
+    # Create a file in the data folder to test duplication
+    data_folder = os.path.join(folder_path_nodes, "data")
+    os.makedirs(data_folder, exist_ok=True)
+    data_file = os.path.join(data_folder, "testfile.txt")
+    with open(data_file, "w") as f:
+        f.write("testdata")
 
-    # Run duplication
+    # --- Test withdata=False (default) ---
     new_node_id = generate_node_id()
     duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, pipeline_id, node_id, new_node_id)
     conn.commit()
@@ -349,10 +355,24 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp
     pyproject_file_path = os.path.join(new_code_folder_path, "pyproject.toml")
     assert os.path.isfile(pyproject_file_path), "pyproject.toml file does not exist in the new node's code folder."
 
-
     with open(pyproject_file_path, "r") as f:
         pyproject_content = toml.load(f)
     assert new_node_id in pyproject_content["project"]["name"], "pyproject.toml does not contain 'dependencies' section."
+
+    # Data folder should exist but not contain the test file (since withdata=False)
+    new_data_folder = os.path.join(new_folder_path_nodes, "data")
+    assert os.path.exists(new_data_folder)
+    assert not os.path.exists(os.path.join(new_data_folder, "testfile.txt")), "Data file should not be copied when withdata=False"
+
+    # --- Test withdata=True ---
+    new_node_id2 = generate_node_id()
+    duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, pipeline_id, node_id, new_node_id2, withdata=True)
+    conn.commit()
+
+    new_folder_path_nodes2 = os.path.join(tmp_base_dir, new_node_id2)
+    new_data_folder2 = os.path.join(new_folder_path_nodes2, "data")
+    assert os.path.exists(new_data_folder2)
+    assert os.path.exists(os.path.join(new_data_folder2, "testfile.txt")), "Data file should be copied when withdata=True"
 
 def test_duplicate_node_in_different_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp_base_dir):
     """
