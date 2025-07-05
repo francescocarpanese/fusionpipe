@@ -74,21 +74,4 @@ To do that, from `<node_id>/code` folder run:
 ```bash
 uv run python init_node_kernel.py
 ```
-Thi command set-up a Jupyter kernel with the same name as your `node_id`, in your home folder. 
-
-## Managing External Python Dependencies
-If the Python dependencies are available as PyPI packages or locally on your system, you can add them using:
-```bash
-uv add --editable <package_name>
-```
-This records the package requirements in the `project.toml` file and installs the package in the node's `.venv`. The package will then be available to the node when it runs as part of the pipeline.
-
-`uv` uses caching to speed up package installation. If the package has already been installed in another node, it will not be downloaded again. This avoids duplicating large packages like `pytorch` or `tensorflow`.
-
-If you need to add a package from a GitHub/GitLab repository, we recommend adding it as a submodule in the folder.
-
-## Managing External MATLAB Dependencies
-External MATLAB dependencies can be added to a MATLAB script by including the path to the folder containing the dependency. Add the following line at the beginning of your script:
-```matlab
-addpath('/path/to/your/folder');
-```
+This command set-up a Jupyter kernel with the same name as your `node_id`, in your home folder. 
