@@ -8,12 +8,12 @@ import random
 import string
 
 
-DATABASE_URL = f"dbname=fusionpipe_test"
+DATABASE_URL_TEST = os.getenv('DATABASE_URL_TEST')
 
 @pytest.fixture(scope="function")
 def pg_test_db():
     # Connect to the default database as the test user
-    admin_conn = psycopg2.connect(DATABASE_URL)
+    admin_conn = psycopg2.connect(DATABASE_URL_TEST)
     admin_conn.autocommit = True
     admin_cur = admin_conn.cursor()
 
@@ -29,7 +29,7 @@ def pg_test_db():
     # Cleanup: close and drop the test database
     test_conn.close()
     # Reconnect to the original database to drop the test db
-    admin_conn2 = psycopg2.connect(DATABASE_URL)
+    admin_conn2 = psycopg2.connect(DATABASE_URL_TEST)
     admin_conn2.autocommit = True
     admin_cur2 = admin_conn2.cursor()
     admin_cur2.execute(f"DROP DATABASE {db_name};")

@@ -4,5 +4,6 @@
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
-    "recommendations": ["svelte.svelte-vscode"]
+    "recommendations": ["svelte.svelte-vscode"],
+    "python.envFile": "${workspaceFolder}/developer.env",   
 }

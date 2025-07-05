@@ -6,7 +6,7 @@ import pytest
 
 def test_get_all_parent_node_folder_paths(pg_test_db, monkeypatch, dag_dummy_1):
     from fusionpipe.utils.pip_utils import graph_to_db
-    from conftest import DATABASE_URL
+    from conftest import DATABASE_URL_TEST
 
     # Initialise DB schema
     cur = db_utils.init_db(pg_test_db)
@@ -20,8 +20,8 @@ def test_get_all_parent_node_folder_paths(pg_test_db, monkeypatch, dag_dummy_1):
     expected_parents = [k for k in dag_dummy_1.predecessors(node_id)]
     expected_paths = [dag_dummy_1.nodes[parent]['folder_path'] for parent in expected_parents]
 
-    # Set DATABASE_URL only for this test using monkeypatch
-    monkeypatch.setenv('DATABASE_URL', DATABASE_URL)
+    # Set DATABASE_URL_TEST only for this test using monkeypatch
+    monkeypatch.setenv('DATABASE_URL_TEST', DATABASE_URL_TEST)
 
     result = node_api.get_all_parent_node_folder_paths(node_id)
     assert set(result) == set(expected_paths)
