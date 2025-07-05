@@ -19,7 +19,7 @@ jobs:
         options: >-
           --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
     env:
-      DATABASE_URL: "dbname=fusionpipe_test user=postgres password=postgres host=localhost port=5432"
+      DATABASE_URL_TEST: "dbname=fusionpipe_test user=postgres password=postgres host=localhost port=5432"
     steps:
     - uses: actions/checkout@v4
     - name: Install system dependencies
