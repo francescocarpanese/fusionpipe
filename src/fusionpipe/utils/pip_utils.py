@@ -717,9 +717,18 @@ def add_node_relation_safe(cur, pipeline_id, parent_id, child_id):
     temp_graph.add_edge(parent_id, child_id)
     if not nx.is_directed_acyclic_graph(temp_graph):
         raise ValueError(f"Adding edge from {parent_id} to {child_id} would create a cycle.")
+    
+    # If the child node is in 'completed' status, set it to 'staledata'
+    child_status = db_utils.get_node_status(cur, node_id=child_id)
+    if child_status == NodeState.COMPLETED.value:
+        db_utils.update_node_status(cur, node_id=child_id, status=NodeState.STALEDATA.value)
 
     # Add the relation
     db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
+
+    # Refresh the status of the child node in the pipeline after adding the relation
+    update_stale_status_for_pipeline_nodes(cur, pipeline_id)
+
     return True
 
 def merge_pipelines(cur, source_pipeline_ids):
