@@ -34,6 +34,7 @@ nav:
   - Developer Guide:
       - Design Principles: developer_guide/design_principles.md
 
+
 plugins:
   - search
   - mkdocstrings
