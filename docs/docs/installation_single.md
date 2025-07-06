@@ -174,5 +174,3 @@ VITE_BACKEND_HOST=$VITE_BACKEND_HOST VITE_BACKEND_PORT=$VITE_BACKEND_PORT  npm r
 ```
 
 You should now be able to reach the frontend with your browser at the address `localhost:<frontend_port>` where frontend port is the one specified in your `.env` file.
-
-
