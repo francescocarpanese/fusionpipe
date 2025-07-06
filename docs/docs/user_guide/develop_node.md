@@ -75,3 +75,5 @@ To do that, from `<node_id>/code` folder run:
 uv run python init_node_kernel.py
 ```
 This command set-up a Jupyter kernel with the same name as your `node_id`, in your home folder. 
+
+See also [Best practices/Develop your pipeline together with your custom package](best_practices_pipeline_package.md) for more details on how to develop a node while developing your custom python package versioned with `.git`.

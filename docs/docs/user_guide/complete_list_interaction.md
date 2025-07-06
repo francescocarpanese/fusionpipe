@@ -1,7 +1,7 @@
 
 # Complete list of functions
 
-- **`Project Interaction`**
+## Project Interaction
 
 Different pipelines can be grouped in a project.
 
@@ -17,7 +17,7 @@ Different pipelines can be grouped in a project.
  
 `Delete project`: select this option to delete the actual project.
 
-- **`Pipeline Interaction`**:
+## Pipeline Interaction
 
 `List ids`: use this option to search and select a pipeline by its unique identifier.
 
@@ -37,8 +37,7 @@ Different pipelines can be grouped in a project.
 
 `Delete Pipeline`: select this option to delete the actual pipeline.
 
-
-- **Node Interaction**:
+## Node Interaction
 
 `Open selected node panel`: this panel allows you to change the pipeline tag and add notes that may be useful for you and future pipelines users. You can fill the `Node Parameters (YAML)` box, which will store your parmeters in a YAML file to be used as fixed parameteres inputs in the node code.
 
@@ -63,8 +62,7 @@ Different pipelines can be grouped in a project.
 
 `Delete selected nodes`: use this command to delete a selected node.
 
-
-- **Actions**:
+## Node Interaction
 
 `Run selected node`: this function will run the code of a selected node, setting its state to <span style="color: blue;">_running_</span> state and at the end of the process to <span style="color: green;">_completed_</span> or <span style="color: red;">_failed_</span> state.
 
@@ -76,8 +74,7 @@ Different pipelines can be grouped in a project.
 
 `Kill run selected node`: select a node and choose this option to kill its execution.
 
-
-- **Layout**:
+## Layout
 
 `Refresh pipeline`: click this command to refresh the state of pipeline nodes.
 

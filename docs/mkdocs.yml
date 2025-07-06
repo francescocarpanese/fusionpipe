@@ -7,8 +7,8 @@ theme:
 nav:
   - Getting Started: intro.md
   - Installation:
-      - Single User (bare metal): installation_single.md
-      - Multiple Users (bare metal): dev_maintainer_guide.md
+      - Single User (Bare metal): installation_single.md
+      - Multiple Users (Bare metal): dev_maintainer_guide.md
   - User Guide:
       - Develop a Node (Basics): user_guide/develop_node.md
       - Pipeline Interaction:
@@ -20,7 +20,13 @@ nav:
           - matlab: package_management_matlab.md
       - Best practices:
           - Develop your pipeline together with your custom package: best_practices_pipeline_package.md
-          - VSCode best practice developing a node: best_practices_vscode.md
+          - Develop with VSCode: best_practices_vscode.md
+          - Develop with Jupyter Notebooks in VSCode: best_practices_jupyter_vscode.md
+          - Develop with Jupyter Lab: best_practices_jupyter_lab.md
+          - Develop with Matlab: best_practices_matlab.md
+          - Develop with Octave: best_practices_octave.md
+  - Developer Guide:
+      - Design Principles: developer_guide/design_principles.md
 
 plugins:
   - search
