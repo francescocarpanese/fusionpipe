@@ -32,7 +32,7 @@ A node may include calls to Python scripts, Jupyter notebooks, MATLAB scripts, o
 # Pipeline
 A pipeline is a directed acyclic graph (DAG) that connects multiple nodes. Each node can have multiple parent and child nodes, enabling the creation of complex workflows. The pipeline orchestrator handles node execution based on dependencies, ensuring that parent nodes are processed before their children.
 
-![Pipeline Example](../../images/pipeline_example.jpg)
+![Pipeline Example](images/pipeline_example.jpg)
 
 # Start using it
 Depending on your role there are several way to can get started with fusionpipe:

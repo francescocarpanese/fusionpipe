@@ -5,7 +5,7 @@
 In this section, you will learn the fundamentals of interacting with the FusionPipe frontend and how to effectively manage your data processing workflows.
 
 <a id="pipeline-example"></a>
-![Pipeline Example](../../images/pipeline_example.jpg)
+![Pipeline Example](../images/pipeline_example.jpg)
 
 Follow these simple description:
 
@@ -21,11 +21,11 @@ From the `Pipeline Interaction` option, select `Open selected pipeline panel` to
 
 Additionally, you can add detailed notes to document the pipeline's objectives, methodology, or any other relevant information for future reference.
 
-![Pipeline](../../images/pipeline_panel.png)
+![Pipeline](../images/pipeline_panel.png)
 
 ### Create a node
 
-To create your first node, click on `Node Interaction` and then select `Create node`. Each node, like a pipeline, is assigned a unique identifier (`node_id`) to ensure its uniqueness within a pipeline. A specific `node_id` can appear only once in a given pipeline, but the same node can be referenced in multiple pipelines, allowing for shared use and consistency. See [Develop a Node](user_guide/develop_node.md) for more information.
+To create your first node, click on `Node Interaction` and then select `Create node`. Each node, like a pipeline, is assigned a unique identifier (`node_id`) to ensure its uniqueness within a pipeline. A specific `node_id` can appear only once in a given pipeline, but the same node can be referenced in multiple pipelines, allowing for shared use and consistency. See [Develop a Node](../user_guide/develop_node.md) for more information.
 
 A node is represented as a folder containing three subfolders:
 

@@ -82,4 +82,4 @@ uv run python init_node_kernel.py
 ```
 This will create a new Jupyter kernel with the same name as your node's ID. You can then select this kernel in your Jupyter environment.
 
-For more advanced topics, such as developing a node in conjunction with a custom Python package, see the [Best practices for pipeline and package development](best_practices_pipeline_package.md).
+For more advanced topics, such as developing a node in conjunction with a custom Python package, see the [Best practices for pipeline and package development](../best_practices_pipeline_package.md).
