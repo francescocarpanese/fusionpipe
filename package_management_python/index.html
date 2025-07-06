@@ -1,0 +1,1314 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../user_guide/complete_list_interaction/">
+      
+      
+        <link rel="next" href="../package_management_matlab/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+    
+    
+      
+        <title>python - https://francescocarpanese.github.io/fusionpipe/</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.342714a4.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#preliminaries" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="https://francescocarpanese.github.io/fusionpipe/" class="md-header__button md-logo" aria-label="https://francescocarpanese.github.io/fusionpipe/" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            https://francescocarpanese.github.io/fusionpipe/
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              python
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="https://francescocarpanese.github.io/fusionpipe/" class="md-nav__button md-logo" aria-label="https://francescocarpanese.github.io/fusionpipe/" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    https://francescocarpanese.github.io/fusionpipe/
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../intro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Getting Started
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Installation
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_single/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Single User (Bare metal)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev_maintainer_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Multiple Users (Bare metal)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    User Guide
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            User Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/develop_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop a Node (Basics)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Pipeline Interaction
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            Pipeline Interaction
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/pipeline_interaction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Basic Interaction
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/pipeline_interaction_advanced/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Advanced Interaction
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/complete_list_interaction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Full list of commands
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    External Dependencies
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            External Dependencies
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    python
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    python
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#preliminaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      Preliminaries
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Preliminaries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#difference-between-python-script-and-python-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      Difference between python script and python packages
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#virtual-environment-for-a-node" class="md-nav__link">
+    <span class="md-ellipsis">
+      Virtual environment for a node
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extarnal-code-is-a-python-packaged" class="md-nav__link">
+    <span class="md-ellipsis">
+      Extarnal code is a python packaged
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#external-code-is-only-a-collection-of-python-scripts" class="md-nav__link">
+    <span class="md-ellipsis">
+      External code is (only) a collection of Python scripts
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../package_management_matlab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    matlab
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Best practices
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            Best practices
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best_practices_pipeline_package/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop your pipeline together with your custom package
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best_practices_vscode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop with VSCode
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best_practices_jupyter_vscode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop with Jupyter Notebooks in VSCode
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best_practices_jupyter_lab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop with Jupyter Lab
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best_practices_matlab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop with Matlab
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best_practices_octave/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop with Octave
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Developer Guide
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Developer Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer_guide/design_principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Design Principles
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#preliminaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      Preliminaries
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Preliminaries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#difference-between-python-script-and-python-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      Difference between python script and python packages
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#virtual-environment-for-a-node" class="md-nav__link">
+    <span class="md-ellipsis">
+      Virtual environment for a node
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extarnal-code-is-a-python-packaged" class="md-nav__link">
+    <span class="md-ellipsis">
+      Extarnal code is a python packaged
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#external-code-is-only-a-collection-of-python-scripts" class="md-nav__link">
+    <span class="md-ellipsis">
+      External code is (only) a collection of Python scripts
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+  <h1>python</h1>
+
+<p>In the following the guideline the instructions to include external python code in yout pipeline is presented in details.</p>
+<h2 id="preliminaries">Preliminaries</h2>
+<h3 id="difference-between-python-script-and-python-packages">Difference between python script and python packages</h3>
+<p>A <strong>Python script</strong> is a single file containing Python code, typically used for small tasks, automation, or quick experiments. Scripts are usually not structured for reuse and are executed directly.</p>
+<p>A <strong>Python package</strong> is a collection of modules organized in directories with an <code>__init__.py</code> file. Packages are designed for code reuse, distribution, and maintainability, making it easier to share and manage complex codebases across multiple projects. Most of the libraries you install from PyPI (using <code>pip install ...</code>) are Python packages, and you typically import them using statements like <code>from package_name import ...</code>.</p>
+<p>It is highly recommended to package your code into a Python package. Follow the guide in <a href="../best_practices_pipeline_package/">Best Practices for Pipeline Packages</a>. However, in the following instructions are provided for both cases where you python code is a script or python package</p>
+<h3 id="virtual-environment-for-a-node">Virtual environment for a node</h3>
+<p>Every node is initialise with the command <code>uv init</code>, which automatically create a dedicated python virtual environment which will contains the dependencies for the node. This can be activate from the 'node_id/code' subfolder</p>
+<p><div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">cd</span><span class="w"> </span>code
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">source</span><span class="w"> </span>.venv/bic/activate
+</span></code></pre></div>
+See guideline at page <a href="../user_guide/develop_node/">Delevelop a Node</a></p>
+<h2 id="extarnal-code-is-a-python-packaged">Extarnal code is a python packaged</h2>
+<p>There can be 2 situations in this case. </p>
+<ul>
+<li><code>Developer</code>: Your are modifying the package while you develop the pipeline.</li>
+<li><code>User</code>: The package remains the same during the development of the full pipeline.</li>
+</ul>
+<details class="note">
+<summary>Developer</summary>
+<p>In this case the code in the python package evolves while you are developing the pipeline. This is the most common case when you are working on your personal project. Usually your code, is version controller <code>.git</code> independently from your pipeline.</p>
+<p>There are two possibile solutions that you can adopt to integrate your code in one node of your pipeline.</p>
+<details class="note">
+<summary>a) Every node has an independent snapshot of the external package</summary>
+<p>In this case in every node a snapshot of your code is available. 
+This means that you either copy paste your code from your local location, or you clone the repository from remote <code>.git</code>. </p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>./&lt;url/mypackageo&gt;
+</span></code></pre></div>
+<p>You can then add your repo to the <code>.venv</code> of the node with 
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uv<span class="w"> </span>add<span class="w"> </span>--editable<span class="w"> </span>&lt;mypackage&gt;
+</span></code></pre></div>
+You will be able then to import functions from your package into the <code>main.py</code> function as usual <code>from mypackage import *</code>.</p>
+<p>The editable flag ensures that changes you make to your external package source code are immediately reflected in the node’s environment without needing to reinstall the package each time. This way you can import a function on the <code>main.py</code> from your package, and modification of your package will be immediately available. </p>
+<p>This step will also automatically install all the dependencies of the external python package in the <code>.venv</code> of your node.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Whenever you create a new node, you will need to follow these steps for all the external packages that are needed in your node.
+When you duplicate a node instead, the new node will be ready ready to be used with all the dependencies installed.</p>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Info: Best practise to update the external packages in previously created nodes</p>
+<p>Suppose that you started developing your pipeline, and your external packages evolves changes while you develop the pipeline. A node that was created and run in the past will have a snapshot of the the external package as on the moment that the node has run. It could happen that you would like to updated the package for an old node, and eventually re-run the node and its children if the changes are expected to affect the output of the node.</p>
+<p>In case you are sure that the changes of your code will not change the outputs of the nodes:
+- Navigate the node folder, <code>cd node_folder_path</code>.
+- Navigate your package subfolder.
+- Merge the latest version of your package <code>git pull</code>.</p>
+<p>If case the changes of your package can affect the output of the node: 
+- Duplicate the node (without data)
+- Attach the nodes to the same parents as for the original one.
+- Navigate the node folder, <code>cd node_folder_path</code>.
+- Merge the latest version of your package <code>git pull</code>.
+- Rerun the node.
+- If completed succesfully, swap the node with the one containing the new package in the pipeline.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip: Create a template node with all your external packages and duplicate it</p>
+<p>When multiple external packages are needed in the same node, in order to avoid to <code>git pull</code> all of them for every node, you can create a node that you will use as a template. In this node you can pull and add all the dependencies. Then, you can duplicate this node instead of creating a new one and add depencies.</p>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p><code>uv</code> will not re-download, or duplicate in the disk dependencies if those are already available in the <code>uv</code> cache. This is convenient especially for large (&gt;1Gib) packages like <code>pytorch</code>,<code>tensorflow</code> to avoid wasting disk space.</p>
+</div>
+</details>
+<details class="note">
+<summary>b) Every node share the same instance of the external package</summary>
+<p>In this case your package is located in 1 single location on your disk. Every node will reference to this package.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>It is recommended to create a node in your pipeline which will only contain the package that will be shared with the other nodes.
+This will allow all the users that are collaborating on your pipeline to have access to the code. Also, this will allow you to have your pipeline be self-contained.</p>
+</div>
+<p>When you creaet a new node:</p>
+<ul>
+<li>Navigate the code folder <code>code_id/node</code></li>
+<li>Add the package using the absolute path to the location on this where the package is located
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>add<span class="w"> </span>--editable<span class="w"> </span>&lt;absolute/path/to/package&gt;
+</span></code></pre></div></li>
+</ul>
+<p>When you duplicate a node where you referenced an external package, this will be ready to use. No need to re-add the package.
+There are pros and cons with both solutions:</p>
+</details>
+<p>There are pros and cons with both solutions:</p>
+<ul>
+<li>
+<p><strong>a) Every node has an independent snapshot of the external package</strong></p>
+<ul>
+<li><strong>PROS:</strong><ul>
+<li>Each node is self-contained and portable.</li>
+<li>Changes to the package in one node do not affect others.</li>
+<li>Easier to reproduce results for a specific node at a given point in time.</li>
+</ul>
+</li>
+<li><strong>CONS:</strong><ul>
+<li>Requires manual updates of the package in each node if changes are made.</li>
+<li>Can lead to code duplication.</li>
+<li>More maintenance overhead when managing multiple nodes.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>b) Every node shares the same instance of the external package</strong></p>
+<ul>
+<li><strong>PROS:</strong><ul>
+<li>Centralized management of the package; updates are immediately available to all nodes.</li>
+<li>Reduces code duplication and saves disk space.</li>
+<li>Easier to maintain consistency across nodes.</li>
+</ul>
+</li>
+<li><strong>CONS:</strong><ul>
+<li>Changes to the package can affect all nodes, potentially breaking reproducibility.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>It is recommended to use option <strong>a)</strong> while developing your pipeline. Pipelines often evolve over time, becoming complex as you iterate on your code, and many nodes may require significant compute resources to process full datasets. The extra effort to update packages in old nodes with solution <strong>a)</strong> is usually outweighed by the benefit of avoiding hard-to-debug issues caused by breaking changes and loss of reproducibility that can occur with solution <strong>b)</strong>.</p>
+</div>
+</details>
+<details class="note">
+<summary>User</summary>
+<p>In this case, the external package does not change while you are developing the pipeline. This is typical when the Python package comes from a stable distribution such as PyPI (e.g., <code>numpy</code>) or a remote repository (e.g., GitHub or GitLab).</p>
+<p>To add such a package to your node:</p>
+<ul>
+<li>Navigate to the node's code folder: <code>cd node_id/code</code></li>
+<li>Add the package using:
+  <div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uv<span class="w"> </span>add<span class="w"> </span>&lt;package-location&gt;
+</span></code></pre></div></li>
+</ul>
+<details class="note">
+<summary>Package hosted in PyPI</summary>
+<p>Simply specify the package name. For example:
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>uv<span class="w"> </span>add<span class="w"> </span>numpy
+</span></code></pre></div>
+To specify a particular version of a package from PyPI, append <code>==&lt;version&gt;</code> to the package name. For example, to install version 1.24.0 of numpy:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="nv">numpy</span><span class="o">==</span><span class="m">1</span>.24.0
+</span></code></pre></div>
+<p>This ensures that the specified version is installed in your node's environment.</p>
+</details>
+<details class="note">
+<summary>Package hosted on GitHub/Gitlab or another remote repository</summary>
+<p>You can provide the repository URL directly. For example:
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>uv<span class="w"> </span>add<span class="w"> </span>git+https://github.com/username/repository.git
+</span></code></pre></div>
+This will install the package from the remote source.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>For better reproducibility and to ensure all nodes use the same version of the package, it is recommended to:</p>
+<ol>
+<li>Create a dedicated node to download and store the package locally.</li>
+<li>Download or clone the package into this node.</li>
+<li>Add the package to other nodes by providing the absolute path to the local copy. For example:
+    <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>uv<span class="w"> </span>add<span class="w"> </span>--editable<span class="w"> </span>/absolute/path/to/package
+</span></code></pre></div>
+This ensures all nodes reference the same package version, avoiding inconsistencies due to remote updates or changes.</li>
+</ol>
+</div>
+</details>
+</details>
+<h2 id="external-code-is-only-a-collection-of-python-scripts">External code is (only) a collection of Python scripts</h2>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>For maximum reproducibility and maintainability, it is best to organize your scripts as a Python package rather than as standalone scripts. Packaging your code ensures consistent imports, easier dependency management, and better compatibility with pipeline tools. See <a href="../best_practices_pipeline_package/">Best Practices for Pipeline Packages</a> for guidance on structuring your code as a package.</p>
+</div>
+<p>There are two main scenarios when including standalone Python scripts (not organized as a package) in your pipeline:</p>
+<details class="note">
+<summary>Developer</summary>
+<p>If you are actively developing or modifying your scripts while building your pipeline, consider the following approaches:</p>
+<details class="note">
+<summary>a) Copy scripts into each node</summary>
+<ul>
+<li>Place your script(s) directly in the <code>code</code> subfolder of the node.</li>
+<li>Import functions or classes from these scripts in your <code>main.py</code> using standard Python import statements:
+    <div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">my_script</span><span class="w"> </span><span class="kn">import</span> <span class="n">my_function</span>
+</span></code></pre></div></li>
+<li><strong>PROS:</strong> Each node is self-contained and reproducible. Changes to scripts in one node do not affect others.</li>
+<li><strong>CONS:</strong> Manual updates are needed if scripts change, and code duplication may occur across nodes.</li>
+</ul>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>If you update your script and want to propagate changes to other nodes, you will need to manually copy the updated script into each relevant node.</p>
+</div>
+</details>
+<details class="note">
+<summary>b) Reference scripts from a shared location</summary>
+<ul>
+<li>Store your scripts in a shared directory outside the node folders.</li>
+<li>In your <code>main.py</code>, add the path to this directory to <code>sys.path</code> at runtime:
+    <div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;/absolute/path/to/shared/scripts&#39;</span><span class="p">)</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">my_script</span><span class="w"> </span><span class="kn">import</span> <span class="n">my_function</span>
+</span></code></pre></div></li>
+<li><strong>PROS:</strong> Centralized management; updates are immediately available to all nodes.</li>
+<li><strong>CONS:</strong> Changes to the script affect all nodes, which may impact reproducibility.</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Be cautious: updating a shared script will affect all nodes that reference it, potentially breaking previous results.</p>
+</div>
+</details>
+<details class="note">
+<summary>c) Use symbolic links (advanced)</summary>
+<ul>
+<li>Create a symbolic link in the node's <code>code</code> folder pointing to the shared script location:
+    <div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>ln<span class="w"> </span>-s<span class="w"> </span>/absolute/path/to/shared/scripts/my_script.py<span class="w"> </span>code/my_script.py
+</span></code></pre></div></li>
+<li><strong>PROS:</strong> Keeps node folders organized and avoids duplication.</li>
+<li><strong>CONS:</strong> Like referencing a shared location, changes to the script affect all nodes using the link.</li>
+</ul>
+</details>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>For most development workflows, copying scripts into each node is recommended for reproducibility. Use shared references or symbolic links if you prioritize easier maintenance and are aware of the implications for reproducibility.</p>
+</div>
+</details>
+<details class="note">
+<summary>User</summary>
+<p>If your scripts are stable and will not change during pipeline development (for example, they are provided by a third party or are finalized):</p>
+<ul>
+<li>It is recommended to create a dedicated node in your pipeline to store the shared scripts in a read-only location.</li>
+<li>In each node that requires these scripts, add the shared scripts directory to <code>sys.path</code> in your <code>main.py</code>:
+    <div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;/absolute/path/to/shared/scripts&#39;</span><span class="p">)</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">my_script</span><span class="w"> </span><span class="kn">import</span> <span class="n">my_function</span>
+</span></code></pre></div></li>
+<li>Alternatively, you may create symbolic links in the node's <code>code</code> folder pointing to the shared scripts.</li>
+</ul>
+<p>This approach ensures all nodes reference the same, unchanging version of the script, supporting reproducibility and easier maintenance.</p>
+</details>
+<hr />
+<p>If your scripts have dependencies, install them in the node's virtual environment using <code>uv add &lt;package&gt;</code> as described in the previous sections.</p>
+<p>Alternatively, if your dependencies are listed in a <code>requirements.txt</code> file, you can install all of them at once by running:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+</span></code></pre></div>
+<p>This will install every package specified in the <code>requirements.txt</code> file into the node's virtual environment.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"method": "material"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      
+    
+  </body>
+</html>

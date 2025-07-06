@@ -1,0 +1,1826 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../installation_single/">
+      
+      
+        <link rel="next" href="../user_guide/develop_node/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+    
+    
+      
+        <title>Multiple Users (Bare metal) - https://francescocarpanese.github.io/fusionpipe/</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.342714a4.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#prerequistes" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="https://francescocarpanese.github.io/fusionpipe/" class="md-header__button md-logo" aria-label="https://francescocarpanese.github.io/fusionpipe/" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            https://francescocarpanese.github.io/fusionpipe/
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Multiple Users (Bare metal)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="https://francescocarpanese.github.io/fusionpipe/" class="md-nav__button md-logo" aria-label="https://francescocarpanese.github.io/fusionpipe/" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    https://francescocarpanese.github.io/fusionpipe/
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../intro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Getting Started
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Installation
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_single/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Single User (Bare metal)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Multiple Users (Bare metal)
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Multiple Users (Bare metal)
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prerequistes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prerequistes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Prerequistes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#postgres" class="md-nav__link">
+    <span class="md-ellipsis">
+      Postgres
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Postgres">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#local-installation-need-sudo" class="md-nav__link">
+    <span class="md-ellipsis">
+      local installation (need sudo)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      docker installation
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#uv-package-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      UV package manager
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#set-up-the-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      Set-up the database
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-and-initialise-the-required-tables-for-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create and initialise the required tables for database
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-data-folder-and-extend-rw-access-for-multiple-users" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create data folder and extend R/W access for multiple users
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#set-enviroment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Set enviroment variables
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-the-frontend-and-backend-developer-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Run the frontend and backend (developer mode)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Run the frontend and backend (developer mode)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#compile-the-frontend-and-serve" class="md-nav__link">
+    <span class="md-ellipsis">
+      Compile the frontend and serve
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-the-frontend-and-backend-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      Run the frontend and backend (production)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Run the frontend and backend (production)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-fusionpipe-in-as-systemd-need-review-not-fully-working-at-the-moment" class="md-nav__link">
+    <span class="md-ellipsis">
+      Run fusionpipe in as systemd (Need review not fully working at the moment)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrade-the-production-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      Upgrade the production version
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#onboard-a-new-user" class="md-nav__link">
+    <span class="md-ellipsis">
+      Onboard a new user
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#user-set-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      User set-up
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#set-up-docker-at-system-level-require-sudo" class="md-nav__link">
+    <span class="md-ellipsis">
+      Set up docker at system level. (require sudo)
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    User Guide
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            User Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/develop_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop a Node (Basics)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Pipeline Interaction
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            Pipeline Interaction
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/pipeline_interaction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Basic Interaction
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/pipeline_interaction_advanced/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Advanced Interaction
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/complete_list_interaction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Full list of commands
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    External Dependencies
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            External Dependencies
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../package_management_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    python
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../package_management_matlab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    matlab
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Best practices
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            Best practices
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best_practices_pipeline_package/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop your pipeline together with your custom package
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best_practices_vscode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop with VSCode
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best_practices_jupyter_vscode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop with Jupyter Notebooks in VSCode
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best_practices_jupyter_lab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop with Jupyter Lab
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best_practices_matlab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop with Matlab
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best_practices_octave/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop with Octave
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Developer Guide
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Developer Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer_guide/design_principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Design Principles
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prerequistes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prerequistes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Prerequistes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#postgres" class="md-nav__link">
+    <span class="md-ellipsis">
+      Postgres
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Postgres">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#local-installation-need-sudo" class="md-nav__link">
+    <span class="md-ellipsis">
+      local installation (need sudo)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      docker installation
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#uv-package-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      UV package manager
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#set-up-the-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      Set-up the database
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-and-initialise-the-required-tables-for-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create and initialise the required tables for database
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-data-folder-and-extend-rw-access-for-multiple-users" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create data folder and extend R/W access for multiple users
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#set-enviroment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Set enviroment variables
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-the-frontend-and-backend-developer-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Run the frontend and backend (developer mode)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Run the frontend and backend (developer mode)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#compile-the-frontend-and-serve" class="md-nav__link">
+    <span class="md-ellipsis">
+      Compile the frontend and serve
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-the-frontend-and-backend-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      Run the frontend and backend (production)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Run the frontend and backend (production)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-fusionpipe-in-as-systemd-need-review-not-fully-working-at-the-moment" class="md-nav__link">
+    <span class="md-ellipsis">
+      Run fusionpipe in as systemd (Need review not fully working at the moment)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrade-the-production-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      Upgrade the production version
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#onboard-a-new-user" class="md-nav__link">
+    <span class="md-ellipsis">
+      Onboard a new user
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#user-set-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      User set-up
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#set-up-docker-at-system-level-require-sudo" class="md-nav__link">
+    <span class="md-ellipsis">
+      Set up docker at system level. (require sudo)
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<p>This is the developer/maintainer guide for <code>fusionpipe</code>.</p>
+<p><code>fusionpipe</code> is lightwise pipeline orchestrator to help organise data-analysis, simulation, machine learning pipelines. It is composed by the following components:</p>
+<ul>
+<li>Frontend in Svelte. </li>
+<li>FASTAPI web-app as backend.</li>
+<li>A postgresSQL database which is used </li>
+</ul>
+<p>With the current guidelines <code>fusionpipe</code> 
+This guide has different level of complexity depending on what is your role an your deployment solution:</p>
+<ul>
+<li><strong>user</strong> (without installation): In case you are only using <code>fusionpipe</code> which is already set-up by your IT, refer to the user guide</li>
+<li><strong>user</strong> (with installation): In case you would like to run <code>fusionpipe</code> locally on your device and use it. This is the same set-up as for the maintainer. If you are the only user, the installation is simplified.</li>
+<li><strong>developer</strong>: In this case you would like to contribute to the development of <code>fusionpipe</code>. You will have some special command to run the different systems in debugging mode. It is expected that in this set-up you will be developing the application as a single user.</li>
+<li><strong>maintainer</strong>: If you are a maintainer of <code>fusionpipe</code>, you are deploying fusion for yourself and potentially other users. In case you will have multiple users using the service, you will need some extra set-up to grant the necessary permission to the different users. </li>
+</ul>
+<p>Some operation during the installation process will require to have sudo access. Reach out to your admin if needed. The operation that requires sudo are:</p>
+<ul>
+<li>Setting up <code>postgresSQL</code> </li>
+<li>Grant access to <code>docker</code> group to your user.</li>
+<li>Extend permission r/w permission if setting up the deployment for multiple users.</li>
+<li>Networking in case you are deploying the solution on a server which firewall and port restriction.</li>
+</ul>
+<p>In summary <code>fusionpipe</code> has the following things to be set-up:</p>
+<ul>
+<li>Svelte application</li>
+<li>FAST-API backend</li>
+<li>PostgresSQL database</li>
+</ul>
+<p>In case of multiple users installation, also the following needs to be set-up.</p>
+<ul>
+<li>Shared access folder for the data.</li>
+<li>Shared access folder for the <code>uv</code> caching folder environment.</li>
+<li>Shared access for the user API utilities folder.</li>
+</ul>
+<h2 id="prerequistes">Prerequistes</h2>
+<h3 id="postgres">Postgres</h3>
+<p><a href="https://www.postgresql.org/">PostgreSQL</a> is used as a database to keep track of the relation between nodes and pipeline and other metadata.
+- Set-up postgres in your local machine.
+- Use docker to set up postgres.</p>
+<h4 id="local-installation-need-sudo">local installation (need sudo)</h4>
+<ul>
+<li>
+<p>Install postgres</p>
+</li>
+<li>
+<p>Initialise postgtes
+<code>sudo /usr/bin/postgresql-setup --initdb</code></p>
+</li>
+</ul>
+<p>Usually postgres is initialised creating the OS user <code>postgres</code>, which serves as admin the database operation.</p>
+<p>The default set-up for postgres to check the OS user, to grant access to the database (<code>peer</code> option). 
+In this condition, in order to perform admin operation on the database, you need to log as <code>postgres</code> user (requires sudo access).</p>
+<p>It is possibile to change the postgres authentication defualt, changing the file <code>pg_hba.conf</code> usually found in the location
+<code>/var/lib/pgsql/data/pg_hba.conf</code>. Changing <code>peer</code> to <code>md5</code> will ask for password authentication at the login instead of </p>
+<p>After changing the authorisatio, reload postgres
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>reload<span class="w"> </span>postgresql
+</span></code></pre></div></p>
+<h4 id="docker-installation">docker installation</h4>
+<ul>
+<li>TO BE UPDATED *</li>
+</ul>
+<p>Set the env variable.</p>
+<ul>
+<li>
+<p>Modify the variables into the <code>developer.env</code> file.</p>
+</li>
+<li>
+<p>Navigate the docker folder
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>docker
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Set up the variables in <code>docker-compose-psg.yml</code>. See documentation in the file.</p>
+</li>
+<li>If you already have a database and you want to remove all the data related to it, delete the folder with the database location. Otherwise, to continue with the existing database, skip this step.</li>
+<li>Run the docker compose command to start the postgres database.
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker-compose<span class="w"> </span>-f<span class="w"> </span>docker-compose-psg.yml<span class="w"> </span>up
+</span></code></pre></div>
+This will startup yuor postgres database in a docker container, and expose to the port specified in the <code>docker-compose-psg.yml</code> file.</li>
+</ul>
+<p>Test connection
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>psql<span class="w"> </span>-h<span class="w"> </span>localhost<span class="w"> </span>-p<span class="w"> </span><span class="m">5542</span><span class="w"> </span>-U<span class="w"> </span>&lt;user&gt;<span class="w"> </span>-d<span class="w"> </span>&lt;database&gt;
+</span></code></pre></div></p>
+<h3 id="uv-package-manager">UV package manager</h3>
+<p>UV package manager is the solution used to in order to deal with python packages.</p>
+<h2 id="set-up-the-database">Set-up the database</h2>
+<p>The following commands needs to be run from the OS user <code>postgres</code> which has all the access.
+It is assumed that there is a priviledge OS user, which is the maintainer/developer for <code>fusionpipe</code> in your machine.
+There are different possibilities for that.</p>
+<ul>
+<li>If you are the only user/developer, use your user as admin.</li>
+<li>If you are the maintainer for fusionpipe on a server, we recommend to create an OS user which will manage the <code>fusionpipe</code> installation. We will assume this user to be to be called <code>fusionpipeadmin</code> in the following.</li>
+</ul>
+<p>The following opeartion must be done in the order they are presented</p>
+<ul>
+<li>
+<p>Log in as <code>postgres</code> user in your machine
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sudo<span class="w"> </span>-u<span class="w"> </span>postgres<span class="w"> </span>-i
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Create the database
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>createdb<span class="w"> </span>fusionpipe_prod1
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Check that the database has been created
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>psql<span class="w"> </span>-U<span class="w"> </span>postgres<span class="w"> </span>-l
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Create a ROLE which will be able to modify the database. User will be added to this role
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>psql<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;CREATE ROLE fusionpipeusers NOLOGIN;&quot;</span>
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Grant connection to the role <code>fusionpipeusers</code>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>psql<span class="w"> </span>-U<span class="w"> </span>postgres<span class="w"> </span>-d<span class="w"> </span>fusionpipe_prod1<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;GRANT CONNECT ON DATABASE fusionpipe_prod1 TO fusionpipeusers;&quot;</span>
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Grant usage to the role <code>fusionpipeusers</code>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>psql<span class="w"> </span>-d<span class="w"> </span>fusionpipe_prod1<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;GRANT USAGE ON SCHEMA public TO fusionpipeusers;&quot;</span>
+</span></code></pre></div></p>
+</li>
+<li>
+<p>As we want only the admin user to have the possibility to create table in the datanase, revoke some access access to other users.
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>psql<span class="w"> </span>-d<span class="w"> </span>fusionpipe_prod1<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;REVOKE CREATE ON SCHEMA public FROM PUBLIC;&quot;</span>
+</span></code></pre></div>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>psql<span class="w"> </span>-d<span class="w"> </span>fusionpipe_prod1<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;REVOKE CREATE ON SCHEMA public FROM fusionpipeusers;&quot;</span>
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Grant the possibility to the ROLE <code>fusionusers</code> to be modify the table in the database.
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>psql<span class="w"> </span>-d<span class="w"> </span>fusionpipe_prod1<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO fusionpipeusers;&quot;</span>
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Grant the possibiliy to possibility to create tables to the <code>fusionpipeadmin</code>.
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>psql<span class="w"> </span>-d<span class="w"> </span>fusionpipe_prod1<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;GRANT CREATE ON SCHEMA public TO fusionpipeadmin;&quot;</span>
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Extend the priviledges of <code>fusionpipeusers</code> to <code>fusionpipeadmin</code>.
+When you add <code>fusionpipeadmin</code> to the <code>fusionpipeusers</code> role in PostgreSQL:</p>
+</li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>psql<span class="w"> </span>-U<span class="w"> </span>postgres<span class="w"> </span>-d<span class="w"> </span>fusionpipe_prod1<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;GRANT fusionpipeusers TO fusionpipeadmin;&quot;</span>
+</span></code></pre></div>
+<p>This <strong>extends</strong> the permissions of <code>fusionpipeadmin</code> to include all privileges granted to <code>fusionpipeusers</code>. The <code>fusionpipeadmin</code> will retain its own privileges and additionally inherit those of <code>fusionpipeusers</code>. It does <strong>not</strong> restrict <code>fusionpipeadmin</code> to only the permissions of <code>fusionpipeusers</code>; instead, it is a superset of both.</p>
+<ul>
+<li>The following command updates the default privileges for tables created in the <code>public</code> schema of the <code>fusionpipe_prod1</code> database. It ensures that any new tables will automatically grant <code>SELECT</code>, <code>INSERT</code>, <code>UPDATE</code>, and <code>DELETE</code> permissions to the <code>fusionpipeusers</code> role. Run this command as the <code>fusionpipeadmin</code> user:
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>psql<span class="w"> </span>-U<span class="w"> </span>fusionpipeadmin<span class="w"> </span>-d<span class="w"> </span>fusionpipe_prod1<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO fusionpipeusers;&quot;</span>
+</span></code></pre></div></li>
+</ul>
+<h1 id="create-and-initialise-the-required-tables-for-database">Create and initialise the required tables for database</h1>
+<blockquote>
+<p><strong>⚠️ WARNING:</strong> The following operations will modify your PostgreSQL database. Ensure you have backed up any important data before proceeding. Only users with the appropriate privileges should perform these actions.</p>
+</blockquote>
+<p>The database needs to be initialised with the tables for the <code>fusionpipe</code> application. Given the role that have been granted in the previous step, only the <code>fusionpipeadmin</code> user is able to create this.</p>
+<ul>
+<li>
+<p>Add to the <code>.bash_profile</code> of <code>fusionpipeadmin</code> user. This will allow the <code>fusionpipeuser</code> to connect to the database through <code>peer</code> connection. (See postgres SQL documentation).
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">DATABASE_URL</span><span class="o">=</span><span class="s2">&quot;dbname=fusionpipe_prod1 port=5432&quot;</span>
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Initialise the tables in the database. This is conveniently done runnig the script. 
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>fusionpipe/src/fusionpipe/utils/init_database.py
+</span></code></pre></div></p>
+</li>
+</ul>
+<h1 id="create-data-folder-and-extend-rw-access-for-multiple-users">Create data folder and extend R/W access for multiple users</h1>
+<ul>
+<li>Create the folder that will contain application data for <code>fusionpipe</code> data application. 
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>mkdir<span class="w"> </span>&lt;fusion_pipe_data_folder&gt;
+</span></code></pre></div></li>
+</ul>
+<p>The following steps are only needed if you are setting-up <code>fusionpipe</code> for multiple users to have access to your machine.
+If you are single developer, or single user you can skip them.</p>
+<ul>
+<li>
+<p>Create a group. This way you will be able to control the user access to data based on the group.
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>sudo<span class="w"> </span>groupadd<span class="w"> </span>fusionpipeusers
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Log out and log in again to allow the propagation of the new group.</p>
+</li>
+<li>
+<p>Add <code>fusionpipeadmin</code> admin user to the group
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>fusionpipeusers<span class="w"> </span>fusionpipeadmin
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Log out and log in every time you add a new user.</p>
+</li>
+<li>
+<p>Set group permission permission to the shared data folder
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>sudo<span class="w"> </span>chown<span class="w"> </span>-R<span class="w"> </span>:fusionpipeusers<span class="w"> </span>&lt;fusion_pipe_data_folder&gt;
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>sudo<span class="w"> </span>chmod<span class="w"> </span>-R<span class="w"> </span><span class="m">2770</span><span class="w"> </span>&lt;fusion_pipe_data_folder&gt;
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Enforce Permissions with ACLs. This will let other user to write on files generated by other users, independently of the user mask.
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>sudo<span class="w"> </span>setfacl<span class="w"> </span>-d<span class="w"> </span>-m<span class="w"> </span>g::rwx<span class="w"> </span>/misc/fusionpipe_shared
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>sudo<span class="w"> </span>setfacl<span class="w"> </span>-d<span class="w"> </span>-m<span class="w"> </span>o::---<span class="w"> </span>/misc/fusionpipe_shared
+</span></code></pre></div>
+The second special folder is the one containing the user utility scripts. This needs to be (only) readable by all users of <code>fusionpipe</code>.</p>
+</li>
+<li>
+<p>Login with <code>fusionpipeadmin</code> in the folder containing the source code of fusion pipe.</p>
+</li>
+<li>Grant reading access to the group <code>fusionpipeusers</code>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>sudo<span class="w"> </span>chown<span class="w"> </span>-R<span class="w"> </span>:fusionpipeusers<span class="w"> </span>fusionpipe/src/fusionpipe/user_utils
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>sudo<span class="w"> </span>chmod<span class="w"> </span>-R<span class="w"> </span><span class="m">2750</span><span class="w"> </span>fusionpipe/src/fusionpipe/user_utils
+</span></code></pre></div></li>
+</ul>
+<h1 id="set-enviroment-variables">Set enviroment variables</h1>
+<p>If you are the maintainer or single developer user, we recommend to collect all your environment variables into a single file <code>&lt;myenvfile&gt;.env</code>.
+Careful with the syntax, <code>.env</code> file does not allow for spaces in the definition definition of the environment variables. The strings needs to be withing <code>""</code> and not <code>''</code>. 
+The full set of environment variables needed to run all services of <code>fusionpipe</code> are:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="nv">FUSIONPIPE_DATA_PATH</span><span class="o">=</span><span class="s2">&quot;&lt;absolute/path/to/fusionpipe/data/folder&gt;&quot;</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="nv">UV_CACHE_DIR</span><span class="o">=</span><span class="s2">&quot;&lt;absolute/path/to/uv/cache/dir&gt;&quot;</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="nv">DATABASE_URL</span><span class="o">=</span><span class="s2">&quot;dbname=&lt;database_name&gt; port=&lt;postgres_port&gt;&quot;</span>
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="nv">BACKEND_HOST</span><span class="o">=</span><span class="s2">&quot;localhost&quot;</span>
+</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="nv">BACKEND_PORT</span><span class="o">=</span>&lt;backend_port&gt;
+</span><span id="__span-24-6"><a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="nv">VITE_BACKEND_PORT</span><span class="o">=</span><span class="si">${</span><span class="nv">BACKEND_PORT</span><span class="si">}</span>
+</span><span id="__span-24-7"><a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="nv">VITE_BACKEND_HOST</span><span class="o">=</span><span class="si">${</span><span class="nv">BACKEND_HOST</span><span class="si">}</span>
+</span><span id="__span-24-8"><a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a><span class="nv">VITE_FRONTEND_PORT</span><span class="o">=</span>&lt;frontend_port&gt;
+</span><span id="__span-24-9"><a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a><span class="nv">VITE_FRONTEND_HOST</span><span class="o">=</span><span class="s2">&quot;localhost&quot;</span>
+</span><span id="__span-24-10"><a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a><span class="nv">USER_UTILS_FOLDER_PATH</span><span class="o">=</span><span class="s2">&quot;&lt;absolute/path/to/user/utils&gt;&quot;</span>
+</span><span id="__span-24-11"><a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a><span class="nv">FP_MATLAB_RUNNER_PATH</span><span class="o">=</span><span class="s2">&quot;&lt;abosolute/path/to/matlab/executable&gt;&quot;</span>
+</span><span id="__span-24-12"><a id="__codelineno-24-12" name="__codelineno-24-12" href="#__codelineno-24-12"></a><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="s2">&quot;&lt;(optional) default virtual env to activate when running the backend&gt;&quot;</span>
+</span><span id="__span-24-13"><a id="__codelineno-24-13" name="__codelineno-24-13" href="#__codelineno-24-13"></a><span class="nv">DATABASE_URL_TEST</span><span class="o">=</span><span class="s2">&quot;dbname=&lt;database_test_name&gt; port=&lt;postgres_port&gt;&quot;</span>
+</span></code></pre></div>
+<p>In the following some explanation of the different environment variables: </p>
+<ul>
+<li><code>&lt;absolute/path/to/fusionpipe/data/folder&gt;</code>: Data from <code>fusionpipe</code> will be stored in this folder.</li>
+<li><code>&lt;absolute/path/to/uv/cache/dir&gt;</code>: This will contain the cache for the uv environment.</li>
+<li><code>&lt;database_name&gt;</code>: The database name that you have created in previous steps.</li>
+<li><code>&lt;postgres_port&gt;</code>: The port where postgresSQL is avilable in your host. Defaulat 5432</li>
+<li><code>&lt;backend_port&gt;</code>: Port for the FAST-API backend. We recommend to user a port &gt;8000</li>
+<li><code>&lt;frontend_port&gt;</code>: This is the port for Svelte frontent. Usually Svelte is using a port &gt;5000</li>
+<li><code>&lt;absolute/path/to/user/utils&gt;</code>: This is the absolute path where the user utilities, which needs to be readable by all users, are stored.</li>
+<li><code>&lt;abosolute/path/to/matlab/executable&gt;</code>: It is conveninet to set-up the path to your local installation of matlab if you are considering using it for development.</li>
+<li><code>&lt;database_test_name&gt;</code>: The database name used for the test suite. Usually <code>fusionpipe_test</code>.</li>
+</ul>
+<h1 id="run-the-frontend-and-backend-developer-mode">Run the frontend and backend (developer mode)</h1>
+<ul>
+<li>
+<p>Open a new terminal</p>
+</li>
+<li>
+<p>Set the environment variable for the terminal. You can set all the variables from your env file with the command.
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="nb">set</span><span class="w"> </span>-a
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="nb">source</span><span class="w"> </span>&lt;myenvfile.env&gt;
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="nb">set</span><span class="w"> </span>+a
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Navigate the backend folder
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="nb">cd</span><span class="w"> </span>fusionpipe/src/fusionpipe/api
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Start the backend service
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>main.py
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Open a new terminal </p>
+</li>
+<li>
+<p>Set the environment variable as above also in this terminal</p>
+</li>
+<li>
+<p>Navigate the frontend folder
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="nb">cd</span><span class="w"> </span>fusionpipe/src/fusionpipe/frontend
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Start the Svelte application in debug mode
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="nv">VITE_BACKEND_HOST</span><span class="o">=</span><span class="nv">$VITE_BACKEND_HOST</span><span class="w"> </span><span class="nv">VITE_BACKEND_PORT</span><span class="o">=</span><span class="nv">$VITE_BACKEND_PORT</span><span class="w">  </span>npm<span class="w"> </span>run<span class="w"> </span>dev<span class="w"> </span>--<span class="w"> </span>--port<span class="w"> </span><span class="nv">$VITE_FRONTEND_PORT</span>
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Open the browser at the port where the frontend is served. For example
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>localhost:5174
+</span></code></pre></div></p>
+</li>
+</ul>
+<p>If your are developing the application and your environment variables are not change, you can consider to add them in your <code>.bashrc</code> or <code>.bashrc_profile</code> in order to have them loaded directly when you log with your user.</p>
+<h2 id="compile-the-frontend-and-serve">Compile the frontend and serve</h2>
+<p>If you want to compile the frontend </p>
+<p>You need to set the environment variable before building the app as the environemtn variable will be backed in the app
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>npm<span class="w"> </span>run<span class="w"> </span>build
+</span></code></pre></div></p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>npm<span class="w"> </span>run<span class="w"> </span>preview<span class="w"> </span>--<span class="w"> </span>--port<span class="w"> </span><span class="nv">$VITE_FRONTEND_PORT</span>
+</span></code></pre></div>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>npx<span class="w"> </span>serve<span class="w"> </span>-s<span class="w"> </span>dist<span class="w"> </span>-l<span class="w"> </span><span class="nv">$VITE_FRONTEND_PORT</span>
+</span></code></pre></div>
+<h1 id="run-the-frontend-and-backend-production">Run the frontend and backend (production)</h1>
+<h2 id="run-fusionpipe-in-as-systemd-need-review-not-fully-working-at-the-moment">Run fusionpipe in as systemd (Need review not fully working at the moment)</h2>
+<ul>
+<li>
+<p>Save the enviroment variable file in location, hidden from the user and protect it.</p>
+</li>
+<li>
+<p>Create the user systemd service directory (if it doesn’t exist):
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.config/systemd/user
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Write <code>systemd</code> configuration file <code>~/.config/systemd/user/fusionpipe_backend.service</code>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="o">[</span>Unit<span class="o">]</span>
+</span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="nv">Description</span><span class="o">=</span>Run<span class="w"> </span>the<span class="w"> </span>backend
+</span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>
+</span><span id="__span-35-4"><a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="o">[</span>Service<span class="o">]</span>
+</span><span id="__span-35-5"><a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a><span class="nv">Type</span><span class="o">=</span>simple
+</span><span id="__span-35-6"><a id="__codelineno-35-6" name="__codelineno-35-6" href="#__codelineno-35-6"></a><span class="nv">WorkingDirectory</span><span class="o">=</span>/home/fusionpipeadmin/Documents/fusionpipe/src/fusionpipe/api
+</span><span id="__span-35-7"><a id="__codelineno-35-7" name="__codelineno-35-7" href="#__codelineno-35-7"></a><span class="nv">EnvironmentFile</span><span class="o">=</span>/home/fusionpipeadmin/Documents/environment/production.env
+</span><span id="__span-35-8"><a id="__codelineno-35-8" name="__codelineno-35-8" href="#__codelineno-35-8"></a><span class="nv">ExecStart</span><span class="o">=</span>/home/fusionpipeadmin/Documents/fusionpipe/.venv/bin/uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>main.py
+</span><span id="__span-35-9"><a id="__codelineno-35-9" name="__codelineno-35-9" href="#__codelineno-35-9"></a><span class="nv">Restart</span><span class="o">=</span>on-failure
+</span><span id="__span-35-10"><a id="__codelineno-35-10" name="__codelineno-35-10" href="#__codelineno-35-10"></a>
+</span><span id="__span-35-11"><a id="__codelineno-35-11" name="__codelineno-35-11" href="#__codelineno-35-11"></a><span class="o">[</span>Install<span class="o">]</span>
+</span><span id="__span-35-12"><a id="__codelineno-35-12" name="__codelineno-35-12" href="#__codelineno-35-12"></a><span class="nv">WantedBy</span><span class="o">=</span>default.target
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Write <code>systemd</code> configuration file <code>~/.config/systemd/user/fusionpipe_frontend.service</code>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="o">[</span>Unit<span class="o">]</span>
+</span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a><span class="nv">Description</span><span class="o">=</span>Run<span class="w"> </span>fusionpipe<span class="w"> </span>frontend
+</span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a>
+</span><span id="__span-36-4"><a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a><span class="o">[</span>Service<span class="o">]</span>
+</span><span id="__span-36-5"><a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a><span class="nv">Type</span><span class="o">=</span>simple
+</span><span id="__span-36-6"><a id="__codelineno-36-6" name="__codelineno-36-6" href="#__codelineno-36-6"></a><span class="nv">EnvironmentFile</span><span class="o">=</span>/home/fusionpipeadmin/Documents/environment/production.env
+</span><span id="__span-36-7"><a id="__codelineno-36-7" name="__codelineno-36-7" href="#__codelineno-36-7"></a><span class="nv">WorkingDirectory</span><span class="o">=</span>/home/fusionpipeadmin/Documents/fusionpipe/src/fusionpipe/frontend
+</span><span id="__span-36-8"><a id="__codelineno-36-8" name="__codelineno-36-8" href="#__codelineno-36-8"></a><span class="nv">ExecStart</span><span class="o">=</span>npx<span class="w"> </span>serve<span class="w"> </span>-s<span class="w"> </span>dist<span class="w"> </span>-l<span class="w"> </span><span class="nv">$VITE_FRONTEND_PORT</span>
+</span><span id="__span-36-9"><a id="__codelineno-36-9" name="__codelineno-36-9" href="#__codelineno-36-9"></a><span class="nv">Restart</span><span class="o">=</span>on-failure
+</span><span id="__span-36-10"><a id="__codelineno-36-10" name="__codelineno-36-10" href="#__codelineno-36-10"></a>
+</span><span id="__span-36-11"><a id="__codelineno-36-11" name="__codelineno-36-11" href="#__codelineno-36-11"></a><span class="o">[</span>Install<span class="o">]</span>
+</span><span id="__span-36-12"><a id="__codelineno-36-12" name="__codelineno-36-12" href="#__codelineno-36-12"></a><span class="nv">WantedBy</span><span class="o">=</span>default.target
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Reload the deamon
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>daemon-reload
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Enable and start the backend
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>systemctl<span class="w"> </span>--user<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>fusionpipe_backend.service
+</span><span id="__span-38-2"><a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>start<span class="w"> </span>fusionpipe_backend.service
+</span><span id="__span-38-3"><a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>status<span class="w"> </span>fusionpipe_backend.service
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Enable and start the frontend
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>systemctl<span class="w"> </span>--user<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>fusionpipe_frontend.service
+</span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>start<span class="w"> </span>fusionpipe_frontend.service
+</span><span id="__span-39-3"><a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>status<span class="w"> </span>fusionpipe_frontend.service
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Let the user systemd be run when the user disconnect
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a>sudo<span class="w"> </span>loginctl<span class="w"> </span>enable-linger<span class="w"> </span><span class="nv">$USER</span>
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Stop services
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>stop<span class="w"> </span>fusionpipe_frontend.service
+</span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>stop<span class="w"> </span>fusionpipe_backend.service
+</span></code></pre></div></p>
+</li>
+<li>
+<p>kill processes if they don't stop by themselves.
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-42-1"><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>systemctl<span class="w"> </span>--user<span class="w"> </span><span class="nb">kill</span><span class="w"> </span>fusionpipe_frontend.service
+</span></code></pre></div></p>
+</li>
+</ul>
+<h1 id="upgrade-the-production-version">Upgrade the production version</h1>
+<ul>
+<li>Login with the `fusionpipe</li>
+<li>Navigate the <code>fusionpipeadmin</code> user.</li>
+<li>Pull the desired version of fusionpipe
+<div class="language-text highlight"><pre><span></span><code><span id="__span-43-1"><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a>git pull
+</span></code></pre></div></li>
+<li>
+<p>Stop services
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-44-1"><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>stop<span class="w"> </span>fusionpipe_frontend.service
+</span><span id="__span-44-2"><a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>stop<span class="w"> </span>fusionpipe_backend.service
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Navigate the frontend folder
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-45-1"><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a><span class="nb">cd</span><span class="w"> </span>src/fusionpipe/frontend
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Set the environment variable from from your production env. See section above</p>
+</li>
+<li>
+<p>Recompile the frontend
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-46-1"><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>npm<span class="w"> </span>run<span class="w"> </span>build
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Start the systemd services
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>start<span class="w"> </span>fusionpipe_backend.service
+</span><span id="__span-47-2"><a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>start<span class="w"> </span>fusionpipe_frontend.service
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Check that the services are working properly
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>status<span class="w"> </span>fusionpipe_backend.service
+</span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>status<span class="w"> </span>fusionpipe_frontend.service
+</span></code></pre></div></p>
+</li>
+</ul>
+<h1 id="onboard-a-new-user">Onboard a new user</h1>
+<ul>
+<li>Create new user with <code>&lt;newusername&gt;</code> in postgres </li>
+</ul>
+<p><code>psql -U postgres -d fusionpipe_prod1 -c "CREATE USER &lt;newusername&gt;;"</code></p>
+<ul>
+<li>Grant user access to role <code>fusionpipeusers</code> in postgres database</li>
+</ul>
+<p><code>psql -U postgres -d fusionpipe_prod1 -c "GRANT fusionpipeusers TO &lt;newusername&gt;;"</code></p>
+<ul>
+<li>Ask user to write the following line in the <code>.profile</code> or <code>.bashrc_profile</code>, in order to persist the access to the database when it log in.</li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-49-1"><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">DATABASE_URL</span><span class="o">=</span><span class="s2">&quot;dbname=fusionpipe_prod1 port=5432&quot;</span>
+</span></code></pre></div>
+<ul>
+<li>
+<p>Write the location of the user utils in the <code>.profile</code>, <code>.bashrc_profile</code>.
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-50-1"><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">USER_UTILS_FOLDER_PATH</span><span class="o">=</span><span class="s2">&quot;&lt;absolute/path/to/user/utils&gt;&quot;</span>
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Add user to the group in the server, in order for him to have access to the shared repository
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-51-1"><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>fusionpipeusers<span class="w"> </span>username
+</span></code></pre></div></p>
+</li>
+</ul>
+<h1 id="user-set-up">User set-up</h1>
+<ul>
+<li>
+<p>Communicate the username to the admin
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-52-1"><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>whoami
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Install <code>uv</code>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-53-1"><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>curl<span class="w"> </span>-LsSf<span class="w"> </span>https://astral.sh/uv/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh
+</span></code></pre></div></p>
+</li>
+<li>
+<p>ssh to the machine and forward the port with the frontend and backend. Ask admin to tell the port used for deployment. 
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-54-1"><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a>ssh<span class="w"> </span>-L<span class="w"> </span>&lt;fronend_port&gt;:localhost:&lt;fronend_port&gt;<span class="w"> </span>-L<span class="w"> </span>&lt;backend_port&gt;:localhost:&lt;backend_port&gt;<span class="w"> </span>&lt;username&gt;@&lt;host&gt;
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Write the following line in the <code>.profile</code>. This allows the user to have access to the database
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-55-1"><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">DATABASE_URL</span><span class="o">=</span><span class="s2">&quot;dbname=fusionpipe_prod1 port=5432&quot;</span>
+</span></code></pre></div></p>
+</li>
+<li>
+<p>Write the location of the user utils in the <code>.profile</code>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-56-1"><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">USER_UTILS_FOLDER_PATH</span><span class="o">=</span><span class="s2">&quot;&lt;absolute_path_to_user_utils&gt;&quot;</span>
+</span></code></pre></div></p>
+</li>
+<li>
+<p>When switching to a node run, if you want to user jupyter notebooks, run the following command to initialise the python kernel.
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-57-1"><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>init_node_kernel.py
+</span></code></pre></div></p>
+</li>
+</ul>
+<h1 id="set-up-docker-at-system-level-require-sudo">Set up docker at system level. (require sudo)</h1>
+<p>Or ask your admin to do that for you.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-58-1"><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>update
+</span><span id="__span-58-2"><a id="__codelineno-58-2" name="__codelineno-58-2" href="#__codelineno-58-2"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>docker.io
+</span></code></pre></div>
+<p>Start docker service at system level
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-59-1"><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>docker
+</span><span id="__span-59-2"><a id="__codelineno-59-2" name="__codelineno-59-2" href="#__codelineno-59-2"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>start<span class="w"> </span>docker
+</span></code></pre></div></p>
+<p>Add your user to docker
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-60-1"><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>docker<span class="w"> </span><span class="nv">$USER</span>
+</span></code></pre></div></p>
+<p>Re-start your user session, and check your user is in the docker group
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-61-1"><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a>groups
+</span></code></pre></div></p>
+<p>Check if docker compose is installed
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-62-1"><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>version
+</span></code></pre></div></p>
+<p>Otherwise install it with
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-63-1"><a id="__codelineno-63-1" name="__codelineno-63-1" href="#__codelineno-63-1"></a>pip<span class="w"> </span>install<span class="w"> </span>docker-compose
+</span></code></pre></div></p>
+<p>Docker can load many images, that can occopy space in your disk. You might want to consider to set the location where docker images are saved.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"method": "material"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      
+    
+  </body>
+</html>

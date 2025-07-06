@@ -1,0 +1,1227 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../develop_node/">
+      
+      
+        <link rel="next" href="../pipeline_interaction_advanced/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+    
+    
+      
+        <title>Basic Interaction - https://francescocarpanese.github.io/fusionpipe/</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.342714a4.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#basic-user-interaction" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="https://francescocarpanese.github.io/fusionpipe/" class="md-header__button md-logo" aria-label="https://francescocarpanese.github.io/fusionpipe/" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            https://francescocarpanese.github.io/fusionpipe/
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Basic Interaction
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="https://francescocarpanese.github.io/fusionpipe/" class="md-nav__button md-logo" aria-label="https://francescocarpanese.github.io/fusionpipe/" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    https://francescocarpanese.github.io/fusionpipe/
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../intro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Getting Started
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Installation
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation_single/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Single User (Bare metal)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dev_maintainer_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Multiple Users (Bare metal)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    User Guide
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            User Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../develop_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop a Node (Basics)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Pipeline Interaction
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            Pipeline Interaction
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Basic Interaction
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Basic Interaction
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#basic-user-interaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic user interaction
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Basic user interaction">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-a-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create a pipeline
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#change-pipeline-name-and-add-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Change pipeline name and add notes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-a-node" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create a node
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#navigate-to-your-node-folder-with-your-favourite-ide" class="md-nav__link">
+    <span class="md-ellipsis">
+      Navigate to your node folder with your favourite IDE
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#connect-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Connect nodes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-nodes-and-connections" class="md-nav__link">
+    <span class="md-ellipsis">
+      Delete nodes and connections
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#node-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      Node status
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Actions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#node-in-status-stale-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      Node in status stale-data
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipeline_interaction_advanced/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Advanced Interaction
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../complete_list_interaction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Full list of commands
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    External Dependencies
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            External Dependencies
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../package_management_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    python
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../package_management_matlab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    matlab
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Best practices
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            Best practices
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../best_practices_pipeline_package/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop your pipeline together with your custom package
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../best_practices_vscode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop with VSCode
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../best_practices_jupyter_vscode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop with Jupyter Notebooks in VSCode
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../best_practices_jupyter_lab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop with Jupyter Lab
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../best_practices_matlab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop with Matlab
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../best_practices_octave/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Develop with Octave
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Developer Guide
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Developer Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/design_principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Design Principles
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#basic-user-interaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic user interaction
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Basic user interaction">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-a-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create a pipeline
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#change-pipeline-name-and-add-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Change pipeline name and add notes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-a-node" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create a node
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#navigate-to-your-node-folder-with-your-favourite-ide" class="md-nav__link">
+    <span class="md-ellipsis">
+      Navigate to your node folder with your favourite IDE
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#connect-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Connect nodes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-nodes-and-connections" class="md-nav__link">
+    <span class="md-ellipsis">
+      Delete nodes and connections
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#node-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      Node status
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Actions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#node-in-status-stale-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      Node in status stale-data
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+  <h1>Basic Interaction</h1>
+
+<h2 id="basic-user-interaction">Basic user interaction</h2>
+<p>In this section, you will learn the fundamentals of interacting with the FusionPipe frontend and how to effectively manage your data processing workflows.</p>
+<p><a id="pipeline-example"></a>
+<img alt="Pipeline Example" src="../../images/pipeline_example.jpg" /></p>
+<p>Follow these simple description:</p>
+<h3 id="create-a-pipeline">Create a pipeline</h3>
+<p>First, click on <code>Pipeline Interaction</code> on the panel options shown in the <a href="#pipeline-example">image</a> above and then on <code>Create Pipeline</code>.
+The pipeline has unique identifier, <code>pipeline_id</code>, and a <code>pipeline_tag</code>. The <code>pipeline_id</code>, differently then the <code>pipeline_tag</code>, cannot be modified by the user.
+ You can select the pipeline per ids (<code>List ids</code>) or tags (<code>List tags</code>) from the dropdown menu in <code>Pipeline Interaction</code>.</p>
+<h3 id="change-pipeline-name-and-add-notes">Change pipeline name and add notes</h3>
+<p>From the <code>Pipeline Interaction</code> option, select <code>Open selected pipeline panel</code> to customize the pipeline tag with a meaningful name that helps you identify the specific purpose of your pipeline. This custom tag will allow you to easily search and access your pipeline later.</p>
+<p>Additionally, you can add detailed notes to document the pipeline's objectives, methodology, or any other relevant information for future reference.</p>
+<p><img alt="Pipeline" src="../../images/pipeline_panel.png" /></p>
+<h3 id="create-a-node">Create a node</h3>
+<p>To create your first node, click on <code>Node Interaction</code> and then select <code>Create node</code>. Each node, like a pipeline, is assigned a unique identifier (<code>node_id</code>) to ensure its uniqueness within a pipeline. A specific <code>node_id</code> can appear only once in a given pipeline, but the same node can be referenced in multiple pipelines, allowing for shared use and consistency. See <a href="../develop_node/">Develop a Node</a> for more information.</p>
+<p>A node is represented as a folder containing three subfolders:</p>
+<ul>
+<li><code>data</code>: stores the output generated by the node.</li>
+<li><code>code</code>: contains your scripts and code files.</li>
+<li><code>reports</code>: used for saving plots or reports produced during your analysis.</li>
+</ul>
+<p>This structure helps organize your workflow by keeping data, code, and results neatly separated within each node.</p>
+<p>If you want to change the tag and add notes to your node, you can select the node and open the <code>Node interaction</code> options and select <code>Open selected node panel</code>. </p>
+<h3 id="navigate-to-your-node-folder-with-your-favourite-ide">Navigate to your node folder with your favourite IDE</h3>
+<p>To get the folder path containing the node, right click on the the node and <code>Copy Folder Path</code>. This will copy in the clipboard the absolute path to the folder containing the node information. </p>
+<p>You can now use your favourite IDE to modify the code in your node.</p>
+<h3 id="connect-nodes">Connect nodes</h3>
+<p>Each node exposes two connection points: an <code>input port</code> and an <code>output port</code>. These ports enable inter-node connections within your pipeline. When you create a new node and connect the <code>output port</code> of your first node to the <code>input port</code> of the second node, FusionPipe automatically establishes a parent-child relationship in its database. This relationship allows child nodes to access the output data generated by their parent nodes, creating a seamless data flow through your pipeline.</p>
+<p>To automatically organize the nodes in your pipeline workspace, access the <code>Layout</code> menu and click <code>Auto reshape</code>. This feature arranges all nodes in an optimal layout for better visualization.</p>
+<h3 id="delete-nodes-and-connections">Delete nodes and connections</h3>
+<p>To delete a node, click on it to ensure it is selected (the edge color will change to indicate selection). Then go to <code>Node interaction</code> (dropdown menu) and choose <code>Delete selected nodes</code> option.</p>
+<p>You can also delete multiple nodes at once by holding <code>Shift</code> and dragging with the left mouse button to select them, then using the same delete option.</p>
+<p>To clear only a node’s outputs while preserving its code, select the node and choose <code>Delete output selected nodes</code>. This action will empty the node’s <code>data</code> folder, but the node itself and its <code>code folder</code> will remain unchanged.</p>
+<p>It is possible to delete connections between node: just select an edge which is connecting an <code>output port</code> and an <code>input port</code> and from <code>Node interaction</code> click on <code>Delete selected edge</code>. </p>
+<h2 id="node-status">Node status</h2>
+<p>A node can be in one of the following five states:</p>
+<p><span style="color: gray;"><em>Ready</em></span>: The node is ready to run; its output folder is empty.</p>
+<p><span style="color: green;"><em>Completed</em></span>: The node has run successfully and produced output.</p>
+<p><span style="color: blue;"><em>Running</em></span>: The node is currently being executed.</p>
+<p><span style="color: red;"><em>Failed</em></span>: The node execution failed. Check the <code>log.txt</code> file in the node folder for debugging information.</p>
+<p><span style="color:rgb(253, 186, 3);"><em>Stale-data</em></span>: The node’s output may be inconsistent with its code or inputs. This indicates the pipeline should be rerun to update results. See <a href="#section-on-stale-data">Stale-data</a> section below for more information.</p>
+<h2 id="actions">Actions</h2>
+<p><strong><em>Select a node and run</em></strong>: to run a node, select it and open the <code>Actions</code> panel. Then click on <code>Run selected node</code>.  This execution will work only if the node has no parents and its <code>data folder</code> is empty, or all the parents of the node are in the status <span style="color: green;"><em>completed</em></span>. Now, you can go on <code>Layout</code> and select <code>Refresh pipeline</code> to see your node entering the <span style="color: blue;"><em>running</em></span> state and finally the <span style="color: green;"><em>completed</em></span> state.</p>
+<p><strong><em>Run full pipeline</em></strong>: from the <code>Actions</code> panel, select <code>Run full pipeline</code> to execute all nodes in your pipeline sequentially. FusionPipe will automatically determine the correct order based on node dependencies, ensuring that each node runs only after its parent nodes have completed. This feature streamlines the workflow, allowing you to process the entire pipeline with a single action.</p>
+<p><strong><em>Run pipelione up to a node</em></strong>: to execute your pipeline sequentially up to a node, select a node and from the <code>Actions</code> panel, select <code>Run pipeline up to selected node</code>.</p>
+<p><strong><em>Kill running node</em></strong>:  to stop the process of a node that is running, select that node, open <code>Actions</code> panel and click on <code>Kill run selected node</code>. That node will switch to <span style="color: red;"><em>failed</em></span> sate. </p>
+<h2 id="node-in-status-stale-data">Node in status stale-data <a id="section-on-stale-data"></a></h2>
+<p>The status <code>stale-data</code> is a special status which allows the user to flag the the output of a node are no longer consistent with the code of the node or the its inputs, and the pipeline needs to be rerun</p>
+<p>A node can transition from <span style="color: green;"><em>completed</em></span> or <span style="color: gray;"><em>ready</em></span> to <span style="color:rgb(253, 186, 3);"><em>stale-data</em></span> state. This can happen in the following situations:</p>
+<ul>
+<li>The user has changed the code in a node. Then it can flag the node to be in <span style="color:rgb(253, 186, 3);"><em>stale-data</em></span> state. This way the pipeline needs to re-run the node and all its children.</li>
+<li>A node was in <span style="color: green;"><em>completed</em></span> state, but then the user changed the inputs of the node.</li>
+<li>If there are multiple connected nodes, which are in <span style="color: green;"><em>completed</em></span> state and you delete the output of one of these nodes. In this case, all the children nodes will switch to <span style="color:rgb(253, 186, 3);"><em>stale-data</em></span> state.</li>
+<li>If you have multiple nodes, connected, which are in <span style="color: green;"><em>completed</em></span> state and you delete the edge (connection) of a node. All the children of this edge enters the state <span style="color:rgb(253, 186, 3);"><em>stale-data</em></span> state.</li>
+<li>When you duplicate a node, with data, the duplicated node by default will be in the <span style="color:rgb(253, 186, 3);"><em>stale-data</em></span> state.</li>
+</ul>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Sometimes, FusionPipe may automatically set a node to the <code>stale-data</code> status after one of the previous condition, when the node was previously in the status <code>completed</code>. However, there may be cases where you are confident that the node’s output remains valid and does not require rerunning. In such situations, you can manually set the node back to <code>completed</code> from the <code>Node Interaction</code> panel. This is especially helpful for nodes with outputs that took significant time to generate.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"method": "material"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      
+    
+  </body>
+</html>
