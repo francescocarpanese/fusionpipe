@@ -15,6 +15,7 @@ def run_node(conn, node_id, run_mode="local"):
         print(f"Running node {node_id} in local mode...")
         db_utils.update_node_status(cur, node_id, "running")
         conn.commit()
+        proc = None
         try:
             log_file = os.path.join(node_path, f"logs.txt")
             start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
@@ -48,7 +49,8 @@ def run_node(conn, node_id, run_mode="local"):
         except Exception as e:
             conn.rollback()
             db_utils.update_node_status(cur, node_id, "failed")
-            db_utils.update_process_status(cur, proc.pid, status="failed")
+            if proc:
+                db_utils.update_process_status(cur, proc.pid, status="failed")
             conn.commit()    
             print(f"Node {node_id} failed to run: {e}")
     elif run_mode == "ray":
