@@ -4,8 +4,7 @@ theme:
   name: material
 
 nav:
-  - Home: index.md
-  - Getting Started: intro.md
+  - Getting Started: index.md
   - Installation:
       - Single User (Bare metal): installation_single.md
       - Multiple Users (Bare metal): dev_maintainer_guide.md
