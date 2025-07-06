@@ -335,12 +335,17 @@ Description=Run the backend
 Type=simple
 WorkingDirectory=/home/fusionpipeadmin/Documents/fusionpipe/src/fusionpipe/api
 EnvironmentFile=/home/fusionpipeadmin/Documents/environment/production.env
+Environment="PATH=/home/fusionpipeadmin/.local/bin:%h/.local/bin:/usr/bin:/bin"
 ExecStart=/home/fusionpipeadmin/Documents/fusionpipe/.venv/bin/uv run python main.py
 Restart=on-failure
 
 [Install]
 WantedBy=default.target
 ```
+
+!!! Warning
+    The extra `Environment` in the previous service is done to prepedn the bin path to the system d. Otherwise this can result in not seeing the `uv` installation, making the nodes fail to run.
+
 
 - Write `systemd` configuration file `~/.config/systemd/user/fusionpipe_frontend.service`
 ```bash
