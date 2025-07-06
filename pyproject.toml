@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [
-    { name = "Francesco Carpanese", email = "francesco.carpanese@epfl.ch" }
+    { name = "Francesco Carpanese", email = "francescocarpanese@hotmail.it" }
 ]
 requires-python = ">=3.12"
 dependencies = [
@@ -26,9 +26,6 @@ dependencies = [
     "toml>=0.10.2",
     "uvicorn>=0.34.2",
 ]
-
-[project.scripts]
-fusionpipe = "fusionpipe:main"
 
 [build-system]
 requires = ["hatchling"]
