@@ -40,6 +40,7 @@
   import filter from "svelte-select/filter";
   import ContextMenu from "./ContextMenu.svelte";
   import { MultiSelect } from "flowbite-svelte";
+    import { nonpassive } from "svelte/legacy";
 
   //  --- Variables and state definitions ---
   let nodes = $state<Node[]>([]);
@@ -881,6 +882,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
       currentPipelineId = pipelineId;
       currentProjectId = pipeline.project_id || "";
+      selectedPipelineDropdown = null;
 
     } catch (error) {
       console.error("Error loading selected pipeline:", error);
