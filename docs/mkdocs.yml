@@ -1,16 +1,10 @@
 site_name: fusionpipe
+site_url: https://fusionpipe.github.io/fusionpipe/
 theme:
   name: material
-  features:
-    - navigation.tabs
-    - navigation.sections
-    - toc.integrate
-    - navigation.top
-    - content.code.copy
-    - content.action.edit
-    - content.tabs.link
 
 nav:
+  - Home: index.md
   - Getting Started: intro.md
   - Installation:
       - Single User (Bare metal): installation_single.md
@@ -52,4 +46,4 @@ markdown_extensions:
 
 extra:
   version:
-    provider: mike
+    method: material
