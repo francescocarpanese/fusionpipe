@@ -317,8 +317,6 @@ npx serve -s dist -l $VITE_FRONTEND_PORT
 
 # Run the frontend and backend (production)
 
-
-
 ## Run fusionpipe in as systemd (Need review not fully working at the moment)
 
 - Save the enviroment variable file in location, hidden from the user and protect it.
@@ -395,6 +393,42 @@ systemctl --user stop fusionpipe_backend.service
 systemctl --user kill fusionpipe_frontend.service
 ```
 
+# Upgrade the production version
+- Login with the `fusionpipe
+- Navigate the `fusionpipeadmin` user.
+- Pull the desired version of fusionpipe
+```
+git pull
+```
+- Stop services
+```bash
+systemctl --user stop fusionpipe_frontend.service
+systemctl --user stop fusionpipe_backend.service
+```
+
+- Navigate the frontend folder
+```bash
+cd src/fusionpipe/frontend
+```
+
+- Set the environment variable from from your production env. See section above
+
+- Recompile the frontend
+```bash
+npm run build
+```
+
+- Start the systemd services
+``` bash
+systemctl --user start fusionpipe_backend.service
+systemctl --user start fusionpipe_frontend.service
+```
+
+- Check that the services are working properly
+```bash
+systemctl --user status fusionpipe_backend.service
+systemctl --user status fusionpipe_frontend.service
+```
 
 # Onboard a new user
 
