@@ -35,4 +35,4 @@ A pipeline is a directed acyclic graph (DAG) that connects multiple nodes. Each 
 ![Pipeline Example](docs/docs/images/pipeline_example.jpg)
 
 # Getting start
-Follow the documentation at 
+Follow the documentation [https://francescocarpanese.github.io/fusionpipe/](https://francescocarpanese.github.io/fusionpipe/)
