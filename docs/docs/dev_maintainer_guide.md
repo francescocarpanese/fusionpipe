@@ -240,6 +240,7 @@ VITE_FRONTEND_HOST="localhost"
 USER_UTILS_FOLDER_PATH="<absolute/path/to/user/utils>"
 FP_MATLAB_RUNNER_PATH="<abosolute/path/to/matlab/executable>"
 VIRTUAL_ENV="<(optional) default virtual env to activate when running the backend>"
+DATABASE_URL_TEST="dbname=<database_test_name> port=<postgres_port>"
 ```
 
 In the following some explanation of the different environment variables: 
@@ -252,7 +253,7 @@ In the following some explanation of the different environment variables:
 - `<frontend_port>`: This is the port for Svelte frontent. Usually Svelte is using a port >5000
 - `<absolute/path/to/user/utils>`: This is the absolute path where the user utilities, which needs to be readable by all users, are stored.
 - `<abosolute/path/to/matlab/executable>`: It is conveninet to set-up the path to your local installation of matlab if you are considering using it for development.
-
+- `<database_test_name>`: The database name used for the test suite. Usually `fusionpipe_test`.
 
 # Run the frontend and backend (developer mode)
 
