@@ -1,6 +1,6 @@
 `fusionpipe` is a lightweight pipeline orchestrator designed to streamline data analysis, simulations, and machine learning workflows, fostering better collaboration among users. It enables rapid prototyping with minimal interface complexity while scaling seamlessly to full production systems.
 
-The guiding principle behind `fusionpipe` is that "fast iteration is key to data science exploration." As a result, the backend interface is intentionally kept minimal, allowing you to develop your code with as little overhead as possible—just as you normally would.
+At the heart of `fusionpipe` is the belief that rapid iteration drives effective data science. By keeping the backend interface intentionally simple, `fusionpipe` lets you focus on developing your code with minimal overhead—empowering you to experiment, adapt, and innovate just as you would in your everyday workflow.
 
 `fusionpipe` consists of few core components:
 
