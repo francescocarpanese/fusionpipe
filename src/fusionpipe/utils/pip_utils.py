@@ -9,6 +9,15 @@ import copy
 from enum import Enum
 import shutil
 import toml
+import stat
+
+def change_permissions_recursive(path, mode):
+    """Recursively change permissions of a directory and its contents."""
+    for root, dirs, files in os.walk(path):
+        for d in dirs:
+            os.chmod(os.path.join(root, d), mode)
+        for f in files:
+            os.chmod(os.path.join(root, f), mode)
 
 class NodeState(Enum):
     READY = "ready"       # Node is created but not yet processed
@@ -519,6 +528,22 @@ def get_all_children_nodes(cur, pipeline_id, node_id):
     graph = db_to_graph_from_pip_id(cur, pipeline_id)
     return list(nx.descendants(graph, node_id))
 
+def copy_with_permissions(src, dst, *, follow_symlinks=True):
+    """Custom copy function to ensure destination files are writable."""
+    if os.path.isdir(dst):
+        dst = os.path.join(dst, os.path.basename(src))
+    try:
+        shutil.copy2(src, dst, follow_symlinks=follow_symlinks)
+    except PermissionError:
+        # If we get a permission error, it's likely because the destination
+        # file is read-only. Change permissions and try again.
+        os.chmod(dst, stat.S_IWUSR)
+        shutil.copy2(src, dst, follow_symlinks=follow_symlinks)
+    # Ensure the destination file is writable
+    os.chmod(dst, os.stat(dst).st_mode | stat.S_IWUSR)
+    return dst
+
+
 def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_pipeline_id, source_node_id, new_node_id, parents=False, childrens=False, withdata=False):
     """
     Duplicate a node in the pipeline, including its code and data.
@@ -545,6 +570,11 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
     old_folder_path_nodes = db_utils.get_node_folder_path(cur, node_id=source_node_id)
 
     if old_folder_path_nodes:
+        # Ensure the source .git directory is readable before copying
+        source_git_dir = os.path.join(old_folder_path_nodes, 'code', '.git')
+        if os.path.exists(source_git_dir):
+            change_permissions_recursive(source_git_dir, 0o755)
+
         # Copy only the 'code' and 'reports' subfolders, skipping '.venv'
         os.makedirs(new_folder_path_nodes, exist_ok=True)
 
@@ -560,8 +590,15 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
                     old_subfolder_path,
                     new_subfolder_path,
                     dirs_exist_ok=True,
-                    ignore=shutil.ignore_patterns('.venv', '__pycache__', '*.pyc', '*.pyo', '*.pyd', '*.ipynb_checkpoints', '.git')
+                    copy_function=copy_with_permissions,
+                    ignore=shutil.ignore_patterns('.venv', '__pycache__', '*.pyc', '*.pyo', '*.pyd', '*.ipynb_checkpoints')
                 )
+
+        # Ensure the new .git directory is writable after copying
+        new_git_dir = os.path.join(new_folder_path_nodes, 'code', '.git')
+        if os.path.exists(new_git_dir):
+            change_permissions_recursive(new_git_dir, 0o755)
+
         if withdata:
             old_data_folder = os.path.join(old_folder_path_nodes, "data")
             new_data_folder = os.path.join(new_folder_path_nodes, "data")
