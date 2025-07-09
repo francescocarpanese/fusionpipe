@@ -664,6 +664,29 @@ def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_p
             child_id=id_map[old_child],
             parent_id=id_map[old_parent]
         )
+
+    # Find head nodes of the duplicated subtree (nodes with no incoming edges in the subtree)
+    head_nodes = [n for n in subtree.nodes if subtree.in_degree(n) == 0]
+    for old_head in head_nodes:
+        new_head = id_map[old_head]
+        # Find parents of the original head node in the full graph (outside the subtree)
+        for parent in graph.predecessors(old_head):
+            if parent not in subtree_nodes:
+                # Attach the new head node to the parent in the target pipeline
+                db_utils.add_node_relation(
+                    cur,
+                    child_id=new_head,
+                    parent_id=parent
+                )
+    
+    # Optionally shift the positions of the duplicated nodes to avoid overlap
+    shift_x, shift_y = 40, 40  # You can adjust the shift values as needed
+    for old_id, new_id in id_map.items():
+        position = db_utils.get_node_position(cur, node_id=old_id, pipeline_id=source_pipeline_id)
+        if position is not None:
+            new_position = (position[0] + shift_x, position[1] + shift_y)
+            db_utils.update_node_position(cur, node_id=new_id, pipeline_id=target_pipeline_id, position_x=new_position[0], position_y=new_position[1])
+    
     return id_map
 
 def delete_node_data(cur, node_ids):

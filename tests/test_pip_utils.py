@@ -438,7 +438,7 @@ def test_duplicate_node_in_different_pipeline_w_code_and_data(monkeypatch, pg_te
 def test_duplicate_duplicate_nodes_in_pipeline_with_relations(monkeypatch, pg_test_db, dag_dummy_1, tmp_base_dir, selected_nodes):
     """
     Test that duplicate_subtree_in_pipeline duplicates a subtree rooted at a node,
-    with new node IDs and correct parent-child relations.
+    with new node IDs and correct parent-child relations, and that head nodes preserve parent relations from outside the subtree.
     """
     import os
     from fusionpipe.utils.pip_utils import (
@@ -488,6 +488,17 @@ def test_duplicate_duplicate_nodes_in_pipeline_with_relations(monkeypatch, pg_te
     # Check: original nodes are still present and unchanged
     for node_id in selected_nodes:
         assert node_id in graph.nodes
+
+    # Head nodes of subtree preserve parent relations from outside the subtree
+    subtree = dag_dummy_1.subgraph(selected_nodes)
+    head_nodes = [n for n in subtree.nodes if subtree.in_degree(n) == 0]
+    for old_head in head_nodes:
+        # Find parents of the head node in the original graph that are outside the selected_nodes
+        external_parents = [p for p in dag_dummy_1.predecessors(old_head) if p not in selected_nodes]
+        new_head = id_map[old_head]
+        for ext_parent in external_parents:
+            # The new duplicated head node should have the same parent (from outside the subtree)
+            assert (ext_parent, new_head) in graph.edges, f"External parent {ext_parent} should be connected to duplicated head node {new_head}"
 
 def test_delete_node_data_removes_data_contents(monkeypatch, pg_test_db, tmp_base_dir):
     """
