@@ -102,12 +102,11 @@ def submit_run_node_with_modality(conn, node_id, run_mode="local"):
             elif run_mode == "ray":
                 # Get the cleint to submit jobs
                 client = JobSubmissionClient(os.getenv("RAY_SUBMIT_URL"))
-
+                timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
                 job_submission = client.submit_job(
                     entrypoint="uv run main.py",
-                    runtime_env={
-                        "working_dir": os.path.join(node_path, "code"),
-                    }
+                    runtime_env={"working_dir": os.path.join(node_path, "code")},
+                    submission_id=f"ray_{node_id}_{timestamp}",
                 )
                 # Write the Ray job submission info
                 logf.write(f"Ray job submitted for node {node_id}, job_id: {job_submission}\n")
