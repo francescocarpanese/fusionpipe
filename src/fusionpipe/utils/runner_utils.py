@@ -499,40 +499,19 @@ def run_pipeline(conn, pipeline_id, last_node_id=None, poll_interval=1.0, debug=
     start_time = time.time()
     
     # Validate inputs
-    if max_concurrent_nodes is not None and max_concurrent_nodes <= 0:
-        raise ValueError("max_concurrent_nodes must be positive")
-    if timeout is not None and timeout <= 0:
-        raise ValueError("timeout must be positive")
+    _validate_pipeline_inputs(max_concurrent_nodes, timeout)
 
     # Get the database cursor
     cur = conn.cursor()
     
-    # Validate pipeline exists
-    if not db_utils.check_pipeline_exists(cur, pipeline_id):
-        raise ValueError(f"Pipeline {pipeline_id} does not exist")
+    # Initialize pipeline state
+    all_nodes, excluded_nodes = _initialize_pipeline_state(cur, pipeline_id, last_node_id)
     
-    all_nodes = set(db_utils.get_all_nodes_from_pip_id(cur, pipeline_id))
-    
+    # Handle empty pipeline
     if not all_nodes:
         if debug:
             print(f"Pipeline {pipeline_id} has no nodes")
-        return {
-            "status": "completed",
-            "completed": 0,
-            "failed": 0,
-            "skipped": 0,
-            "total": 0,
-            "execution_time": 0.0
-        }
-
-    # If last_node_id is provided, exclude its children from the execution
-    excluded_nodes = set()
-    if last_node_id is not None:
-        if last_node_id not in all_nodes:
-            raise ValueError(f"last_node_id {last_node_id} is not in pipeline {pipeline_id}")
-        children_nodes = set(pip_utils.get_all_children_nodes(cur, pipeline_id=pipeline_id, node_id=last_node_id))
-        excluded_nodes = children_nodes
-        all_nodes = all_nodes - excluded_nodes
+        return _create_execution_summary(set(), set(), excluded_nodes, set(), 0.0)
 
     running_nodes = set()
     completed_nodes = set()
@@ -549,58 +528,14 @@ def run_pipeline(conn, pipeline_id, last_node_id=None, poll_interval=1.0, debug=
             # Check timeout
             if timeout and (current_time - start_time) > timeout:
                 # Kill running processes before timeout
-                for node_id in list(running_nodes):
-                    try:
-                        kill_running_process(conn, node_id)
-                        failed_nodes.add(node_id)
-                        running_nodes.discard(node_id)
-                        running_node_procs.pop(node_id, None)
-                    except Exception as e:
-                        if debug:
-                            print(f"Error killing node {node_id} on timeout: {e}")
-                
-                raise TimeoutError(f"Pipeline execution exceeded timeout of {timeout} seconds")
+                _handle_timeout_cleanup(conn, running_nodes, failed_nodes, running_node_procs, timeout, debug)
 
             try:
                 # Handle status updates - update status sets by checking database
-                for node_id in list(all_nodes):  # Use list() to avoid runtime modification
-                    if node_id in running_nodes or node_id in completed_nodes or node_id in failed_nodes:
-                        continue
-                        
-                    status = db_utils.get_node_status(cur, node_id)
-                    if status == "completed":
-                        completed_nodes.add(node_id)
-                    elif status == "failed":
-                        failed_nodes.add(node_id)
+                _update_node_status_from_database(cur, all_nodes, running_nodes, completed_nodes, failed_nodes)
 
                 # Update running nodes status
-                for node_id in list(running_nodes):
-                    try:
-                        if node_id in running_node_procs:
-                            status = check_proc_status(running_node_procs[node_id])
-                            db_utils.update_node_status(cur, node_id, status)
-                            conn.commit()
-                            
-                            if status == "completed":
-                                completed_nodes.add(node_id)
-                                running_nodes.discard(node_id)
-                                running_node_procs.pop(node_id, None)
-                            elif status == "failed":
-                                failed_nodes.add(node_id)
-                                running_nodes.discard(node_id)
-                                running_node_procs.pop(node_id, None)
-                    except Exception as e:
-                        if debug:
-                            print(f"Error checking status for node {node_id}: {e}")
-                        # Mark as failed if we can't check status
-                        failed_nodes.add(node_id)
-                        running_nodes.discard(node_id)
-                        running_node_procs.pop(node_id, None)
-                        try:
-                            db_utils.update_node_status(cur, node_id, "failed")
-                            conn.commit()
-                        except Exception:
-                            pass
+                _update_running_nodes_status(conn, cur, running_nodes, completed_nodes, failed_nodes, running_node_procs, debug)
 
                 consecutive_errors = 0  # Reset on successful status check
 
@@ -628,71 +563,23 @@ def run_pipeline(conn, pipeline_id, last_node_id=None, poll_interval=1.0, debug=
                 print(f"Failed nodes: {failed_nodes}")
 
             # Find the new nodes that can run and are not already running/completed/failed
-            try:
-                runnable_nodes = [
-                    node_id for node_id in all_nodes
-                    if pip_utils.can_node_run(cur, node_id) and node_id not in (running_nodes | completed_nodes | failed_nodes)
-                ]
-            except Exception as e:
-                if debug:
-                    print(f"Error finding runnable nodes: {e}")
-                runnable_nodes = []
+            runnable_nodes = _find_runnable_nodes(cur, all_nodes, running_nodes, completed_nodes, failed_nodes, max_concurrent_nodes, debug)
 
-            # Apply concurrency limit
-            if max_concurrent_nodes:
-                available_slots = max_concurrent_nodes - len(running_nodes)
-                runnable_nodes = runnable_nodes[:max(0, available_slots)]
-
-            # Stop if all nodes are completed or failed, or no more can be scheduled
-            if len(completed_nodes | failed_nodes) == len(all_nodes):
-                if debug:
-                    print("Pipeline execution completed - all nodes processed")
-                break
-            if not runnable_nodes and not running_nodes:
-                if debug:
-                    print("Pipeline execution stopped - no runnable nodes and none running")
+            # Check if execution is complete
+            if _check_execution_complete(all_nodes, completed_nodes, failed_nodes, runnable_nodes, running_nodes, debug):
                 break
 
             if debug and runnable_nodes:
                 print(f"Runnable nodes: {runnable_nodes}")
 
             # Start processes for runnable nodes
-            for node_id in runnable_nodes:
-                try:
-                    running_node_procs[node_id] = submit_run_node(conn, node_id)
-                    running_nodes.add(node_id)
-                    if debug:
-                        print(f"Started running node {node_id}")
-
-                except RuntimeError as e:
-                    if debug:
-                        print(f"Error running node {node_id}: {e}")
-                    failed_nodes.add(node_id)
-                    try:
-                        db_utils.update_node_status(cur, node_id, "failed")
-                        conn.commit()
-                    except Exception as commit_error:
-                        if debug:
-                            print(f"Error updating failed status for node {node_id}: {commit_error}")
-                        conn.rollback()
+            _start_runnable_nodes(conn, cur, runnable_nodes, running_nodes, failed_nodes, running_node_procs, debug)
 
             time.sleep(poll_interval)
 
     except (KeyboardInterrupt, TimeoutError):
         # Graceful shutdown - kill all running processes
-        if debug:
-            print("Pipeline execution interrupted - cleaning up running processes")
-        
-        for node_id in list(running_nodes):
-            try:
-                kill_running_process(conn, node_id)
-                failed_nodes.add(node_id)
-                running_nodes.discard(node_id)
-                running_node_procs.pop(node_id, None)
-            except Exception as e:
-                if debug:
-                    print(f"Error killing node {node_id} during cleanup: {e}")
-        
+        _handle_interrupt_cleanup(conn, running_nodes, failed_nodes, running_node_procs, debug)
         raise
     
     finally:
@@ -702,14 +589,7 @@ def run_pipeline(conn, pipeline_id, last_node_id=None, poll_interval=1.0, debug=
 
     # Execution summary
     execution_time = time.time() - start_time
-    summary = {
-        "status": "completed" if len(failed_nodes) == 0 else "failed",
-        "completed": len(completed_nodes),
-        "failed": len(failed_nodes),
-        "skipped": len(excluded_nodes),
-        "total": len(all_nodes) + len(excluded_nodes),
-        "execution_time": execution_time
-    }
+    summary = _create_execution_summary(completed_nodes, failed_nodes, excluded_nodes, all_nodes, execution_time)
     
     if debug:
         print(f"Pipeline execution summary: {summary}")
@@ -985,3 +865,290 @@ def get_running_ray_tasks(ray_futures):
             }
     
     return running_tasks
+
+def _validate_pipeline_inputs(max_concurrent_nodes, timeout):
+    """
+    Validate input parameters for pipeline execution.
+    
+    Args:
+        max_concurrent_nodes: Maximum number of nodes to run concurrently
+        timeout: Maximum total execution time in seconds
+    
+    Raises:
+        ValueError: If inputs are invalid
+    """
+    if max_concurrent_nodes is not None and max_concurrent_nodes <= 0:
+        raise ValueError("max_concurrent_nodes must be positive")
+    if timeout is not None and timeout <= 0:
+        raise ValueError("timeout must be positive")
+
+
+def _initialize_pipeline_state(cur, pipeline_id, last_node_id=None):
+    """
+    Initialize pipeline state and validate pipeline exists.
+    
+    Args:
+        cur: Database cursor
+        pipeline_id: ID of the pipeline to run
+        last_node_id: Stop execution after this node (exclude its children)
+    
+    Returns:
+        tuple: (all_nodes, excluded_nodes) as sets
+    
+    Raises:
+        ValueError: If pipeline doesn't exist or last_node_id is invalid
+    """
+    # Validate pipeline exists
+    if not db_utils.check_pipeline_exists(cur, pipeline_id):
+        raise ValueError(f"Pipeline {pipeline_id} does not exist")
+    
+    all_nodes = set(db_utils.get_all_nodes_from_pip_id(cur, pipeline_id))
+    
+    # If last_node_id is provided, exclude its children from the execution
+    excluded_nodes = set()
+    if last_node_id is not None:
+        if last_node_id not in all_nodes:
+            raise ValueError(f"last_node_id {last_node_id} is not in pipeline {pipeline_id}")
+        children_nodes = set(pip_utils.get_all_children_nodes(cur, pipeline_id=pipeline_id, node_id=last_node_id))
+        excluded_nodes = children_nodes
+        all_nodes = all_nodes - excluded_nodes
+    
+    return all_nodes, excluded_nodes
+
+
+def _update_node_status_from_database(cur, all_nodes, running_nodes, completed_nodes, failed_nodes):
+    """
+    Update node status sets by checking database for non-running nodes.
+    
+    Args:
+        cur: Database cursor
+        all_nodes: Set of all nodes in pipeline
+        running_nodes: Set of currently running nodes
+        completed_nodes: Set of completed nodes
+        failed_nodes: Set of failed nodes
+    """
+    for node_id in list(all_nodes):  # Use list() to avoid runtime modification
+        if node_id in running_nodes or node_id in completed_nodes or node_id in failed_nodes:
+            continue
+            
+        status = db_utils.get_node_status(cur, node_id)
+        if status == "completed":
+            completed_nodes.add(node_id)
+        elif status == "failed":
+            failed_nodes.add(node_id)
+
+
+def _update_running_nodes_status(conn, cur, running_nodes, completed_nodes, failed_nodes, running_node_procs, debug=False):
+    """
+    Check and update status of currently running nodes.
+    
+    Args:
+        conn: Database connection
+        cur: Database cursor
+        running_nodes: Set of currently running nodes
+        completed_nodes: Set of completed nodes
+        failed_nodes: Set of failed nodes
+        running_node_procs: Dict mapping node_id to process/job_id
+        debug: Enable debug logging
+    """
+    for node_id in list(running_nodes):
+        try:
+            if node_id in running_node_procs:
+                status = check_proc_status(running_node_procs[node_id])
+                db_utils.update_node_status(cur, node_id, status)
+                conn.commit()
+                
+                if status == "completed":
+                    completed_nodes.add(node_id)
+                    running_nodes.discard(node_id)
+                    running_node_procs.pop(node_id, None)
+                elif status == "failed":
+                    failed_nodes.add(node_id)
+                    running_nodes.discard(node_id)
+                    running_node_procs.pop(node_id, None)
+        except Exception as e:
+            if debug:
+                print(f"Error checking status for node {node_id}: {e}")
+            # Mark as failed if we can't check status
+            failed_nodes.add(node_id)
+            running_nodes.discard(node_id)
+            running_node_procs.pop(node_id, None)
+            try:
+                db_utils.update_node_status(cur, node_id, "failed")
+                conn.commit()
+            except Exception:
+                pass
+
+
+def _find_runnable_nodes(cur, all_nodes, running_nodes, completed_nodes, failed_nodes, max_concurrent_nodes=None, debug=False):
+    """
+    Find nodes that can be run and are not already running/completed/failed.
+    
+    Args:
+        cur: Database cursor
+        all_nodes: Set of all nodes in pipeline
+        running_nodes: Set of currently running nodes
+        completed_nodes: Set of completed nodes
+        failed_nodes: Set of failed nodes
+        max_concurrent_nodes: Maximum number of nodes to run concurrently
+        debug: Enable debug logging
+    
+    Returns:
+        list: List of node IDs that can be run
+    """
+    try:
+        runnable_nodes = [
+            node_id for node_id in all_nodes
+            if pip_utils.can_node_run(cur, node_id) and node_id not in (running_nodes | completed_nodes | failed_nodes)
+        ]
+    except Exception as e:
+        if debug:
+            print(f"Error finding runnable nodes: {e}")
+        runnable_nodes = []
+
+    # Apply concurrency limit
+    if max_concurrent_nodes:
+        available_slots = max_concurrent_nodes - len(running_nodes)
+        runnable_nodes = runnable_nodes[:max(0, available_slots)]
+    
+    return runnable_nodes
+
+
+def _check_execution_complete(all_nodes, completed_nodes, failed_nodes, runnable_nodes, running_nodes, debug=False):
+    """
+    Check if pipeline execution is complete.
+    
+    Args:
+        all_nodes: Set of all nodes in pipeline
+        completed_nodes: Set of completed nodes
+        failed_nodes: Set of failed nodes
+        runnable_nodes: List of nodes that can be run
+        running_nodes: Set of currently running nodes
+        debug: Enable debug logging
+    
+    Returns:
+        bool: True if execution is complete
+    """
+    # Stop if all nodes are completed or failed
+    if len(completed_nodes | failed_nodes) == len(all_nodes):
+        if debug:
+            print("Pipeline execution completed - all nodes processed")
+        return True
+    
+    # Stop if no more can be scheduled and none running
+    if not runnable_nodes and not running_nodes:
+        if debug:
+            print("Pipeline execution stopped - no runnable nodes and none running")
+        return True
+    
+    return False
+
+
+def _start_runnable_nodes(conn, cur, runnable_nodes, running_nodes, failed_nodes, running_node_procs, debug=False):
+    """
+    Start processes for runnable nodes.
+    
+    Args:
+        conn: Database connection
+        cur: Database cursor
+        runnable_nodes: List of nodes that can be run
+        running_nodes: Set of currently running nodes
+        failed_nodes: Set of failed nodes
+        running_node_procs: Dict mapping node_id to process/job_id
+        debug: Enable debug logging
+    """
+    for node_id in runnable_nodes:
+        try:
+            running_node_procs[node_id] = submit_run_node(conn, node_id)
+            running_nodes.add(node_id)
+            if debug:
+                print(f"Started running node {node_id}")
+
+        except RuntimeError as e:
+            if debug:
+                print(f"Error running node {node_id}: {e}")
+            failed_nodes.add(node_id)
+            try:
+                db_utils.update_node_status(cur, node_id, "failed")
+                conn.commit()
+            except Exception as commit_error:
+                if debug:
+                    print(f"Error updating failed status for node {node_id}: {commit_error}")
+                conn.rollback()
+
+
+def _handle_timeout_cleanup(conn, running_nodes, failed_nodes, running_node_procs, timeout, debug=False):
+    """
+    Handle timeout by killing all running processes.
+    
+    Args:
+        conn: Database connection
+        running_nodes: Set of currently running nodes
+        failed_nodes: Set of failed nodes
+        running_node_procs: Dict mapping node_id to process/job_id
+        timeout: Timeout value for error message
+        debug: Enable debug logging
+    
+    Raises:
+        TimeoutError: Always raised after cleanup
+    """
+    for node_id in list(running_nodes):
+        try:
+            kill_running_process(conn, node_id)
+            failed_nodes.add(node_id)
+            running_nodes.discard(node_id)
+            running_node_procs.pop(node_id, None)
+        except Exception as e:
+            if debug:
+                print(f"Error killing node {node_id} on timeout: {e}")
+    
+    raise TimeoutError(f"Pipeline execution exceeded timeout of {timeout} seconds")
+
+
+def _handle_interrupt_cleanup(conn, running_nodes, failed_nodes, running_node_procs, debug=False):
+    """
+    Handle interrupt by killing all running processes.
+    
+    Args:
+        conn: Database connection
+        running_nodes: Set of currently running nodes
+        failed_nodes: Set of failed nodes
+        running_node_procs: Dict mapping node_id to process/job_id
+        debug: Enable debug logging
+    """
+    if debug:
+        print("Pipeline execution interrupted - cleaning up running processes")
+    
+    for node_id in list(running_nodes):
+        try:
+            kill_running_process(conn, node_id)
+            failed_nodes.add(node_id)
+            running_nodes.discard(node_id)
+            running_node_procs.pop(node_id, None)
+        except Exception as e:
+            if debug:
+                print(f"Error killing node {node_id} during cleanup: {e}")
+
+
+def _create_execution_summary(completed_nodes, failed_nodes, excluded_nodes, all_nodes, execution_time):
+    """
+    Create execution summary dictionary.
+    
+    Args:
+        completed_nodes: Set of completed nodes
+        failed_nodes: Set of failed nodes
+        excluded_nodes: Set of excluded nodes
+        all_nodes: Set of all nodes that were supposed to run
+        execution_time: Total execution time in seconds
+    
+    Returns:
+        dict: Execution summary
+    """
+    return {
+        "status": "completed" if len(failed_nodes) == 0 else "failed",
+        "completed": len(completed_nodes),
+        "failed": len(failed_nodes),
+        "skipped": len(excluded_nodes),
+        "total": len(all_nodes) + len(excluded_nodes),
+        "execution_time": execution_time
+    }
