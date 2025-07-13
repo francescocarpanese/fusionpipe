@@ -14,14 +14,14 @@ def run_node(conn, node_id):
         conn: Database connection
         node_id: ID of the node to run
     """
-    run_mode = get_node_run_mode(conn, node_id)
-    proc = submit_run_node_with_modality(conn, node_id, run_mode=run_mode)
+    proc = submit_run_node(conn, node_id)
+    run_mode = get_run_mode_from_params(conn, node_id)
     if run_mode == "ray":
         wait_ray_job_completion(conn, node_id, proc)
     else:
         wait_subprocess_completion(conn, node_id, proc)
 
-def get_node_run_mode(conn, node_id):
+def get_run_mode_from_params(conn, node_id):
     """
     Get the run_mode parameter from node_parameters.yaml for a given node.
     Defaults to "local" if missing or invalid.
@@ -48,15 +48,15 @@ def submit_run_node(conn, node_id):
     Returns:
         Process or Ray job submission object
     """
-    run_mode = get_node_run_mode(conn, node_id)
+    run_mode = get_run_mode_from_params(conn, node_id)
     try:
-        return submit_run_node_with_modality(conn, node_id, run_mode=run_mode)
+        return submit_node_with_run_mode(conn, node_id, run_mode=run_mode)
     except ValueError as e:
         print(f"Error starting node {node_id}: {e}")
         raise RuntimeError(f"Failed to start node {node_id} due to invalid run_mode: {run_mode}")
     
 
-def submit_run_node_with_modality(conn, node_id, run_mode="local"):
+def submit_node_with_run_mode(conn, node_id, run_mode="local"):
     # Initialize Ray if needed
     if run_mode == "ray":
         if not ray.is_initialized():
