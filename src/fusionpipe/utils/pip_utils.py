@@ -152,6 +152,11 @@ def init_node_folder(folder_path_nodes, verbose=False):
             with open(pyproject_file_path, 'w') as file:
                 toml.dump(pyproject_data, file)
 
+        # Write the node ID to a .node_id file inside the code folder
+        node_id_file_path = os.path.join(code_folder_path, '.node_id')
+        with open(node_id_file_path, 'w') as node_id_file:
+            node_id_file.write(os.path.basename(folder_path_nodes) + '\n')
+
 
     finally:
         # Change back to the previous working directory
@@ -168,11 +173,10 @@ def init_node_folder(folder_path_nodes, verbose=False):
     # Run empty main to set-up the .venv
     os.system("uv run")
     os.chdir(current_dir)  # Change back to the original directory    
-
-
     
     if verbose:
         print(f"Node folder created at: {folder_path_nodes}")
+
 
 def delete_node_folder(node_folder_path, verbose=False):
     
@@ -591,7 +595,7 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
                     new_subfolder_path,
                     dirs_exist_ok=True,
                     copy_function=copy_with_permissions,
-                    ignore=shutil.ignore_patterns('.venv', '__pycache__', '*.pyc', '*.pyo', '*.pyd', '*.ipynb_checkpoints')
+                    ignore=shutil.ignore_patterns('.venv', '__pycache__', '*.pyc', '*.pyo', '*.pyd', '*.ipynb_checkpoints', '.node_id')
                 )
 
         # Ensure the new .git directory is writable after copying

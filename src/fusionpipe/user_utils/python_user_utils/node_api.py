@@ -69,18 +69,22 @@ def get_all_parent_node_folder_paths(node_id):
 
 def get_node_id():
     """
-    Get the node id by searching the current working directory path for a folder
-    name matching the pattern: n_<14 digits>_<4 digits>.
+    Get the node id by searching for a '.node_id' file in the current directory or its parent directories.
 
     Returns:
         str or None: The node ID if found, else None.
     """
-    pwd = os.getcwd()
-    # Pattern: n_ followed by 14 digits, underscore, 4 digits
-    pattern = re.compile(r'n_\d{14}_\d{4}')
-    match = pattern.search(pwd)
-    if match:
-        return match.group(0)
+    current_dir = os.getcwd()
+    while True:
+        node_id_file = os.path.join(current_dir, '.node_id')
+        if os.path.isfile(node_id_file):
+            with open(node_id_file, 'r') as f:
+                node_id = f.read().strip()
+                return node_id if node_id else None
+        parent_dir = os.path.dirname(current_dir)
+        if parent_dir == current_dir:
+            break
+        current_dir = parent_dir
     return None
 
 def get_folder_path_node():
