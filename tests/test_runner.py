@@ -707,3 +707,432 @@ def test_submit_node_successful_submission_verification(pg_test_db, tmp_base_dir
         assert processes[0]['process_id'] == str(mock_proc.pid)
 
     conn.close()
+
+
+@pytest.mark.parametrize("pipeline_exists,expected_error", [
+    (False, "Pipeline .* does not exist"),
+    (True, None),
+])
+def test_run_pipeline_validation_errors(pg_test_db, tmp_path, pipeline_exists, expected_error):
+    """Test run_pipeline with invalid inputs and validation errors"""
+    from fusionpipe.utils import db_utils, pip_utils, runner_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    
+    if pipeline_exists:
+        pipeline_id = pip_utils.generate_pip_id()
+        db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+        conn.commit()
+    else:
+        pipeline_id = "non_existent_pipeline"
+    
+    if expected_error:
+        with pytest.raises(ValueError, match=expected_error):
+            runner_utils.run_pipeline(conn, pipeline_id)
+    else:
+        # Should succeed with empty pipeline
+        summary = runner_utils.run_pipeline(conn, pipeline_id)
+        assert summary["status"] == "completed"
+        assert summary["total"] == 0
+
+    conn.close()
+
+
+@pytest.mark.parametrize("max_concurrent,timeout,expected_error", [
+    (-1, None, "max_concurrent_nodes must be positive"),
+    (0, None, "max_concurrent_nodes must be positive"),
+    (None, -1, "timeout must be positive"),
+    (None, 0, "timeout must be positive"),
+    (1, 1, None),  # Valid values
+])
+def test_run_pipeline_parameter_validation(pg_test_db, tmp_path, max_concurrent, timeout, expected_error):
+    """Test run_pipeline parameter validation"""
+    from fusionpipe.utils import db_utils, pip_utils, runner_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    conn.commit()
+
+    if expected_error:
+        with pytest.raises(ValueError, match=expected_error):
+            runner_utils.run_pipeline(conn, pipeline_id, max_concurrent_nodes=max_concurrent, timeout=timeout)
+    else:
+        # Should succeed
+        summary = runner_utils.run_pipeline(conn, pipeline_id, max_concurrent_nodes=max_concurrent, timeout=timeout)
+        assert summary["status"] == "completed"
+
+    conn.close()
+
+
+def test_run_pipeline_timeout_handling(pg_test_db, tmp_path):
+    """Test run_pipeline timeout functionality"""
+    from fusionpipe.utils import db_utils, pip_utils, runner_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+
+    # Create a node that will mock a long-running process
+    node_id = pip_utils.generate_node_id()
+    folder_path = os.path.join(tmp_path, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path)
+    conn.commit()
+
+    # Mock submit_run_node to simulate a long-running process
+    mock_proc = MagicMock()
+    mock_proc.pid = 12345
+    mock_proc.poll.return_value = None  # Still running
+
+    with patch.object(runner_utils, 'submit_run_node', return_value=mock_proc), \
+         patch.object(runner_utils, 'check_proc_status', return_value="running"), \
+         patch.object(runner_utils, 'kill_running_process') as mock_kill:
+        
+        with pytest.raises(TimeoutError, match="Pipeline execution exceeded timeout"):
+            runner_utils.run_pipeline(conn, pipeline_id, timeout=0.1, poll_interval=0.05)
+        
+        # Verify cleanup was called
+        mock_kill.assert_called()
+
+    conn.close()
+
+
+def test_run_pipeline_max_concurrent_nodes(pg_test_db, tmp_path):
+    """Test run_pipeline concurrency control"""
+    from fusionpipe.utils import db_utils, pip_utils, runner_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+
+    # Create 3 independent nodes (no dependencies)
+    node_ids = []
+    for i in range(3):
+        node_id = pip_utils.generate_node_id()
+        node_ids.append(node_id)
+        folder_path = os.path.join(tmp_path, node_id)
+        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path)
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+        pip_utils.init_node_folder(folder_path_nodes=folder_path)
+    
+    conn.commit()
+
+    # Track how many nodes are started simultaneously
+    started_nodes = []
+    original_submit = runner_utils.submit_run_node
+
+    def mock_submit_that_tracks(conn, node_id):
+        started_nodes.append(node_id)
+        mock_proc = MagicMock()
+        mock_proc.pid = len(started_nodes) * 1000
+        return mock_proc
+
+    with patch.object(runner_utils, 'submit_run_node', side_effect=mock_submit_that_tracks), \
+         patch.object(runner_utils, 'check_proc_status', return_value="completed"):
+        
+        summary = runner_utils.run_pipeline(conn, pipeline_id, max_concurrent_nodes=2, poll_interval=0.05)
+        
+        # All nodes should eventually complete
+        assert summary["completed"] == 3
+        assert summary["failed"] == 0
+        assert len(started_nodes) == 3
+
+    conn.close()
+
+
+def test_run_pipeline_progress_callback(pg_test_db, tmp_path):
+    """Test run_pipeline progress reporting functionality"""
+    from fusionpipe.utils import db_utils, pip_utils, runner_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+
+    # Create chain of 2 nodes (A -> B)
+    node_a = pip_utils.generate_node_id()
+    node_b = pip_utils.generate_node_id()
+    
+    for node_id in [node_a, node_b]:
+        folder_path = os.path.join(tmp_path, node_id)
+        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path)
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+        pip_utils.init_node_folder(folder_path_nodes=folder_path)
+    
+    db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_a)
+    conn.commit()
+
+    # Track progress updates
+    progress_updates = []
+    
+    def progress_callback(completed, failed, running, total):
+        progress_updates.append({
+            "completed": completed,
+            "failed": failed, 
+            "running": running,
+            "total": total
+        })
+
+    with patch.object(runner_utils, 'submit_run_node') as mock_submit, \
+         patch.object(runner_utils, 'check_proc_status', return_value="completed"):
+        
+        mock_submit.return_value = MagicMock(pid=12345)
+        
+        summary = runner_utils.run_pipeline(
+            conn, pipeline_id, 
+            on_progress=progress_callback,
+            poll_interval=0.05
+        )
+        
+        # Should have received progress updates
+        assert len(progress_updates) > 0
+        
+        # Final update should show all completed
+        final_update = progress_updates[-1]
+        assert final_update["completed"] == 2
+        assert final_update["failed"] == 0
+        assert final_update["total"] == 2
+
+    conn.close()
+
+
+def test_run_pipeline_execution_summary(pg_test_db, tmp_path):
+    """Test run_pipeline return value structure and content"""
+    from fusionpipe.utils import db_utils, pip_utils, runner_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+
+    # Create 2 nodes
+    node_ids = []
+    for i in range(2):
+        node_id = pip_utils.generate_node_id()
+        node_ids.append(node_id)
+        folder_path = os.path.join(tmp_path, node_id)
+        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path)
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+        pip_utils.init_node_folder(folder_path_nodes=folder_path)
+    
+    conn.commit()
+
+    with patch.object(runner_utils, 'submit_run_node') as mock_submit, \
+         patch.object(runner_utils, 'check_proc_status', return_value="completed"):
+        
+        mock_submit.return_value = MagicMock(pid=12345)
+        
+        summary = runner_utils.run_pipeline(conn, pipeline_id, poll_interval=0.05)
+        
+        # Verify summary structure
+        assert isinstance(summary, dict)
+        assert "status" in summary
+        assert "completed" in summary
+        assert "failed" in summary
+        assert "skipped" in summary
+        assert "total" in summary
+        assert "execution_time" in summary
+        
+        # Verify summary content
+        assert summary["status"] == "completed"
+        assert summary["completed"] == 2
+        assert summary["failed"] == 0
+        assert summary["skipped"] == 0
+        assert summary["total"] == 2
+        assert isinstance(summary["execution_time"], (int, float))
+        assert summary["execution_time"] >= 0
+
+    conn.close()
+
+
+def test_run_pipeline_with_failed_nodes(pg_test_db, tmp_path):
+    """Test run_pipeline behavior when some nodes fail"""
+    from fusionpipe.utils import db_utils, pip_utils, runner_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+
+    # Create chain of 3 nodes (A -> B -> C)
+    node_ids = []
+    for i in range(3):
+        node_id = pip_utils.generate_node_id()
+        node_ids.append(node_id)
+        folder_path = os.path.join(tmp_path, node_id)
+        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path)
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+        pip_utils.init_node_folder(folder_path_nodes=folder_path)
+    
+    # Create chain: A -> B -> C
+    db_utils.add_node_relation(cur, child_id=node_ids[1], parent_id=node_ids[0])
+    db_utils.add_node_relation(cur, child_id=node_ids[2], parent_id=node_ids[1])
+    conn.commit()
+
+    # Mock first node to complete, second to fail, third should not run
+    def mock_status_side_effect(proc):
+        if hasattr(proc, 'test_node_id'):
+            if proc.test_node_id == node_ids[0]:
+                return "completed"
+            elif proc.test_node_id == node_ids[1]:
+                return "failed"
+        return "running"
+
+    submission_count = 0
+    def mock_submit_side_effect(conn, node_id):
+        nonlocal submission_count
+        submission_count += 1
+        mock_proc = MagicMock()
+        mock_proc.test_node_id = node_id
+        mock_proc.pid = submission_count * 1000
+        return mock_proc
+
+    with patch.object(runner_utils, 'submit_run_node', side_effect=mock_submit_side_effect), \
+         patch.object(runner_utils, 'check_proc_status', side_effect=mock_status_side_effect):
+        
+        summary = runner_utils.run_pipeline(conn, pipeline_id, poll_interval=0.05)
+        
+        # Should complete A, fail B, and not run C
+        assert summary["status"] == "failed"  # Overall status should be failed
+        assert summary["completed"] == 1  # Only A completed
+        assert summary["failed"] == 1      # B failed
+        assert submission_count == 2       # Only A and B should be submitted
+
+    conn.close()
+
+
+def test_run_pipeline_empty_pipeline(pg_test_db):
+    """Test run_pipeline with an empty pipeline (no nodes)"""
+    from fusionpipe.utils import db_utils, pip_utils, runner_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="empty_pipeline")
+    conn.commit()
+
+    summary = runner_utils.run_pipeline(conn, pipeline_id, debug=True)
+    
+    # Should complete immediately with zero counts
+    assert summary["status"] == "completed"
+    assert summary["completed"] == 0
+    assert summary["failed"] == 0
+    assert summary["skipped"] == 0
+    assert summary["total"] == 0
+    assert summary["execution_time"] >= 0
+
+    conn.close()
+
+
+def test_run_pipeline_keyboard_interrupt_cleanup(pg_test_db, tmp_path):
+    """Test run_pipeline cleanup when interrupted"""
+    from fusionpipe.utils import db_utils, pip_utils, runner_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+
+    # Create a node 
+    node_id = pip_utils.generate_node_id()
+    folder_path = os.path.join(tmp_path, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path)
+    conn.commit()
+
+    # Mock to simulate long-running process and keyboard interrupt
+    mock_proc = MagicMock()
+    mock_proc.pid = 12345
+
+    interrupt_after_iterations = 2
+    iteration_count = 0
+    
+    def mock_status_that_interrupts(*args):
+        nonlocal iteration_count
+        iteration_count += 1
+        if iteration_count >= interrupt_after_iterations:
+            raise KeyboardInterrupt("User interrupted")
+        return "running"
+
+    with patch.object(runner_utils, 'submit_run_node', return_value=mock_proc), \
+         patch.object(runner_utils, 'check_proc_status', side_effect=mock_status_that_interrupts), \
+         patch.object(runner_utils, 'kill_running_process') as mock_kill:
+        
+        with pytest.raises(KeyboardInterrupt):
+            runner_utils.run_pipeline(conn, pipeline_id, poll_interval=0.05)
+        
+        # Verify cleanup was called
+        mock_kill.assert_called()
+
+    conn.close()
+
+
+def test_run_pipeline_last_node_exclusion(pg_test_db, tmp_path):
+    """Test run_pipeline last_node_id parameter with invalid node ID"""
+    from fusionpipe.utils import db_utils, pip_utils, runner_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+
+    # Create a valid node
+    node_id = pip_utils.generate_node_id()
+    folder_path = os.path.join(tmp_path, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path)
+    conn.commit()
+
+    # Test with non-existent last_node_id
+    invalid_node_id = "non_existent_node"
+    
+    with pytest.raises(ValueError, match=f"last_node_id {invalid_node_id} is not in pipeline {pipeline_id}"):
+        runner_utils.run_pipeline(conn, pipeline_id, last_node_id=invalid_node_id)
+
+    conn.close()
+
+
+def test_run_pipeline_execution_error_recovery(pg_test_db, tmp_path):
+    """Test run_pipeline error recovery during execution"""
+    from fusionpipe.utils import db_utils, pip_utils, runner_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+
+    # Create a node
+    node_id = pip_utils.generate_node_id()
+    folder_path = os.path.join(tmp_path, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path)
+    conn.commit()
+
+    # Mock submit_run_node to raise an exception on first call, succeed on retry
+    error_count = 0
+    def mock_submit_with_initial_error(conn, node_id):
+        nonlocal error_count
+        error_count += 1
+        if error_count == 1:
+            raise RuntimeError("Temporary submission error")
+        # Subsequent calls succeed
+        return MagicMock(pid=12345)
+
+    with patch.object(runner_utils, 'submit_run_node', side_effect=mock_submit_with_initial_error), \
+         patch.object(runner_utils, 'check_proc_status', return_value="completed"):
+        
+        summary = runner_utils.run_pipeline(conn, pipeline_id, poll_interval=0.05, debug=True)
+        
+        # Should handle the error gracefully and continue
+        assert summary["failed"] == 1  # Node should be marked as failed due to submission error
+
+    conn.close()
