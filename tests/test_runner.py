@@ -8,13 +8,14 @@ import yaml
 from unittest.mock import patch, MagicMock, mock_open
 from fusionpipe.utils import db_utils, pip_utils, runner_utils
 
+@pytest.mark.parametrize("run_mode", ["local", "ray"])
 @pytest.mark.parametrize("last_node,expected_status_a,expected_status_b,expected_status_c", [
     (None, "completed", "completed", "completed"),
     (0, "completed", "ready", "ready"),
     (1, "completed", "completed", "ready"),
     (2, "completed", "completed", "completed"),
 ])
-def test_run_pipeline(pg_test_db, tmp_path, last_node, expected_status_a, expected_status_b, expected_status_c):
+def test_run_pipeline(pg_test_db, tmp_path, last_node, expected_status_a, expected_status_b, expected_status_c,run_mode):
     """
     Test the runner_utils.run_pipeline function for different starting nodes.
     Verifies that pipeline execution updates node statuses as expected:
@@ -43,6 +44,16 @@ def test_run_pipeline(pg_test_db, tmp_path, last_node, expected_status_a, expect
         db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
         pip_utils.init_node_folder(folder_path_nodes=folder)
+
+    # If run_mode is "ray", set run_mode in node_parameters.yaml for each node
+    if run_mode == "ray":
+        for folder in [folder_a, folder_b, folder_c]:
+            param_file = os.path.join(folder, "code", "node_parameters.yaml")
+            with open(param_file, "r") as f:
+                params = yaml.safe_load(f)
+            params["run_mode"] = "ray"
+            with open(param_file, "w") as f:
+                yaml.safe_dump(params, f)
 
     db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_a)
     db_utils.add_node_relation(cur, child_id=node_c, parent_id=node_b)
