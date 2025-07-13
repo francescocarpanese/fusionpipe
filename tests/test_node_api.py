@@ -28,11 +28,12 @@ def test_get_all_parent_node_folder_paths(pg_test_db, monkeypatch, dag_dummy_1):
     cur.close()
 
 def test_get_node_id(monkeypatch, tmp_path):
-    # Simulate a working directory with a node id pattern
-    node_dir = tmp_path / 'n_12345678901234_5678'
-    node_dir.mkdir()
-    monkeypatch.chdir(node_dir)
-    assert node_api.get_node_id() == 'n_12345678901234_5678'
+    # Create a .node_id file with the expected node ID
+    node_id = 'n_12345678901234_5678'
+    node_id_file = tmp_path / '.node_id'
+    node_id_file.write_text(node_id)
+    monkeypatch.chdir(tmp_path)
+    assert node_api.get_node_id() == node_id
 
 
 def test_get_folder_path_node(pg_test_db, monkeypatch, tmp_path):
@@ -42,7 +43,12 @@ def test_get_folder_path_node(pg_test_db, monkeypatch, tmp_path):
     cur.execute('INSERT INTO nodes (node_id, folder_path) VALUES (%s, %s)', (node_id, folder_path))
     pg_test_db.commit()
     monkeypatch.setattr(node_api, 'connect_to_db', lambda db_url=None: pg_test_db)
-    monkeypatch.setattr(os, 'getcwd', lambda: str(tmp_path / node_id))
+    
+    # Create .node_id file instead of relying on directory name
+    node_id_file = tmp_path / '.node_id'
+    node_id_file.write_text(node_id)
+    monkeypatch.chdir(tmp_path)
+    
     assert node_api.get_folder_path_node() == folder_path
     cur.close()
 
@@ -57,7 +63,12 @@ def test_get_folder_path_code(pg_test_db, monkeypatch, tmp_path):
     cur.execute('INSERT INTO nodes (node_id, folder_path) VALUES (%s, %s)', (node_id, str(node_folder)))
     pg_test_db.commit()
     monkeypatch.setattr(node_api, 'connect_to_db', lambda db_url=None: pg_test_db)
-    monkeypatch.setattr(os, 'getcwd', lambda: str(node_folder))
+    
+    # Create .node_id file in the node folder
+    node_id_file = node_folder / '.node_id'
+    node_id_file.write_text(node_id)
+    monkeypatch.chdir(node_folder)
+    
     assert node_api.get_folder_path_code() == str(code_folder)
     cur.close()
 
@@ -72,7 +83,12 @@ def test_get_folder_path_data(pg_test_db, monkeypatch, tmp_path):
     cur.execute('INSERT INTO nodes (node_id, folder_path) VALUES (%s, %s)', (node_id, str(node_folder)))
     pg_test_db.commit()
     monkeypatch.setattr(node_api, 'connect_to_db', lambda db_url=None: pg_test_db)
-    monkeypatch.setattr(os, 'getcwd', lambda: str(node_folder))
+    
+    # Create .node_id file in the node folder
+    node_id_file = node_folder / '.node_id'
+    node_id_file.write_text(node_id)
+    monkeypatch.chdir(node_folder)
+    
     assert node_api.get_folder_path_data() == str(data_folder)
     cur.close()
 
@@ -87,7 +103,12 @@ def test_get_folder_path_reports(pg_test_db, monkeypatch, tmp_path):
     cur.execute('INSERT INTO nodes (node_id, folder_path) VALUES (%s, %s)', (node_id, str(node_folder)))
     pg_test_db.commit()
     monkeypatch.setattr(node_api, 'connect_to_db', lambda db_url=None: pg_test_db)
-    monkeypatch.setattr(os, 'getcwd', lambda: str(node_folder))
+    
+    # Create .node_id file in the node folder
+    node_id_file = node_folder / '.node_id'
+    node_id_file.write_text(node_id)
+    monkeypatch.chdir(node_folder)
+    
     assert node_api.get_folder_path_reports() == str(reports_folder)
     cur.close()
 
