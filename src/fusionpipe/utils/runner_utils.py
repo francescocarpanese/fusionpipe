@@ -472,92 +472,249 @@ def wait_ray_job_completion(conn, node_id, job_id):
         conn.commit()
 
 
-def run_pipeline(conn, pipeline_id, last_node_id=None, poll_interval=1.0, debug=False):
+def run_pipeline(conn, pipeline_id, last_node_id=None, poll_interval=1.0, debug=False, max_concurrent_nodes=None, timeout=None, on_progress=None):
     """
-    Orchestrate the execution of a pipeline.
-    - conn: sqlite3.Connection
-    - pipeline_id: str
-    - poll_interval: float, seconds between polling for new runnable nodes
+    Run a pipeline with improved error handling, concurrency control, and progress tracking.
+    
+    Args:
+        conn: Database connection
+        pipeline_id: ID of the pipeline to run
+        last_node_id: Stop execution after this node (exclude its children)
+        poll_interval: Time between status checks (seconds)
+        debug: Enable debug logging
+        max_concurrent_nodes: Maximum number of nodes to run concurrently (None for unlimited)
+        timeout: Maximum total execution time in seconds (None for no timeout)
+        on_progress: Callback function called on progress updates: on_progress(completed, failed, running, total)
+    
+    Returns:
+        dict: Execution summary with counts and timing information
+    
+    Raises:
+        TimeoutError: If execution exceeds timeout
+        RuntimeError: If pipeline execution fails critically
     """
     from fusionpipe.utils import db_utils, pip_utils
+    import time
+    
+    start_time = time.time()
+    
+    # Validate inputs
+    if max_concurrent_nodes is not None and max_concurrent_nodes <= 0:
+        raise ValueError("max_concurrent_nodes must be positive")
+    if timeout is not None and timeout <= 0:
+        raise ValueError("timeout must be positive")
 
     # Get the database cursor
     cur = conn.cursor()
+    
+    # Validate pipeline exists
+    if not db_utils.check_pipeline_exists(cur, pipeline_id):
+        raise ValueError(f"Pipeline {pipeline_id} does not exist")
+    
     all_nodes = set(db_utils.get_all_nodes_from_pip_id(cur, pipeline_id))
+    
+    if not all_nodes:
+        if debug:
+            print(f"Pipeline {pipeline_id} has no nodes")
+        return {
+            "status": "completed",
+            "completed": 0,
+            "failed": 0,
+            "skipped": 0,
+            "total": 0,
+            "execution_time": 0.0
+        }
 
+    # If last_node_id is provided, exclude its children from the execution
+    excluded_nodes = set()
     if last_node_id is not None:
+        if last_node_id not in all_nodes:
+            raise ValueError(f"last_node_id {last_node_id} is not in pipeline {pipeline_id}")
         children_nodes = set(pip_utils.get_all_children_nodes(cur, pipeline_id=pipeline_id, node_id=last_node_id))
-        all_nodes = all_nodes - children_nodes
+        excluded_nodes = children_nodes
+        all_nodes = all_nodes - excluded_nodes
 
     running_nodes = set()
     completed_nodes = set()
     failed_nodes = set()
-    running_node_procs = {}
+    running_node_procs = {}  # Collector for subprocesses handle and submission_ids ray
+    last_progress_report = 0
+    consecutive_errors = 0
+    max_consecutive_errors = 5
 
-    while True:
+    try:
+        while True:
+            current_time = time.time()
+            
+            # Check timeout
+            if timeout and (current_time - start_time) > timeout:
+                # Kill running processes before timeout
+                for node_id in list(running_nodes):
+                    try:
+                        kill_running_process(conn, node_id)
+                        failed_nodes.add(node_id)
+                        running_nodes.discard(node_id)
+                        running_node_procs.pop(node_id, None)
+                    except Exception as e:
+                        if debug:
+                            print(f"Error killing node {node_id} on timeout: {e}")
+                
+                raise TimeoutError(f"Pipeline execution exceeded timeout of {timeout} seconds")
 
-        # Handle local mode - update status sets by checking database
-        for node_id in all_nodes:
-            status = db_utils.get_node_status(cur, node_id)
-            if status == "completed":
-                completed_nodes.add(node_id)
-                running_nodes.discard(node_id)
-                running_node_procs.pop(node_id, None)
-            elif status == "failed":
-                failed_nodes.add(node_id)
-                running_nodes.discard(node_id)
-                running_node_procs.pop(node_id, None)
-            elif status == "running":
-                running_nodes.add(node_id)
-
-
-        if debug:
-            print(f"Running nodes: {running_nodes}")
-            print(f"Completed nodes: {completed_nodes}")
-            print(f"Failed nodes: {failed_nodes}")
-
-        # Find nodes that can run and are not already running/completed/failed
-        runnable_nodes = [
-            node_id for node_id in all_nodes
-            if pip_utils.can_node_run(cur, node_id) and node_id not in (running_nodes | completed_nodes | failed_nodes)
-        ]
-
-        # Stop if all nodes are completed or failed, or no more can be scheduled
-        if len(completed_nodes | failed_nodes) == len(all_nodes):
-            if debug:
-                print("Pipeline execution completed - all nodes processed")
-            break
-        if not runnable_nodes and not running_nodes:
-            if debug:
-                print("Pipeline execution stopped - no runnable nodes and none running")
-            break
-
-
-        if debug:
-            print(f"Runnable nodes: {runnable_nodes}")
-
-        # Start processes for runnable nodes
-        for node_id in runnable_nodes:
             try:
-                # Run locally (blocking at each node)
-                running_node_procs[node_id] = submit_run_node(conn, node_id)
-                running_nodes.add(node_id)
+                # Handle status updates - update status sets by checking database
+                for node_id in list(all_nodes):  # Use list() to avoid runtime modification
+                    if node_id in running_nodes or node_id in completed_nodes or node_id in failed_nodes:
+                        continue
+                        
+                    status = db_utils.get_node_status(cur, node_id)
+                    if status == "completed":
+                        completed_nodes.add(node_id)
+                    elif status == "failed":
+                        failed_nodes.add(node_id)
+
+                # Update running nodes status
+                for node_id in list(running_nodes):
+                    try:
+                        if node_id in running_node_procs:
+                            status = check_proc_status(running_node_procs[node_id])
+                            db_utils.update_node_status(cur, node_id, status)
+                            conn.commit()
+                            
+                            if status == "completed":
+                                completed_nodes.add(node_id)
+                                running_nodes.discard(node_id)
+                                running_node_procs.pop(node_id, None)
+                            elif status == "failed":
+                                failed_nodes.add(node_id)
+                                running_nodes.discard(node_id)
+                                running_node_procs.pop(node_id, None)
+                    except Exception as e:
+                        if debug:
+                            print(f"Error checking status for node {node_id}: {e}")
+                        # Mark as failed if we can't check status
+                        failed_nodes.add(node_id)
+                        running_nodes.discard(node_id)
+                        running_node_procs.pop(node_id, None)
+                        try:
+                            db_utils.update_node_status(cur, node_id, "failed")
+                            conn.commit()
+                        except Exception:
+                            pass
+
+                consecutive_errors = 0  # Reset on successful status check
+
+            except Exception as e:
+                consecutive_errors += 1
                 if debug:
-                    print(f"Started running node {node_id}")
+                    print(f"Error in status checking loop (attempt {consecutive_errors}): {e}")
+                
+                if consecutive_errors >= max_consecutive_errors:
+                    raise RuntimeError(f"Too many consecutive errors ({consecutive_errors}) in pipeline execution")
+                
+                # Continue with degraded functionality
+                time.sleep(poll_interval)
+                continue
 
-            except RuntimeError as e:
-                print(f"Error running node {node_id}: {e}")
+            # Progress reporting
+            total_processed = len(completed_nodes | failed_nodes)
+            if on_progress and (total_processed != last_progress_report):
+                on_progress(len(completed_nodes), len(failed_nodes), len(running_nodes), len(all_nodes))
+                last_progress_report = total_processed
+
+            if debug:
+                print(f"Running nodes: {running_nodes}")
+                print(f"Completed nodes: {completed_nodes}")
+                print(f"Failed nodes: {failed_nodes}")
+
+            # Find the new nodes that can run and are not already running/completed/failed
+            try:
+                runnable_nodes = [
+                    node_id for node_id in all_nodes
+                    if pip_utils.can_node_run(cur, node_id) and node_id not in (running_nodes | completed_nodes | failed_nodes)
+                ]
+            except Exception as e:
+                if debug:
+                    print(f"Error finding runnable nodes: {e}")
+                runnable_nodes = []
+
+            # Apply concurrency limit
+            if max_concurrent_nodes:
+                available_slots = max_concurrent_nodes - len(running_nodes)
+                runnable_nodes = runnable_nodes[:max(0, available_slots)]
+
+            # Stop if all nodes are completed or failed, or no more can be scheduled
+            if len(completed_nodes | failed_nodes) == len(all_nodes):
+                if debug:
+                    print("Pipeline execution completed - all nodes processed")
+                break
+            if not runnable_nodes and not running_nodes:
+                if debug:
+                    print("Pipeline execution stopped - no runnable nodes and none running")
+                break
+
+            if debug and runnable_nodes:
+                print(f"Runnable nodes: {runnable_nodes}")
+
+            # Start processes for runnable nodes
+            for node_id in runnable_nodes:
+                try:
+                    running_node_procs[node_id] = submit_run_node(conn, node_id)
+                    running_nodes.add(node_id)
+                    if debug:
+                        print(f"Started running node {node_id}")
+
+                except RuntimeError as e:
+                    if debug:
+                        print(f"Error running node {node_id}: {e}")
+                    failed_nodes.add(node_id)
+                    try:
+                        db_utils.update_node_status(cur, node_id, "failed")
+                        conn.commit()
+                    except Exception as commit_error:
+                        if debug:
+                            print(f"Error updating failed status for node {node_id}: {commit_error}")
+                        conn.rollback()
+
+            time.sleep(poll_interval)
+
+    except (KeyboardInterrupt, TimeoutError):
+        # Graceful shutdown - kill all running processes
+        if debug:
+            print("Pipeline execution interrupted - cleaning up running processes")
+        
+        for node_id in list(running_nodes):
+            try:
+                kill_running_process(conn, node_id)
                 failed_nodes.add(node_id)
-                conn.rollback()
+                running_nodes.discard(node_id)
+                running_node_procs.pop(node_id, None)
+            except Exception as e:
+                if debug:
+                    print(f"Error killing node {node_id} during cleanup: {e}")
+        
+        raise
+    
+    finally:
+        # Final progress report
+        if on_progress:
+            on_progress(len(completed_nodes), len(failed_nodes), len(running_nodes), len(all_nodes))
 
-        # Update the status of the nodes depending on the process
-        for node_id in running_nodes:
-            status = check_proc_status(running_node_procs[node_id])
-            db_utils.update_node_status(cur, node_id, status)
-            conn.commit()
-
-        time.sleep(poll_interval)
-
+    # Execution summary
+    execution_time = time.time() - start_time
+    summary = {
+        "status": "completed" if len(failed_nodes) == 0 else "failed",
+        "completed": len(completed_nodes),
+        "failed": len(failed_nodes),
+        "skipped": len(excluded_nodes),
+        "total": len(all_nodes) + len(excluded_nodes),
+        "execution_time": execution_time
+    }
+    
+    if debug:
+        print(f"Pipeline execution summary: {summary}")
+    
+    return summary
 
 def kill_running_process(conn, node_id, ray_futures=None):
     """
@@ -765,10 +922,8 @@ def kill_all_pipeline_tasks(conn, pipeline_id, ray_futures=None):
                         os.kill(int(pid), 9)
                         db_utils.remove_process(cur, pid)
                         killed_summary["local_processes_killed"] += 1
-                        print(f"Local process {pid} for node {node_id} killed")
                     except Exception as e:
-                        print(f"Failed to kill local process {pid}: {e}")
-                        killed_summary["failed_to_kill"].append(f"process_{pid}")
+                        print(f"Failed to kill process {pid} for node {node_id}: {e}")
                 
                 # Update node status
                 if ray_killed or proc_ids:
@@ -816,7 +971,7 @@ def get_running_ray_tasks(ray_futures):
                     result = ray.get(ready[0])
                     running_tasks[node_id] = {
                         "status": "completed",
-                        "result": result
+                        "result": str(result)
                     }
                 except Exception as e:
                     running_tasks[node_id] = {
