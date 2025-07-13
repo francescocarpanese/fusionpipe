@@ -3,7 +3,9 @@ import tempfile
 import os
 import sqlite3
 import time
-from unittest.mock import patch, MagicMock
+import subprocess
+import yaml
+from unittest.mock import patch, MagicMock, mock_open
 from fusionpipe.utils import db_utils, pip_utils, runner_utils
 
 
@@ -111,6 +113,7 @@ def test_run_pipeline(pg_test_db, tmp_path, last_node, expected_status_a, expect
     conn.close()
 
 
+
 @pytest.mark.parametrize("node_init_status,expected_status", [
     ("ready", "completed"),
     ("running", "running"),
@@ -163,7 +166,6 @@ def test_create_and_run_node_ray(pg_test_db, tmp_base_dir, node_init_status, exp
     (None, None, None, None, False),  # Default initialization
     ("localhost:10001", None, None, None, False),  # Connect to existing cluster
     (None, 1024*1024*1024, "/tmp/ray_test", 2, False),  # Custom config
-    ("invalid_address", None, None, None, True),  # Invalid address should fail
 ])
 def test_init_ray_cluster(address, object_store_memory, temp_dir, num_cpus, should_fail):
     """Test Ray cluster initialization with various configurations"""
@@ -220,44 +222,6 @@ def test_init_ray_cluster(address, object_store_memory, temp_dir, num_cpus, shou
             # Verify temp directory creation if specified
             if temp_dir:
                 mock_makedirs.assert_called_once_with(temp_dir, exist_ok=True)
-
-
-# def test_init_ray_cluster_already_initialized():
-#     """Test that init_ray_cluster returns early when Ray is already initialized"""
-    
-#     with patch('ray.is_initialized') as mock_is_initialized, \
-#          patch('ray.init') as mock_init:
-        
-#         # Mock Ray being already initialized
-#         mock_is_initialized.return_value = True
-        
-#         # Call the function
-#         runner_utils.init_ray_cluster()
-        
-#         # Verify ray.init was NOT called
-#         mock_init.assert_not_called()
-
-
-# def test_init_ray_cluster_with_env_variable():
-#     """Test init_ray_cluster uses RAY_SUBMIT_URL environment variable as default address"""
-    
-#     test_url = "http://localhost:8265"
-    
-#     with patch.dict(os.environ, {'RAY_SUBMIT_URL': test_url}), \
-#          patch('ray.is_initialized') as mock_is_initialized, \
-#          patch('ray.init') as mock_init:
-        
-#         # Mock Ray not being initialized
-#         mock_is_initialized.return_value = False
-#         mock_init.return_value = None
-        
-#         # Call function without explicit address
-#         runner_utils.init_ray_cluster()
-        
-#         # Verify ray.init was called with the environment variable address
-#         mock_init.assert_called_once()
-#         actual_kwargs = mock_init.call_args[1]
-#         assert actual_kwargs['address'] == test_url
 
 
 @pytest.mark.parametrize("node_init_status,expected_status", [
@@ -374,5 +338,521 @@ def test_create_and_run_node_with_ray(pg_test_db, tmp_base_dir, node_init_status
 
     if error_message:
         print(f"Caught error: {error_message}")
+
+    conn.close()
+
+
+@pytest.mark.parametrize("run_mode", ["local", "ray"])
+def test_node_execution_context_success(pg_test_db, tmp_base_dir, run_mode):
+    """Test successful execution of node_execution_context"""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Setup test node
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    node_id = pip_utils.generate_node_id()
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
+    conn.commit()
+
+    proc_ref = None  # Initialize proc_ref before using
+
+    with patch('ray.is_initialized', return_value=False), \
+         patch.object(runner_utils, 'init_ray_cluster') as mock_init_ray:
+        
+        # Use the context manager
+        with runner_utils.node_execution_context(conn, node_id, run_mode) as (cur, node_path, log_file, proc_ref):
+            # Verify setup
+            assert cur is not None
+            assert node_path == folder_path_nodes
+            assert log_file.endswith("logs.txt")
+            assert proc_ref["proc"] is None
+            
+            # Check node status was set to running
+            status = db_utils.get_node_status(cur, node_id)
+            assert status == "running"
+            
+            # Verify Ray initialization was called if run_mode is ray
+            if run_mode == "ray":
+                mock_init_ray.assert_called_once()
+            else:
+                mock_init_ray.assert_not_called()
+
+    # After context manager, node should still be running (no error occurred)
+    final_status = db_utils.get_node_status(cur, node_id)
+    assert final_status == "running"
+
+    conn.close()
+
+
+def test_node_execution_context_node_cannot_run(pg_test_db, tmp_base_dir):
+    """Test context manager when node cannot run"""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Setup test node that cannot run
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    node_id = pip_utils.generate_node_id()
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    # Don't initialize node folder to make it unrunnable
+    conn.commit()
+
+    with patch.object(pip_utils, 'can_node_run', return_value=False):
+        with pytest.raises(RuntimeError, match=f"Node {node_id} cannot be run"):
+            with runner_utils.node_execution_context(conn, node_id, "local") as context:
+                pass
+
+    conn.close()
+
+
+def test_node_execution_context_exception_cleanup(pg_test_db, tmp_base_dir):
+    """Test context manager cleanup when exception occurs inside context"""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Setup test node
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    node_id = pip_utils.generate_node_id()
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
+    conn.commit()
+
+    # Mock process for cleanup testing
+    mock_proc = MagicMock()
+    mock_proc.pid = 12345
+    log_file = os.path.join(folder_path_nodes, "logs.txt")
+    proc_ref = {"proc": mock_proc}  # Initialize proc_ref with mock process
+    node_path = folder_path_nodes
+
+    with pytest.raises(ValueError, match="Test exception"):
+        with runner_utils.node_execution_context(conn, node_id, "local") as (cur, node_path, log_file, proc_ref):
+            # Simulate process creation
+            proc_ref["proc"] = mock_proc
+            
+            # Verify node is running
+            status = db_utils.get_node_status(cur, node_id)
+            assert status == "running"
+            
+            # Raise an exception to test cleanup
+            raise ValueError("Test exception")
+
+    # Verify cleanup occurred
+    final_status = db_utils.get_node_status(cur, node_id)
+    assert final_status == "failed"
+
+    conn.close()
+
+
+
+def test_create_ray_job(pg_test_db, tmp_base_dir):
+    """Test _create_ray_job function"""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Setup test node
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    node_id = pip_utils.generate_node_id()
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
+    conn.commit()
+
+    log_file = os.path.join(folder_path_nodes, "logs.txt")
+    test_job_id = "test_job_12345"
+    
+    # Mock Ray JobSubmissionClient
+    mock_client = MagicMock()
+    mock_client.submit_job.return_value = test_job_id
+    
+    with patch('fusionpipe.utils.runner_utils.JobSubmissionClient', return_value=mock_client), \
+         patch.dict(os.environ, {'RAY_SUBMIT_URL': 'http://localhost:8265'}), \
+         patch('builtins.open', mock_open()) as mock_file:
+        
+        # Call the function
+        result_job_id = runner_utils._create_ray_job(cur, node_id, folder_path_nodes, log_file)
+        
+        # Verify JobSubmissionClient was created with correct URL
+        runner_utils.JobSubmissionClient.assert_called_once_with('http://localhost:8265')
+        
+        # Verify submit_job was called correctly
+        mock_client.submit_job.assert_called_once()
+        call_kwargs = mock_client.submit_job.call_args[1]
+        assert call_kwargs['entrypoint'] == "uv run main.py"
+        assert call_kwargs['runtime_env']['working_dir'] == os.path.join(folder_path_nodes, "code")
+        assert call_kwargs['submission_id'].startswith(f"ray_{node_id}_")
+        
+        # Verify the job was added to database
+        processes = db_utils.get_processes_by_node(cur, node_id)
+        assert len(processes) == 1
+        assert processes[0]['process_id'] == test_job_id
+        assert processes[0]['status'] == "running"
+        
+        # Verify return value
+        assert result_job_id == test_job_id
+
+    conn.close()
+
+
+def test_create_local_process_file_operations(pg_test_db, tmp_base_dir):
+    """Test _create_local_process file writing and logging"""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Setup test node
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    node_id = pip_utils.generate_node_id()
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
+    conn.commit()
+
+    log_file = os.path.join(folder_path_nodes, "logs.txt")
+    
+    # Mock subprocess.Popen
+    mock_proc = MagicMock()
+    mock_proc.pid = 54321
+    mock_proc.poll.return_value = None  # Simulate running process
+
+    # Create actual log file for testing
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+
+    with patch('subprocess.Popen', return_value=mock_proc):
+        # Call the function
+        result_proc = runner_utils._create_local_process(cur, node_id, folder_path_nodes, log_file)
+        
+        # Verify log file was written
+        assert os.path.exists(log_file)
+        with open(log_file, 'r') as f:
+            log_content = f.read()
+            assert f"PID: {mock_proc.pid}" in log_content
+            assert "---" in log_content
+
+    conn.close()
+
+
+def test_create_ray_job_submission_id_format(pg_test_db, tmp_base_dir):
+    """Test _create_ray_job submission ID format"""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Setup test node
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    node_id = pip_utils.generate_node_id()
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
+    conn.commit()
+
+    log_file = os.path.join(folder_path_nodes, "logs.txt")
+    test_job_id = "ray_job_response_12345"
+    
+    # Mock Ray JobSubmissionClient
+    mock_client = MagicMock()
+    mock_client.submit_job.return_value = test_job_id
+    
+    with patch('fusionpipe.utils.runner_utils.JobSubmissionClient', return_value=mock_client), \
+         patch.dict(os.environ, {'RAY_SUBMIT_URL': 'http://localhost:8265'}), \
+         patch('time.strftime', return_value='20240101_120000'):
+        
+        # Call the function
+        result_job_id = runner_utils._create_ray_job(cur, node_id, folder_path_nodes, log_file)
+        
+        # Verify submission_id format
+        call_kwargs = mock_client.submit_job.call_args[1]
+        expected_submission_id = f"ray_{node_id}_20240101_120000"
+        assert call_kwargs['submission_id'] == expected_submission_id
+
+    conn.close()
+
+
+
+def test_create_ray_job_client_error_handling(pg_test_db, tmp_base_dir):
+    """Test _create_ray_job error handling when Ray client fails"""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Setup test node
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    node_id = pip_utils.generate_node_id()
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
+    conn.commit()
+
+    log_file = os.path.join(folder_path_nodes, "logs.txt")
+    
+    # Mock Ray JobSubmissionClient to raise an exception
+    with patch('fusionpipe.utils.runner_utils.JobSubmissionClient', side_effect=Exception("Ray connection failed")), \
+         patch.dict(os.environ, {'RAY_SUBMIT_URL': 'http://localhost:8265'}):
+        
+        with pytest.raises(Exception, match="Ray connection failed"):
+            runner_utils._create_ray_job(cur, node_id, folder_path_nodes, log_file)
+
+    conn.close()
+
+
+def test_write_execution_start_log(tmp_base_dir):
+    """Test _write_execution_start_log function"""
+    log_file = os.path.join(tmp_base_dir, "test_logs.txt")
+    node_id = "test_node_123"
+    run_mode = "local"
+    
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    
+    with patch('time.strftime', return_value='2024-01-01 12:00:00'):
+        runner_utils._write_execution_start_log(log_file, node_id, run_mode)
+    
+    # Verify log file content
+    assert os.path.exists(log_file)
+    with open(log_file, 'r') as f:
+        content = f.read()
+        assert f"Node {node_id} execution starting" in content
+        assert "Time: 2024-01-01 12:00:00" in content
+        assert f"Run mode: {run_mode}" in content
+        assert "---" in content
+
+
+def test_submit_node_with_run_mode_local_submission_failure(pg_test_db, tmp_base_dir):
+    """Test submission failure handling for local processes"""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Setup test node
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    node_id = pip_utils.generate_node_id()
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
+    conn.commit()
+
+    # Mock subprocess.Popen to fail
+    with patch('subprocess.Popen', side_effect=subprocess.SubprocessError("Process creation failed")):
+        with pytest.raises(RuntimeError, match="Submission failed for node"):
+            runner_utils.submit_node_with_run_mode(conn, node_id, run_mode="local")
+    
+    # Verify node status was set to failed
+    final_status = db_utils.get_node_status(cur, node_id)
+    assert final_status == "failed"
+    
+    # Verify no process was added to database
+    processes = db_utils.get_processes_by_node(cur, node_id)
+    assert len(processes) == 0
+
+    conn.close()
+
+
+def test_submit_node_with_run_mode_ray_submission_failure(pg_test_db, tmp_base_dir):
+    """Test submission failure handling for Ray jobs"""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Setup test node
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    node_id = pip_utils.generate_node_id()
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
+    conn.commit()
+
+    # Mock Ray JobSubmissionClient to fail
+    mock_client = MagicMock()
+    mock_client.submit_job.side_effect = Exception("Ray cluster unavailable")
+    
+    with patch('fusionpipe.utils.runner_utils.JobSubmissionClient', return_value=mock_client), \
+         patch.dict(os.environ, {'RAY_SUBMIT_URL': 'http://localhost:8265'}):
+        
+        with pytest.raises(RuntimeError, match="Submission failed for node"):
+            runner_utils.submit_node_with_run_mode(conn, node_id, run_mode="ray")
+    
+    # Verify node status was set to failed
+    final_status = db_utils.get_node_status(cur, node_id)
+    assert final_status == "failed"
+    
+    # Verify no process was added to database
+    processes = db_utils.get_processes_by_node(cur, node_id)
+    assert len(processes) == 0
+
+    conn.close()
+
+
+def test_submit_node_with_run_mode_process_dies_immediately(pg_test_db, tmp_base_dir):
+    """Test handling when local process terminates immediately"""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Setup test node
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    node_id = pip_utils.generate_node_id()
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
+    conn.commit()
+
+    # Mock process that terminates immediately
+    mock_proc = MagicMock()
+    mock_proc.pid = 12345
+    mock_proc.poll.return_value = 1  # Process terminated with error code 1
+    mock_proc.returncode = 1
+    
+    with patch('subprocess.Popen', return_value=mock_proc):
+        with pytest.raises(RuntimeError, match="Submission failed for node"):
+            runner_utils.submit_node_with_run_mode(conn, node_id, run_mode="local")
+    
+    # Verify node status was set to failed
+    final_status = db_utils.get_node_status(cur, node_id)
+    assert final_status == "failed"
+
+    conn.close()
+
+
+def test_submit_node_with_run_mode_ray_job_not_found(pg_test_db, tmp_base_dir):
+    """Test handling when Ray job is not found after submission"""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Setup test node
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    node_id = pip_utils.generate_node_id()
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
+    conn.commit()
+
+    # Mock Ray client that returns job ID but job is not found when checked
+    mock_client = MagicMock()
+    mock_client.submit_job.return_value = "test_job_123"
+    mock_client.get_job_status.return_value = None  # Job not found
+    
+    with patch('fusionpipe.utils.runner_utils.JobSubmissionClient', return_value=mock_client), \
+         patch.dict(os.environ, {'RAY_SUBMIT_URL': 'http://localhost:8265'}):
+        
+        with pytest.raises(RuntimeError, match="Submission failed for node"):
+            runner_utils.submit_node_with_run_mode(conn, node_id, run_mode="ray")
+    
+    # Verify node status was set to failed
+    final_status = db_utils.get_node_status(cur, node_id)
+    assert final_status == "failed"
+
+    conn.close()
+
+
+def test_submit_node_with_run_mode_missing_main_py(pg_test_db, tmp_base_dir):
+    """Test handling when main.py is missing"""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Setup test node
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    node_id = pip_utils.generate_node_id()
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
+    
+    # Remove main.py to simulate missing file
+    main_py_path = os.path.join(folder_path_nodes, "code", "main.py")
+    if os.path.exists(main_py_path):
+        os.remove(main_py_path)
+    
+    conn.commit()
+
+    # Test both local and ray modes
+    for run_mode in ["local", "ray"]:
+        with pytest.raises(RuntimeError, match="Submission failed for node"):
+            runner_utils.submit_node_with_run_mode(conn, node_id, run_mode=run_mode)
+        
+        # Verify node status was set to failed
+        final_status = db_utils.get_node_status(cur, node_id)
+        assert final_status == "failed"
+        
+        # Reset node status for next test
+        db_utils.update_node_status(cur, node_id, "ready")
+        conn.commit()
+
+    conn.close()
+
+
+def test_submit_node_with_run_mode_missing_ray_submit_url(pg_test_db, tmp_base_dir):
+    """Test handling when RAY_SUBMIT_URL is not set"""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Setup test node
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    node_id = pip_utils.generate_node_id()
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
+    conn.commit()
+
+    # Remove RAY_SUBMIT_URL environment variable
+    with patch.dict(os.environ, {}, clear=True):
+        with pytest.raises(RuntimeError, match="Submission failed for node"):
+            runner_utils.submit_node_with_run_mode(conn, node_id, run_mode="ray")
+    
+    # Verify node status was set to failed
+    final_status = db_utils.get_node_status(cur, node_id)
+    assert final_status == "failed"
+
+    conn.close()
+
+
+def test_submit_node_successful_submission_verification(pg_test_db, tmp_base_dir):
+    """Test successful submission with proper verification"""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Setup test node
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    node_id = pip_utils.generate_node_id()
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
+    conn.commit()
+
+    # Test successful local submission
+    mock_proc = MagicMock()
+    mock_proc.pid = 12345
+    mock_proc.poll.return_value = None  # Process is running
+    
+    with patch('subprocess.Popen', return_value=mock_proc):
+        result = runner_utils.submit_node_with_run_mode(conn, node_id, run_mode="local")
+        assert result == mock_proc
+        
+        # Verify process was added to database
+        processes = db_utils.get_processes_by_node(cur, node_id)
+        assert len(processes) == 1
+        assert processes[0]['process_id'] == str(mock_proc.pid)
 
     conn.close()

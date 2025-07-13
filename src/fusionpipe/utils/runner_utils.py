@@ -5,6 +5,7 @@ import time
 import ray
 from ray.job_submission import JobSubmissionClient
 import yaml
+from contextlib import contextmanager
 
 def run_node(conn, node_id):
     """
@@ -47,83 +48,288 @@ def submit_run_node(conn, node_id):
     
     Returns:
         Process or Ray job submission object
+        
+    Raises:
+        RuntimeError: If submission fails for any reason
+        FileNotFoundError: If parameter file is not found
+        ValueError: If run_mode is invalid
     """
-    run_mode = get_run_mode_from_params(conn, node_id)
     try:
+        run_mode = get_run_mode_from_params(conn, node_id)
         return submit_node_with_run_mode(conn, node_id, run_mode=run_mode)
-    except ValueError as e:
-        print(f"Error starting node {node_id}: {e}")
-        raise RuntimeError(f"Failed to start node {node_id} due to invalid run_mode: {run_mode}")
+    except (ValueError, FileNotFoundError) as e:
+        # These are validation errors - don't retry
+        print(f"Validation error for node {node_id}: {e}")
+        raise
+    except Exception as e:
+        # These are submission errors
+        print(f"Submission failed for node {node_id}: {e}")
+        raise RuntimeError(f"Failed to submit node {node_id}: {e}")
     
-
-def submit_node_with_run_mode(conn, node_id, run_mode="local"):
-    # Initialize Ray if needed
-    if run_mode == "ray":
-        if not ray.is_initialized():
+@contextmanager
+def node_execution_context(conn, node_id, run_mode):
+    """
+    Context manager for safe node execution with automatic cleanup.
+    
+    Args:
+        conn: Database connection
+        node_id: ID of the node to execute
+        run_mode: Execution mode ("local" or "ray")
+    
+    Yields:
+        tuple: (cursor, node_path, log_file, proc_ref)
+    """
+    cur = conn.cursor()
+    proc_ref = {"proc": None}  # Use dict to allow modification in nested scope
+    node_path = db_utils.get_node_folder_path(cur, node_id)
+    
+    try:
+        
+        # Pre-execution validation
+        if not pip_utils.can_node_run(cur, node_id):
+            raise RuntimeError(f"Node {node_id} cannot be run.")
+        
+        # Initialize Ray if needed
+        if run_mode == "ray" and not ray.is_initialized():
             init_ray_cluster()
             print("Ray initialized for pipeline execution")
-
-    # Get the database cursor
-    cur = conn.cursor()
-    if not pip_utils.can_node_run(cur, node_id):
-        raise RuntimeError(f"Node {node_id} cannot be run.")
-    
-    node_path = db_utils.get_node_folder_path(cur, node_id)
-    if db_utils.get_node_status(cur, node_id) == "running":
-        raise RuntimeError(f"Node {node_id} is already running.")
-
-    print(f"Running node {node_id} in local mode...")
-    db_utils.update_node_status(cur, node_id, "running")
-    conn.commit()
-    proc = None  # Initialize proc to None for error handling
-
-    try:
-        log_file = os.path.join(node_path, f"logs.txt")
-        start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-        # Start the process and redirect stdout/stderr to log file
-        with open(log_file, "a") as logf:  # Use "a" to append
-            # Write process info before starting
-            logf.write(f"\n---\nProcess starting\nTime: {start_time}\n")
-            # Temporarily write PID as 'TBD', will update after process starts
-            logf.flush()
-            if run_mode == "local":
-                # Run the node's main script using uv
-                proc = subprocess.Popen(
-                    ["uv", "run", "main.py"],
-                    cwd=os.path.join(node_path, "code"),
-                    stdout=logf,
-                    stderr=subprocess.STDOUT
-                )
-                # Now write the PID
-                logf.write(f"PID: {proc.pid}\n---\n")
-                logf.flush()
-                # Insert process info into process table
-                db_utils.add_process(cur, proc.pid, node_id=node_id, status="running")                
-            elif run_mode == "ray":
-                # Get the cleint to submit jobs
-                client = JobSubmissionClient(os.getenv("RAY_SUBMIT_URL"))
-                timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-                job_submission = client.submit_job(
-                    entrypoint="uv run main.py",
-                    runtime_env={"working_dir": os.path.join(node_path, "code")},
-                    submission_id=f"ray_{node_id}_{timestamp}",
-                )
-                # Write the Ray job submission info
-                logf.write(f"Ray job submitted for node {node_id}, job_id: {job_submission}\n")
-                logf.flush()
-                db_utils.add_process(cur, job_submission, node_id=node_id, status="running")
-                proc = job_submission
         
+        # Set node to running state
+        print(f"Running node {node_id} in {run_mode} mode...")
+        db_utils.update_node_status(cur, node_id, "running")
         conn.commit()
-        return proc  # Return the process or Ray job submission object
+        
+        # Prepare log file
+        log_file = os.path.join(node_path, "logs.txt")
+        
+        yield cur, node_path, log_file, proc_ref
         
     except Exception as e:
+        # Cleanup on any error
         conn.rollback()
         db_utils.update_node_status(cur, node_id, "failed")
+        
+        # Handle process cleanup based on what type of process we have
+        proc = proc_ref.get("proc")
         if proc:
-            db_utils.update_process_status(cur, proc.pid, status="failed")
-        conn.commit()    
+            try:
+                if isinstance(proc, subprocess.Popen):
+                    # Local process cleanup
+                    try:
+                        proc.terminate()  # Try graceful termination first
+                        time.sleep(0.5)
+                        if proc.poll() is None:
+                            proc.kill()  # Force kill if still running
+                        db_utils.update_process_status(cur, proc.pid, status="failed")
+                    except Exception as cleanup_error:
+                        print(f"Warning: Failed to cleanup local process for node {node_id}: {cleanup_error}")
+                elif isinstance(proc, str):
+                    # Ray job cleanup
+                    try:
+                        client = JobSubmissionClient(os.getenv("RAY_SUBMIT_URL"))
+                        client.stop_job(proc)
+                        db_utils.update_process_status(cur, proc, status="failed")
+                    except Exception as cleanup_error:
+                        print(f"Warning: Failed to cleanup Ray job for node {node_id}: {cleanup_error}")
+            except Exception as e:
+                print(f"Error during process cleanup for node {node_id}: {e}")
+        
+        conn.commit()
         print(f"Node {node_id} failed to run: {e}")
+        raise
+
+
+def _write_execution_start_log(log_file, node_id, run_mode):
+    """Write execution start information to log file"""
+    start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    with open(log_file, "a") as logf:
+        logf.write(f"\n---\nNode {node_id} execution starting\n")
+        logf.write(f"Time: {start_time}\n")
+        logf.write(f"Run mode: {run_mode}\n")
+        logf.flush()
+
+def _create_local_process(cur, node_id, node_path, log_file):
+    """
+    Create and start a local subprocess
+    
+    Raises:
+        RuntimeError: If process creation fails
+        FileNotFoundError: If working directory doesn't exist
+    """
+    working_dir = os.path.join(node_path, "code")
+    
+    # Validate working directory exists
+    if not os.path.exists(working_dir):
+        raise FileNotFoundError(f"Working directory does not exist: {working_dir}")
+    
+    # Validate main.py exists
+    main_py_path = os.path.join(working_dir, "main.py")
+    if not os.path.exists(main_py_path):
+        raise FileNotFoundError(f"main.py not found in {working_dir}")
+    
+    try:
+        with open(log_file, "a") as logf:
+            proc = subprocess.Popen(
+                ["uv", "run", "main.py"],
+                cwd=working_dir,
+                stdout=logf,
+                stderr=subprocess.STDOUT
+            )
+            
+            # Log process information
+            logf.write(f"PID: {proc.pid}\n---\n")
+            logf.flush()
+            
+            # Verify process started successfully
+            poll_result = proc.poll()
+            if poll_result is not None and poll_result != 0:
+                raise RuntimeError(f"Process terminated immediately with return code {proc.returncode}")
+            
+            # Add to database
+            db_utils.add_process(cur, proc.pid, node_id=node_id, status="running")
+            return proc
+            
+    except subprocess.SubprocessError as e:
+        raise RuntimeError(f"Failed to start subprocess: {e}")
+    except Exception as e:
+        raise RuntimeError(f"Unexpected error creating local process: {e}")
+
+
+def _create_ray_job(cur, node_id, node_path, log_file):
+    """
+    Create and submit a Ray job
+    
+    Raises:
+        RuntimeError: If Ray job submission fails
+        FileNotFoundError: If working directory doesn't exist
+        ConnectionError: If Ray cluster is not accessible
+    """
+    working_dir = os.path.join(node_path, "code")
+    
+    # Validate working directory exists
+    if not os.path.exists(working_dir):
+        raise FileNotFoundError(f"Working directory does not exist: {working_dir}")
+    
+    # Validate main.py exists
+    main_py_path = os.path.join(working_dir, "main.py")
+    if not os.path.exists(main_py_path):
+        raise FileNotFoundError(f"main.py not found in {working_dir}")
+    
+    # Validate Ray submit URL
+    ray_submit_url = os.getenv("RAY_SUBMIT_URL")
+    if not ray_submit_url:
+        raise RuntimeError("RAY_SUBMIT_URL environment variable is not set")
+    
+    try:
+        client = JobSubmissionClient(ray_submit_url)
+        
+        # Create unique submission ID with timestamp
+        timestamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
+        submission_id = f"ray_{node_id}_{timestamp}"
+        
+        job_submission = client.submit_job(
+            entrypoint="uv run main.py",
+            runtime_env={"working_dir": working_dir},
+            submission_id=submission_id,
+        )
+        
+        # Validate job submission response
+        if not job_submission or job_submission == "":
+            raise RuntimeError("Ray job submission returned empty job ID")
+        
+        # Log Ray job information
+        with open(log_file, "a") as logf:
+            logf.write(f"Ray job submitted: {job_submission}\n---\n")
+            logf.flush()
+        
+        # Add to database
+        db_utils.add_process(cur, job_submission, node_id=node_id, status="running")
+        
+        # Verify job was actually submitted by checking its status
+        try:
+            job_status = client.get_job_status(job_submission)
+            if job_status is None:
+                raise RuntimeError(f"Job {job_submission} not found after submission")
+        except Exception as e:
+            raise RuntimeError(f"Failed to verify job submission: {e}")
+        
+        return job_submission
+        
+    except ConnectionError as e:
+        raise ConnectionError(f"Failed to connect to Ray cluster at {ray_submit_url}: {e}")
+    except Exception as e:
+        raise RuntimeError(f"Unexpected error creating Ray job: {e}")
+
+def submit_node_with_run_mode(conn, node_id, run_mode="local"):
+    """
+    Submit a node for execution with the specified run mode.
+    
+    Args:
+        conn: Database connection
+        node_id: ID of the node to run
+        run_mode: Execution mode ("local" or "ray")
+    
+    Returns:
+        Process object (subprocess.Popen for local, job_id string for ray)
+    
+    Raises:
+        RuntimeError: If node cannot be run, is already running, or submission fails
+        ValueError: If run_mode is invalid
+    """
+    # Validate run mode
+    if run_mode not in ["local", "ray"]:
+        raise ValueError(f"Invalid run_mode: {run_mode}. Must be 'local' or 'ray'")
+    
+    with node_execution_context(conn, node_id, run_mode) as (cur, node_path, log_file, proc_ref):
+        try:
+            # Write execution start log
+            _write_execution_start_log(log_file, node_id, run_mode)
+            
+            # Create and start the process based on run mode
+            proc = None
+            if run_mode == "local":
+                proc = _create_local_process(cur, node_id, node_path, log_file)
+                if proc is None:
+                    raise RuntimeError(f"Failed to create local process for node {node_id}")
+                # Verify process is actually running
+                if proc.poll() is not None:
+                    raise RuntimeError(f"Local process for node {node_id} terminated immediately with return code {proc.returncode}")
+                    
+            elif run_mode == "ray":
+                proc = _create_ray_job(cur, node_id, node_path, log_file)
+                if proc is None or proc == "":
+                    raise RuntimeError(f"Failed to create Ray job for node {node_id}")
+                # Verify Ray job was submitted successfully
+                try:
+                    client = JobSubmissionClient(os.getenv("RAY_SUBMIT_URL"))
+                    job_status = client.get_job_status(proc)
+                    if job_status is None:
+                        raise RuntimeError(f"Ray job {proc} for node {node_id} was not found after submission")
+                except Exception as e:
+                    raise RuntimeError(f"Failed to verify Ray job submission for node {node_id}: {e}")
+            
+            # Store proc in the reference for potential cleanup
+            proc_ref["proc"] = proc
+            
+            # Final validation before committing
+            if proc is None:
+                raise RuntimeError(f"Process creation returned None for node {node_id}")
+            
+            # Commit transaction
+            conn.commit()
+            print(f"Successfully submitted node {node_id} with {run_mode} mode")
+            return proc
+            
+        except Exception as e:
+            # Re-raise with more context
+            raise RuntimeError(f"Submission failed for node {node_id} in {run_mode} mode: {e}")
+
+
+
+
+
+
+
 
 def check_proc_status(proc):
     """
