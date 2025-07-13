@@ -8,9 +8,6 @@ import yaml
 from unittest.mock import patch, MagicMock, mock_open
 from fusionpipe.utils import db_utils, pip_utils, runner_utils
 
-
-
-
 @pytest.mark.parametrize("last_node,expected_status_a,expected_status_b,expected_status_c", [
     (None, "completed", "completed", "completed"),
     (0, "completed", "ready", "ready"),
@@ -18,53 +15,51 @@ from fusionpipe.utils import db_utils, pip_utils, runner_utils
     (2, "completed", "completed", "completed"),
 ])
 def test_run_pipeline(pg_test_db, tmp_path, last_node, expected_status_a, expected_status_b, expected_status_c):
+    """
+    Test the runner_utils.run_pipeline function for different starting nodes.
+    Verifies that pipeline execution updates node statuses as expected:
+    - If last_node is None, the pipeline runs from the beginning.
+    - If last_node is specified, the pipeline runs starting from that node.
+    Checks that each node's status matches the expected value after execution.
+    """
     from fusionpipe.utils import db_utils, pip_utils, runner_utils
 
-    # Setup DB
+    # Setup DB and pipeline
     conn = pg_test_db
     cur = db_utils.init_db(conn)
-
-    # Create pipeline and two nodes (A -> B)
     pipeline_id = pip_utils.generate_pip_id()
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
+    # Create three nodes (A -> B -> C)
     node_a = pip_utils.generate_node_id()
     node_b = pip_utils.generate_node_id()
     node_c = pip_utils.generate_node_id()
-    node_ids = [node_a, node_b, node_c] 
+    node_ids = [node_a, node_b, node_c]
     folder_a = os.path.join(tmp_path, node_a)
     folder_b = os.path.join(tmp_path, node_b)
-    folder_c = os.path.join(tmp_path, node_c)    
+    folder_c = os.path.join(tmp_path, node_c)
 
-    db_utils.add_node_to_nodes(cur, node_id=node_a, status="ready", editable=True, folder_path=folder_a)
-    db_utils.add_node_to_nodes(cur, node_id=node_b, status="ready", editable=True, folder_path=folder_b)
-    db_utils.add_node_to_nodes(cur, node_id=node_c, status="ready", editable=True, folder_path=folder_c)
-    db_utils.add_node_to_pipeline(cur, node_id=node_a, pipeline_id=pipeline_id)
-    db_utils.add_node_to_pipeline(cur, node_id=node_b, pipeline_id=pipeline_id)
-    db_utils.add_node_to_pipeline(cur, node_id=node_c, pipeline_id=pipeline_id)    
+    for node_id, folder in zip(node_ids, [folder_a, folder_b, folder_c]):
+        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder)
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+        pip_utils.init_node_folder(folder_path_nodes=folder)
+
     db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_a)
     db_utils.add_node_relation(cur, child_id=node_c, parent_id=node_b)
-    pip_utils.init_node_folder(folder_path_nodes=folder_a)
-    pip_utils.init_node_folder(folder_path_nodes=folder_b)
-    pip_utils.init_node_folder(folder_path_nodes=folder_c)    
     conn.commit()
 
+    # Run pipeline from specified node or from the beginning
     if last_node is not None:
-        # Run pipeline from last node
-        runner_utils.run_pipeline(conn, pipeline_id, last_node_id=node_ids[last_node], run_mode="local", poll_interval=0.2, debug=True)
+        runner_utils.run_pipeline(conn, pipeline_id, last_node_id=node_ids[last_node], poll_interval=0.2, debug=True)
     else:
-        runner_utils.run_pipeline(conn, pipeline_id, run_mode="local", poll_interval=0.2, debug=True)
+        runner_utils.run_pipeline(conn, pipeline_id, poll_interval=0.2, debug=True)
 
-    # Assert both nodes are completed
-    status_a = db_utils.get_node_status(cur, node_a)
-    status_b = db_utils.get_node_status(cur, node_b)
-    status_c = db_utils.get_node_status(cur, node_c)    
-    assert status_a == expected_status_a
-    assert status_b == expected_status_b
-    assert status_c == expected_status_c
+    # Assert node statuses
+    assert db_utils.get_node_status(cur, node_a) == expected_status_a
+    assert db_utils.get_node_status(cur, node_b) == expected_status_b
+    assert db_utils.get_node_status(cur, node_c) == expected_status_c
 
     conn.close()
-
 
 
 
