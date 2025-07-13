@@ -79,6 +79,9 @@ def init_node_folder(folder_path_nodes, verbose=False):
         # Add the ipykernel package to the virtual environment
         os.system("uv add ipykernel")
 
+        # Add ray
+        os.system("uv add ray[default]")
+
         # Add nbconvert for notebook conversion support
         os.system("uv add nbconvert")
 
