@@ -26,6 +26,7 @@ dependencies = [
     "toml>=0.10.2",
     "uvicorn>=0.34.2",
     "nbconvert>=7.16.6",
+    "ray[default]>=2.47.1",
 ]
 
 [build-system]
