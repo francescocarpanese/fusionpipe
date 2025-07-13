@@ -9,53 +9,6 @@ from unittest.mock import patch, MagicMock, mock_open
 from fusionpipe.utils import db_utils, pip_utils, runner_utils
 
 
-@pytest.mark.parametrize("node_init_status,expected_status", [
-    ("ready", "completed"),
-    ("running", "running"),
-    ("failed", "failed"),
-    ("completed", "completed"),
-])
-def test_create_and_run_node(pg_test_db, tmp_base_dir, node_init_status, expected_status):
-
-    conn = pg_test_db
-    cur = db_utils.init_db(conn)
-
-    pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
-    node_id = pip_utils.generate_node_id()
-    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status=node_init_status)
-    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
-    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
-    conn.commit()
-
-
-    # Check that no process exists for this node before running
-    processes_before = db_utils.get_processes_by_node(cur, node_id)
-    assert not processes_before, f"Expected no process for node {node_id} before running, found: {processes_before}"
-
-    try:
-        proc = runner_utils.submit_run_node(conn, node_id, run_mode="local")
-        runner_utils.wait_subprocess_completion(conn, node_id, proc)
-        error_message = None
-    except Exception as e:
-        conn.rollback()
-        error_message = str(e)
-
-    status = db_utils.get_node_status(cur, node_id)
-    assert status == expected_status, f"Expected status '{expected_status}', got '{status}'"
-
-    # Check process table after running
-    processes_after = db_utils.get_processes_by_node(cur, node_id)
-    if expected_status == "completed":
-        # Process should be removed after successful completion
-        assert not processes_after, f"Expected no process for node {node_id} after completion, found: {processes_after}"
-
-    if error_message:
-        print(f"Caught error: {error_message}")
-
-    conn.close()
-
 
 
 @pytest.mark.parametrize("last_node,expected_status_a,expected_status_b,expected_status_c", [
@@ -113,53 +66,6 @@ def test_run_pipeline(pg_test_db, tmp_path, last_node, expected_status_a, expect
     conn.close()
 
 
-
-@pytest.mark.parametrize("node_init_status,expected_status", [
-    ("ready", "completed"),
-    ("running", "running"),
-    ("failed", "failed"),
-    ("completed", "completed"),
-])
-def test_create_and_run_node_ray(pg_test_db, tmp_base_dir, node_init_status, expected_status):
-
-    conn = pg_test_db
-    cur = db_utils.init_db(conn)
-
-    pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
-    node_id = pip_utils.generate_node_id()
-    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status=node_init_status)
-    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
-    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
-    conn.commit()
-
-
-    # Check that no process exists for this node before running
-    processes_before = db_utils.get_processes_by_node(cur, node_id)
-    assert not processes_before, f"Expected no process for node {node_id} before running, found: {processes_before}"
-
-    try:
-        proc = runner_utils.submit_node_with_run_mode(conn, node_id, run_mode="ray")
-        runner_utils.wait_ray_job_completion(conn, node_id, proc)
-        error_message = None
-    except Exception as e:
-        conn.rollback()
-        error_message = str(e)
-
-    status = db_utils.get_node_status(cur, node_id)
-    assert status == expected_status, f"Expected status '{expected_status}', got '{status}'"
-
-    # Check process table after running
-    processes_after = db_utils.get_processes_by_node(cur, node_id)
-    if expected_status == "completed":
-        # Process should be removed after successful completion
-        assert not processes_after, f"Expected no process for node {node_id} after completion, found: {processes_after}"
-
-    if error_message:
-        print(f"Caught error: {error_message}")
-
-    conn.close()
 
 
 @pytest.mark.parametrize("address,object_store_memory,temp_dir,num_cpus,should_fail", [
@@ -224,13 +130,17 @@ def test_init_ray_cluster(address, object_store_memory, temp_dir, num_cpus, shou
                 mock_makedirs.assert_called_once_with(temp_dir, exist_ok=True)
 
 
-@pytest.mark.parametrize("node_init_status,expected_status", [
-    ("ready", "completed"),
-    ("running", "running"),
-    ("failed", "failed"),
-    ("completed", "completed"),
+@pytest.mark.parametrize("node_init_status,expected_status,run_mode", [
+    ("ready", "completed","ray"),
+    ("running", "running","ray"),
+    ("failed", "failed","ray"),
+    ("completed", "completed","ray"),
+    ("ready", "completed","local"),
+    ("running", "running","local"),
+    ("failed", "failed","local"),
+    ("completed", "completed","local"),    
 ])
-def test_create_and_run_node_with_ray_parameter(pg_test_db, tmp_base_dir, node_init_status, expected_status):
+def test_create_and_run_node_from_parameter_file(pg_test_db, tmp_base_dir, node_init_status, expected_status, run_mode):
     """
     Test running a node by modifying the node_parameters.yaml file to set run_mode to "ray"
     and using the submit_run_node function which reads the run_mode from the parameter file.
@@ -253,10 +163,9 @@ def test_create_and_run_node_with_ray_parameter(pg_test_db, tmp_base_dir, node_i
     param_file = os.path.join(folder_path_nodes, "code", "node_parameters.yaml")
     with open(param_file, "r") as f:
         params = yaml.safe_load(f)
-    params["run_mode"] = "ray"
+    params["run_mode"] = run_mode
     with open(param_file, "w") as f:
         yaml.safe_dump(params, f)
-    
     conn.commit()
 
     # Patch the environment variable so internal functions use the correct data path
@@ -268,61 +177,8 @@ def test_create_and_run_node_with_ray_parameter(pg_test_db, tmp_base_dir, node_i
     assert not processes_before, f"Expected no process for node {node_id} before running, found: {processes_before}"
 
     try:
-        proc = runner_utils.submit_run_node(conn, node_id)
-        runner_utils.wait_ray_job_completion(conn, node_id, proc)
         error_message = None
-    except Exception as e:
-        conn.rollback()
-        error_message = str(e)
-
-    status = db_utils.get_node_status(cur, node_id)
-    assert status == expected_status, f"Expected status '{expected_status}', got '{status}'"
-
-    # Check process table after running
-    processes_after = db_utils.get_processes_by_node(cur, node_id)
-    if expected_status == "completed":
-        # Process should be removed after successful completion
-        assert not processes_after, f"Expected no process for node {node_id} after completion, found: {processes_after}"
-
-    if error_message:
-        print(f"Caught error: {error_message}")
-
-    conn.close()
-
-@pytest.mark.parametrize("node_init_status,expected_status", [
-    ("ready", "completed"),
-    ("running", "running"),
-    ("failed", "failed"),
-    ("completed", "completed"),
-])
-def test_create_and_run_node_with_ray(pg_test_db, tmp_base_dir, node_init_status, expected_status):
-    """
-    Test running a node by modifying the node_parameters.yaml file to set run_mode to "ray"
-    and using the submit_run_node function which reads the run_mode from the parameter file.
-    """
-    import yaml
-
-    conn = pg_test_db
-    cur = db_utils.init_db(conn)
-
-    pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
-    node_id = pip_utils.generate_node_id()
-    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status=node_init_status)
-    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
-    pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
-    
-    conn.commit()
-
-    # Check that no process exists for this node before running
-    processes_before = db_utils.get_processes_by_node(cur, node_id)
-    assert not processes_before, f"Expected no process for node {node_id} before running, found: {processes_before}"
-
-    try:
-        proc = runner_utils.submit_node_with_run_mode(conn, node_id, run_mode="ray")
-        runner_utils.wait_ray_job_completion(conn, node_id, proc)
-        error_message = None
+        runner_utils.run_node(conn,node_id)
     except Exception as e:
         conn.rollback()
         error_message = str(e)

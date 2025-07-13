@@ -82,9 +82,17 @@ def node_execution_context(conn, node_id, run_mode):
     cur = conn.cursor()
     proc_ref = {"proc": None}  # Use dict to allow modification in nested scope
     node_path = db_utils.get_node_folder_path(cur, node_id)
-    
+    already_running_or_completed = False
+
     try:
-        
+        # Prepare log file
+        log_file = os.path.join(node_path, "logs.txt")
+
+        # If it was already running or completed, skip the submission.
+        if db_utils.get_node_status(cur, node_id) == "running" or db_utils.get_node_status(cur, node_id) == "completed":
+            already_running_or_completed = True
+            raise RuntimeError(f"Node {node_id} is already running or completed.")
+
         # Pre-execution validation
         if not pip_utils.can_node_run(cur, node_id):
             raise RuntimeError(f"Node {node_id} cannot be run.")
@@ -98,45 +106,48 @@ def node_execution_context(conn, node_id, run_mode):
         print(f"Running node {node_id} in {run_mode} mode...")
         db_utils.update_node_status(cur, node_id, "running")
         conn.commit()
-        
-        # Prepare log file
-        log_file = os.path.join(node_path, "logs.txt")
-        
+    
         yield cur, node_path, log_file, proc_ref
         
     except Exception as e:
         # Cleanup on any error
         conn.rollback()
-        db_utils.update_node_status(cur, node_id, "failed")
+
+        if already_running_or_completed:
+            print(f"Node {node_id} is already running or completed, skipping cleanup.")
+            raise RuntimeError(f"Node {node_id} is already running or completed, cannot submit again.")
+
+        if not already_running_or_completed:
+            db_utils.update_node_status(cur, node_id, "failed")
+            
+            # Handle process cleanup based on what type of process we have
+            proc = proc_ref.get("proc")
+            if proc:
+                try:
+                    if isinstance(proc, subprocess.Popen):
+                        # Local process cleanup
+                        try:
+                            proc.terminate()  # Try graceful termination first
+                            time.sleep(0.5)
+                            if proc.poll() is None:
+                                proc.kill()  # Force kill if still running
+                            db_utils.update_process_status(cur, proc.pid, status="failed")
+                        except Exception as cleanup_error:
+                            print(f"Warning: Failed to cleanup local process for node {node_id}: {cleanup_error}")
+                    elif isinstance(proc, str):
+                        # Ray job cleanup
+                        try:
+                            client = JobSubmissionClient(os.getenv("RAY_SUBMIT_URL"))
+                            client.stop_job(proc)
+                            db_utils.update_process_status(cur, proc, status="failed")
+                        except Exception as cleanup_error:
+                            print(f"Warning: Failed to cleanup Ray job for node {node_id}: {cleanup_error}")
+                except Exception as e:
+                    print(f"Error during process cleanup for node {node_id}: {e}")
         
-        # Handle process cleanup based on what type of process we have
-        proc = proc_ref.get("proc")
-        if proc:
-            try:
-                if isinstance(proc, subprocess.Popen):
-                    # Local process cleanup
-                    try:
-                        proc.terminate()  # Try graceful termination first
-                        time.sleep(0.5)
-                        if proc.poll() is None:
-                            proc.kill()  # Force kill if still running
-                        db_utils.update_process_status(cur, proc.pid, status="failed")
-                    except Exception as cleanup_error:
-                        print(f"Warning: Failed to cleanup local process for node {node_id}: {cleanup_error}")
-                elif isinstance(proc, str):
-                    # Ray job cleanup
-                    try:
-                        client = JobSubmissionClient(os.getenv("RAY_SUBMIT_URL"))
-                        client.stop_job(proc)
-                        db_utils.update_process_status(cur, proc, status="failed")
-                    except Exception as cleanup_error:
-                        print(f"Warning: Failed to cleanup Ray job for node {node_id}: {cleanup_error}")
-            except Exception as e:
-                print(f"Error during process cleanup for node {node_id}: {e}")
-        
-        conn.commit()
-        print(f"Node {node_id} failed to run: {e}")
-        raise
+            conn.commit()
+            print(f"Node {node_id} failed to run: {e}")
+            raise
 
 
 def _write_execution_start_log(log_file, node_id, run_mode):
