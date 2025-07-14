@@ -1,1 +1,2 @@
 # Include parameters for the node which are exposed to the frontend
+run_mode: "local" # Options: "local", "ray"

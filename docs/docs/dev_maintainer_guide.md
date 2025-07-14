@@ -398,6 +398,12 @@ systemctl --user stop fusionpipe_backend.service
 systemctl --user kill fusionpipe_frontend.service
 ```
 
+- Restart the services
+```bash
+systemctl --user restart fusionpipe_backend.service
+systemctl --user restart fusionpipe_frontend.service
+```
+
 # Upgrade the production version
 - Login with the `fusionpipe
 - Navigate the `fusionpipeadmin` user.

@@ -313,12 +313,10 @@ def update_node_status(node_id: str, payload: dict, db_conn=Depends(get_db)):
 
 @router.post("/run_pipeline/{pipeline_id}")
 def run_pipeline_route(pipeline_id: str, payload: dict = None, db_conn=Depends(get_db)):
-    run_mode = "local"
     poll_interval = 1.0
     debug = False
 
     if payload:
-        run_mode = payload.get("run_mode", "local")
         poll_interval = payload.get("poll_interval", 1.0)
         debug = payload.get("debug", False)
 
@@ -326,7 +324,6 @@ def run_pipeline_route(pipeline_id: str, payload: dict = None, db_conn=Depends(g
         result = runner_utils.run_pipeline(
             db_conn,
             pipeline_id,
-            run_mode=run_mode,
             poll_interval=poll_interval,
             debug=debug
         )
@@ -341,7 +338,6 @@ def run_pipeline_up_to_node_route(pipeline_id: str, node_id: str, payload: dict 
     debug = False
 
     if payload:
-        run_mode = payload.get("run_mode", "local")
         poll_interval = payload.get("poll_interval", 1.0)
         debug = payload.get("debug", False)
 
@@ -350,7 +346,6 @@ def run_pipeline_up_to_node_route(pipeline_id: str, node_id: str, payload: dict 
             db_conn,
             pipeline_id,
             last_node_id=node_id,
-            run_mode=run_mode,
             poll_interval=poll_interval,
             debug=debug
         )
@@ -360,14 +355,11 @@ def run_pipeline_up_to_node_route(pipeline_id: str, node_id: str, payload: dict 
 
 @router.post("/run_node/{node_id}")
 def run_node_route(node_id: str, payload: dict = None, db_conn=Depends(get_db)):
-    run_mode = "local"
-    if payload:
-        run_mode = payload.get("run_mode", "local")
     try:
-        runner_utils.run_node(db_conn, node_id, run_mode=run_mode)
+        runner_utils.run_node(db_conn, node_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return {"message": f"Node {node_id} run completed in {run_mode} mode"}
+    return {"message": f"Node {node_id} run completed"}
 
 @router.post("/duplicate_nodes_in_pipeline")
 def duplicate_nodes_in_pipeline_route(payload: dict, db_conn=Depends(get_db)):

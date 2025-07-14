@@ -79,6 +79,9 @@ def init_node_folder(folder_path_nodes, verbose=False):
         # Add the ipykernel package to the virtual environment
         os.system("uv add ipykernel")
 
+        # Add ray
+        os.system("uv add ray[default]")
+
         # Add nbconvert for notebook conversion support
         os.system("uv add nbconvert")
 
@@ -90,11 +93,21 @@ def init_node_folder(folder_path_nodes, verbose=False):
         if os.path.exists(template_file_path):
             destination_file_path = os.path.join(code_folder_path, 'main.py')        
             with open(template_file_path, 'r') as template_file:
-                with open(destination_file_path, 'w') as dest_file:
-                    dest_file.write(template_file.read())
+                template_content = template_file.read()
+            
+            # Import and append commented examples from example_generator
+            from fusionpipe.utils.example_generator import generate_commented_examples_for_main
+            
+            # Generate commented examples using the dedicated function
+            example_section = generate_commented_examples_for_main()
+            template_content += f"\n{example_section}\n"
+            
+            with open(destination_file_path, 'w') as dest_file:
+                dest_file.write(template_content)
         else:
             raise FileNotFoundError(f"Template file not found at {template_file_path}")
         
+
         # Copy example files into the code folder
         template_folder_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates')
         example_python_path = os.path.join(template_folder_path, 'example_python.py')
@@ -152,6 +165,11 @@ def init_node_folder(folder_path_nodes, verbose=False):
             with open(pyproject_file_path, 'w') as file:
                 toml.dump(pyproject_data, file)
 
+        # Write the node ID to a .node_id file inside the code folder
+        node_id_file_path = os.path.join(code_folder_path, '.node_id')
+        with open(node_id_file_path, 'w') as node_id_file:
+            node_id_file.write(os.path.basename(folder_path_nodes) + '\n')
+
 
     finally:
         # Change back to the previous working directory
@@ -168,11 +186,10 @@ def init_node_folder(folder_path_nodes, verbose=False):
     # Run empty main to set-up the .venv
     os.system("uv run")
     os.chdir(current_dir)  # Change back to the original directory    
-
-
     
     if verbose:
         print(f"Node folder created at: {folder_path_nodes}")
+
 
 def delete_node_folder(node_folder_path, verbose=False):
     
@@ -591,7 +608,7 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
                     new_subfolder_path,
                     dirs_exist_ok=True,
                     copy_function=copy_with_permissions,
-                    ignore=shutil.ignore_patterns('.venv', '__pycache__', '*.pyc', '*.pyo', '*.pyd', '*.ipynb_checkpoints')
+                    ignore=shutil.ignore_patterns('.venv', '__pycache__', '*.pyc', '*.pyo', '*.pyd', '*.ipynb_checkpoints', '.node_id')
                 )
 
         # Ensure the new .git directory is writable after copying
