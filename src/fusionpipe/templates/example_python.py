@@ -47,6 +47,7 @@ def run_ray_example():
         return {"id": item["id"], "processed_value": item["value"] * 2}
 
     # Launch jobs in parallel for each item in the dataset
+    # To fine tuning your resource allocation visit https://docs.ray.io/en/latest/ray-core/api/doc/ray.remote.html#ray.remote
     futures = [process_item.remote(item) for item in dataset]
     results = ray.get(futures)
     print("Processed dataset:", results)
