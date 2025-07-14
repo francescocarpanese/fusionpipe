@@ -21,3 +21,19 @@ def save_dummy_output():
     with open(output_path, "w") as f:
         f.write("This is a dummy output file for the fusionpipe template.\n")
     print(f"Dummy output saved to {output_path}")
+
+def run_ray_example():
+    """ Run a simple Ray example to demonstrate distributed computing.
+    This function initializes Ray and runs a simple remote function.
+    It is useful for testing the Ray setup in the FusionPipe environment.
+    """
+    import ray
+    ray.init(address=os.getenv("RAY_CLUSTER_ADDRESS"))
+
+    @ray.remote
+    def simple_job(x):
+        return x * x
+
+    # Run a simple job as remote job in the ray cluster
+    result = ray.get(simple_job.remote(5))
+    print("Result:", result)

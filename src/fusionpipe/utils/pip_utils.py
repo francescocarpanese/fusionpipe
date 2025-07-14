@@ -93,11 +93,21 @@ def init_node_folder(folder_path_nodes, verbose=False):
         if os.path.exists(template_file_path):
             destination_file_path = os.path.join(code_folder_path, 'main.py')        
             with open(template_file_path, 'r') as template_file:
-                with open(destination_file_path, 'w') as dest_file:
-                    dest_file.write(template_file.read())
+                template_content = template_file.read()
+            
+            # Import and append commented examples from example_generator
+            from fusionpipe.utils.example_generator import generate_commented_examples_for_main
+            
+            # Generate commented examples using the dedicated function
+            example_section = generate_commented_examples_for_main()
+            template_content += f"\n{example_section}\n"
+            
+            with open(destination_file_path, 'w') as dest_file:
+                dest_file.write(template_content)
         else:
             raise FileNotFoundError(f"Template file not found at {template_file_path}")
         
+
         # Copy example files into the code folder
         template_folder_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates')
         example_python_path = os.path.join(template_folder_path, 'example_python.py')
