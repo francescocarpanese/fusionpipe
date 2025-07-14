@@ -33,6 +33,15 @@ examples = {
     ], check=True, cwd=os.path.dirname(__file__), env=os.environ.copy())
     """,
     },
+    "example_python_ray": {
+        "header": "--- Example Python Functions ---",
+        "code":  """
+    print("Running python functions")
+    from examples.example_python import run_ray_example
+    print("Running python example from function")
+    run_ray_example()
+    """,
+    },
 }
 
 def code_snippet_to_commented(code):

@@ -23,17 +23,30 @@ def save_dummy_output():
     print(f"Dummy output saved to {output_path}")
 
 def run_ray_example():
-    """ Run a simple Ray example to demonstrate distributed computing.
-    This function initializes Ray and runs a simple remote function.
-    It is useful for testing the Ray setup in the FusionPipe environment.
     """
+    Run a Ray example to demonstrate distributed processing on a dataset.
+    This function initializes Ray and applies a remote operation to each item in a dummy dataset in parallel.
+
+    Explanation:
+    - Ray is initialized (connecting to a cluster if RAY_CLUSTER_ADDRESS is set).
+    - A remote function `process_item` is defined, which simulates processing a dataset item.
+    - The dummy dataset is a list of dictionaries.
+    - Each item is processed in parallel using Ray.
+    - The results are collected and printed.
+    """
+
     import ray
     ray.init(address=os.getenv("RAY_CLUSTER_ADDRESS"))
 
-    @ray.remote
-    def simple_job(x):
-        return x * x
+    # Simulate a dataset: list of dicts
+    dataset = [{"id": i, "value": i * 10} for i in range(10)]
 
-    # Run a simple job as remote job in the ray cluster
-    result = ray.get(simple_job.remote(5))
-    print("Result:", result)
+    @ray.remote
+    def process_item(item):
+        # Simulate a computation (e.g., multiply value by 2)
+        return {"id": item["id"], "processed_value": item["value"] * 2}
+
+    # Launch jobs in parallel for each item in the dataset
+    futures = [process_item.remote(item) for item in dataset]
+    results = ray.get(futures)
+    print("Processed dataset:", results)
