@@ -835,3 +835,32 @@ def merge_pipelines(cur, source_pipeline_ids):
 
 
     return target_pipeline_id
+
+def create_new_node_into_pipeline(cur, pipeline_id):
+    node_id = generate_node_id()
+    folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"),node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path_nodes)
+    position_x = random.randint(-10, 10)
+    position_y = random.randint(-10, 10)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, position_x=position_x, position_y=position_y)
+    init_node_folder(folder_path_nodes=folder_path_nodes)
+    return node_id
+
+
+def create_new_pipeline(cur):
+    pipeline_id = generate_pip_id()
+    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag=None)
+    node_id = create_new_node_into_pipeline(cur, pipeline_id)
+    db_utils.update_node_tag(cur, node_id=node_id, pipeline_id=pipeline_id, node_tag="GLOBAL_PARAMS")
+
+    folder_path_nodes = db_utils.get_node_folder_path(cur, node_id=node_id)
+    node_parameters_yaml = os.path.join(folder_path_nodes, "code", "node_parameters.yaml")
+    if os.path.exists(node_parameters_yaml):
+        os.remove(node_parameters_yaml)
+
+    global_parameters_yaml_src = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates", "global_parameters.yaml")
+    global_parameters_yaml_dst = os.path.join(folder_path_nodes, "code", "node_parameters.yaml")
+    if os.path.exists(global_parameters_yaml_src):
+        shutil.copy(global_parameters_yaml_src, global_parameters_yaml_dst)
+        os.chmod(global_parameters_yaml_dst, 0o664)
+    return pipeline_id

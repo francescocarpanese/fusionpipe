@@ -1,5 +1,7 @@
 # Definition of node parameters
-default_parameters: {}
+default_parameters:
+  run_mode: "local" # Options: "local", "ray"
+  preview: false # Whether to run in preview mode, which may limit functionality
 
 enforced_parameters: {}
 

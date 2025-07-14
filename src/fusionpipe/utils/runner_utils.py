@@ -7,44 +7,40 @@ from ray.job_submission import JobSubmissionClient
 import yaml
 from contextlib import contextmanager
 
-def run_node(conn, node_id):
+def run_node(conn, node_id, pipeline_id):
     """
     Run a node based on its run_mode. This wait till the process completes.
     
     Args:
         conn: Database connection
         node_id: ID of the node to run
+        pipeline_id: ID of the pipeline
     """
-    proc = submit_run_node(conn, node_id)
-    run_mode = get_run_mode_from_params(conn, node_id)
+    proc = submit_run_node(conn, node_id, pipeline_id)
+    run_mode = get_run_mode_from_params(conn, node_id, pipeline_id)
     if run_mode == "ray":
         wait_ray_job_completion(conn, node_id, proc)
     else:
         wait_subprocess_completion(conn, node_id, proc)
 
-def get_run_mode_from_params(conn, node_id):
+def get_run_mode_from_params(conn, node_id, pipeline_id):
     """
     Get the run_mode parameter from node_parameters.yaml for a given node.
     Defaults to "local" if missing or invalid.
     """
     cur = conn.cursor()
-    node_path = db_utils.get_node_folder_path(cur, node_id)
-    param_file = os.path.join(node_path, "code", "node_parameters.yaml")
-    if not os.path.isfile(param_file):
-        raise FileNotFoundError(f"Parameter file not found for node {node_id}: {param_file}")
-    with open(param_file, "r") as f:
-        params = yaml.safe_load(f)
-    run_mode = params.get("run_mode", "local")
-    return run_mode
+    params = get_compiled_node_parameters(cur, node_id, pipeline_id)
+    return  params.get("run_mode", "local")
 
 
-def submit_run_node(conn, node_id):
+def submit_run_node(conn, node_id, pipeline_id):
     """
     Start running a node based on its run_mode.
     
     Args:
         conn: Database connection
         node_id: ID of the node to run
+        pipeline_id: ID of the pipeline
     
     Returns:
         Process or Ray job submission object
@@ -55,7 +51,7 @@ def submit_run_node(conn, node_id):
         ValueError: If run_mode is invalid
     """
     try:
-        run_mode = get_run_mode_from_params(conn, node_id)
+        run_mode = get_run_mode_from_params(conn, node_id, pipeline_id)
         return submit_node_with_run_mode(conn, node_id, run_mode=run_mode)
     except (ValueError, FileNotFoundError) as e:
         # These are validation errors - don't retry
@@ -774,6 +770,7 @@ def kill_all_pipeline_tasks(conn, pipeline_id, ray_futures=None):
     """
     from fusionpipe.utils import db_utils
 
+
     
     cur = conn.cursor()
     all_nodes = set(db_utils.get_all_nodes_from_pip_id(cur, pipeline_id))
@@ -1152,3 +1149,57 @@ def _create_execution_summary(completed_nodes, failed_nodes, excluded_nodes, all
         "total": len(all_nodes) + len(excluded_nodes),
         "execution_time": execution_time
     }
+
+
+def compile_parameters(global_parameters, node_parameters):
+    """
+    Merge global and node parameters into a flat dictionary.
+    Precedence order for duplicate keys:
+        1. node_parameters['enforced_parameters']
+        2. global_parameters['enforced_parameters']
+        3. node_parameters['default_parameters']
+        4. global_parameters['default_parameters']
+
+    Args:
+        global_parameters (dict): Global parameters with 'default_parameters' and 'enforced_parameters'
+        node_parameters (dict): Node parameters with 'default_parameters' and 'enforced_parameters'
+
+    Returns:
+        dict: Merged flat dictionary of parameters
+    """
+    merged = {}
+
+    # Helper to safely get sub-dicts
+    def get_subdict(d, key):
+        return d.get(key, {}) if isinstance(d, dict) else {}
+
+    # Merge in order of precedence
+    merged.update(get_subdict(global_parameters, "default_parameters"))
+    merged.update(get_subdict(node_parameters, "default_parameters"))
+    merged.update(get_subdict(global_parameters, "enforced_parameters"))
+    merged.update(get_subdict(node_parameters, "enforced_parameters"))
+
+    return merged
+
+
+def get_compiled_node_parameters(conn, node_id, pipeline_id):
+    cur = conn.cursor()
+    # Get node folder path
+    node_path = db_utils.get_node_folder_path(cur, node_id)
+    node_param_file = os.path.join(node_path, "code", "node_parameters.yaml")
+    with open(node_param_file, "r") as f:
+        node_parameters = yaml.safe_load(f)
+
+    # Find the node_id with tag GLOBAL_PARAMS in the same pipeline
+    global_node_id = db_utils.get_node_id_by_tag(cur, pipeline_id, "GLOBAL_PARAMS")
+    if global_node_id is not None:
+        global_node_path = db_utils.get_node_folder_path(cur, global_node_id)
+        global_param_file = os.path.join(global_node_path, "code", "node_parameters.yaml")
+        with open(global_param_file, "r") as f:
+            global_parameters = yaml.safe_load(f)
+    else:
+        global_parameters = {}
+
+    # Merge parameters
+    merged_parameters = compile_parameters(global_parameters, node_parameters)
+    return merged_parameters

@@ -1150,7 +1150,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       const response = await fetch(`${BACKEND_URL}/run_node/${nodeId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ run_mode: "local" }),
+        body: JSON.stringify({ pipeline_id: pipelineatcall }),
       });
       if (!response.ok) await handleApiError(response);
       const data = await response.json();

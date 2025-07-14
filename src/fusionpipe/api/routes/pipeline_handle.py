@@ -19,9 +19,8 @@ def get_db():
 @router.post("/create_pipeline")
 def create_pipeline(db_conn=Depends(get_db)):
     cur = db_conn.cursor()
-    pipeline_id = pip_utils.generate_pip_id()
     try:
-        db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag=None)
+        pipeline_id = pip_utils.create_new_pipeline(cur)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
@@ -99,13 +98,7 @@ def get_project(project_id: str, db_conn=Depends(get_db)):
 def add_node_to_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     try:
-        node_id = pip_utils.generate_node_id()
-        folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"),node_id)
-        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path_nodes)
-        position_x = random.randint(-10, 10)
-        position_y = random.randint(-10, 10)
-        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, position_x=position_x, position_y=position_y)
-        pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
+        node_id = pip_utils.create_new_node_into_pipeline(cur, pipeline_id=pipeline_id)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
@@ -355,11 +348,16 @@ def run_pipeline_up_to_node_route(pipeline_id: str, node_id: str, payload: dict 
 
 @router.post("/run_node/{node_id}")
 def run_node_route(node_id: str, payload: dict = None, db_conn=Depends(get_db)):
+    pipeline_id = None
+    if payload:
+        pipeline_id = payload.get("pipeline_id")
+    if not pipeline_id:
+        raise HTTPException(status_code=400, detail="Missing pipeline_id in payload")
     try:
-        runner_utils.run_node(db_conn, node_id)
+        runner_utils.run_node(db_conn, node_id, pipeline_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return {"message": f"Node {node_id} run completed"}
+    return {"message": f"Node {node_id} run completed in pipeline {pipeline_id}"}
 
 @router.post("/duplicate_nodes_in_pipeline")
 def duplicate_nodes_in_pipeline_route(payload: dict, db_conn=Depends(get_db)):
