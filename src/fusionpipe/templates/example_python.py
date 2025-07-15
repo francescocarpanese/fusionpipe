@@ -28,7 +28,6 @@ def run_ray_example():
     This function initializes Ray and applies a remote operation to each item in a dummy dataset in parallel.
 
     Explanation:
-    - Ray is initialized (connecting to a cluster if RAY_CLUSTER_ADDRESS is set).
     - A remote function `process_item` is defined, which simulates processing a dataset item.
     - The dummy dataset is a list of dictionaries.
     - Each item is processed in parallel using Ray.
@@ -36,7 +35,7 @@ def run_ray_example():
     """
 
     import ray
-    ray.init(address=os.getenv("RAY_CLUSTER_ADDRESS"))
+    ray.init()
 
     # Simulate a dataset: list of dicts
     dataset = [{"id": i, "value": i * 10} for i in range(10)]

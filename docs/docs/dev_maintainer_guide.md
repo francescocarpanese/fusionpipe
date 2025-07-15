@@ -314,10 +314,15 @@ npm run preview -- --port $VITE_FRONTEND_PORT
 npx serve -s dist -l $VITE_FRONTEND_PORT
 ```
 
+- Start ray cluster locally if you want to use it for paralellelisation
+```bash
+ray start --head
+```
+
 
 # Run the frontend and backend (production)
 
-## Run fusionpipe in as systemd (Need review not fully working at the moment)
+## Run fusionpipe in as systemd (Unstable)
 
 - Save the enviroment variable file in location, hidden from the user and protect it.
 
@@ -333,10 +338,10 @@ Description=Run the backend
 
 [Service]
 Type=simple
-WorkingDirectory=/home/fusionpipeadmin/Documents/fusionpipe/src/fusionpipe/api
-EnvironmentFile=/home/fusionpipeadmin/Documents/environment/production.env
+WorkingDirectory=/home/fusionpipeadmin/Documents/fusionpipe
+EnvironmentFile=<absolute_path_to_env_file>
 Environment="PATH=/home/fusionpipeadmin/.local/bin:%h/.local/bin:/usr/bin:/bin"
-ExecStart=/home/fusionpipeadmin/Documents/fusionpipe/.venv/bin/uv run python main.py
+ExecStart=/home/fusionpipeadmin/.local/bin/uv run uvicorn fusionpipe.api.main:app --host 0.0.0.0 --port 8101
 Restart=on-failure
 
 [Install]
@@ -344,7 +349,7 @@ WantedBy=default.target
 ```
 
 !!! Warning
-    The extra `Environment` in the previous service is done to prepedn the bin path to the system d. Otherwise this can result in not seeing the `uv` installation, making the nodes fail to run.
+    The extra `Environment` in the previous service is done to prepend the bin path to the system d. Otherwise this can result in not seeing the `uv` installation, making the nodes fail to run.
 
 
 - Write `systemd` configuration file `~/.config/systemd/user/fusionpipe_frontend.service`
@@ -354,10 +359,36 @@ Description=Run fusionpipe frontend
 
 [Service]
 Type=simple
-EnvironmentFile=/home/fusionpipeadmin/Documents/environment/production.env
+EnvironmentFile=<absolute_path_to_env_file>
 WorkingDirectory=/home/fusionpipeadmin/Documents/fusionpipe/src/fusionpipe/frontend
 ExecStart=npx serve -s dist -l $VITE_FRONTEND_PORT
 Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+Ray clustet can be set up to orchestrate parallel workflow.
+
+- Set up folder for ray cluster temporary file. This must be inside the folder shared with other users.
+```bash
+mkdir -p <data_temporary_file>
+```
+
+- Write `systemd` configuration file `~/.config/systemd/user/fusionpipe_ray.service`
+```bash
+[Unit]
+Description=Ray Cluster Service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/fusionpipeadmin/Documents/fusionpipe
+EnvironmentFile=<absolute_path_to_env_file>
+Environment="PATH=/home/fusionpipeadmin/.local/bin:%h/.local/bin:/usr/bin:/bin"
+ExecStart=/home/fusionpipeadmin/.local/bin/uv run ray start --head --temp-dir <path_to_tmp_folder_in_shared_folder>
+ExecStop=/home/fusionpipeadmin/.local/bin/uv run ray stop
+TimeoutStopSec=30
 
 [Install]
 WantedBy=default.target
@@ -382,6 +413,13 @@ systemctl --user start fusionpipe_frontend.service
 systemctl --user status fusionpipe_frontend.service
 ```
 
+- Enable and start ray cluster
+```bash
+systemctl --user enable fusionpipe_ray.service
+systemctl --user start fusionpipe_ray.service
+systemctl --user status fusionpipe_ray.service
+```
+
 - Let the user systemd be run when the user disconnect
 ```bash
 sudo loginctl enable-linger $USER
@@ -391,6 +429,7 @@ sudo loginctl enable-linger $USER
 ```bash
 systemctl --user stop fusionpipe_frontend.service
 systemctl --user stop fusionpipe_backend.service
+systemctl --user stop fusionpipe_ray.service
 ```
 
 - kill processes if they don't stop by themselves.
@@ -402,6 +441,7 @@ systemctl --user kill fusionpipe_frontend.service
 ```bash
 systemctl --user restart fusionpipe_backend.service
 systemctl --user restart fusionpipe_frontend.service
+systemctl --user restart fusionpipe_ray.service
 ```
 
 # Upgrade the production version
@@ -439,6 +479,7 @@ systemctl --user start fusionpipe_frontend.service
 ```bash
 systemctl --user status fusionpipe_backend.service
 systemctl --user status fusionpipe_frontend.service
+systemctl --user status fusionpipe_ray.service
 ```
 
 # Onboard a new user
@@ -480,8 +521,9 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 - ssh to the machine and forward the port with the frontend and backend. Ask admin to tell the port used for deployment. 
 ```bash
-ssh -L <fronend_port>:localhost:<fronend_port> -L <backend_port>:localhost:<backend_port> <username>@<host>
+ssh -L <fronend_port>:localhost:<fronend_port> -L <backend_port>:localhost:<backend_port> -L <ray_port>:localhost:<ray_port>  <username>@<host> 
 ```
+Usually ray port is set to 8265
 
 - Write the following line in the `.profile`. This allows the user to have access to the database
 ```bash
