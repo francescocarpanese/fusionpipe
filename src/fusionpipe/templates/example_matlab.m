@@ -9,10 +9,7 @@ addpath(genpath(getenv('USER_UTILS_FOLDER_PATH')));
 node_id = get_current_node_id();
 
 % Get folder paths of all the parents of this node
-node_parents = get_all_parent_node_folder_paths(node_id);
+node_info = get_info_parents(node_id);
 
 % Display the folder path of the parent nodes
-disp('Node Parents:');
-for i = 1:length(node_parents)
-    disp(node_parents{i});
-end
+disp(node_info);
