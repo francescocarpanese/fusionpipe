@@ -66,11 +66,11 @@ Here’s a typical workflow for developing the logic for your node:
 
 To access data from other nodes or manage the current node's data, `fusionpipe` provides a simple API. Here are the main functions you can use in your scripts:
 
-- `get_node_id()`: Retrieves the ID of the current node. The ID follows the format `n_<datetime>_<random_4digit_integers>`.
+- `get_current_node_id()`: Retrieves the ID of the current node. The ID follows the format `n_<datetime>_<random_4digit_integers>`.
 
 - `get_all_parent_node_folder_paths(node_id)`: Returns a list of folder paths for all parent nodes of the specified node. This is how you access the output data from the nodes that run before yours.
 
-- `get_folder_path_node()`: Retrieves the folder path of the current node. This is useful for saving your node's output to its `data` subfolder.
+- `get_current_node_folder_path()`: Retrieves the folder path of the current node. This is useful for saving your node's output to its `data` subfolder.
 
 ## Using Jupyter
 

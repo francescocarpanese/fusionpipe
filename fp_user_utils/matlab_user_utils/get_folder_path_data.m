@@ -1,4 +1,4 @@
-function data_folder_path = get_folder_path_data()
+function data_folder_path = get_current_node_folder_path_data()
 %GET_FOLDER_PATH_DATA Get the data folder path of the current node.
 %   DATA_FOLDER_PATH = GET_FOLDER_PATH_DATA() returns the full path to the
 %   'data' subfolder within the current node's folder. The function first
@@ -10,11 +10,11 @@ function data_folder_path = get_folder_path_data()
 %       data_folder_path - Full path to the 'data' subfolder (char array)
 %
 %   Example:
-%       dataPath = get_folder_path_data();
+%       dataPath = get_current_node_folder_path_data();
 %
 %   See also: GET_FOLDER_PATH_NODE, FULLFILE, EXIST
 
-    node_folder_path = get_folder_path_node();
+    node_folder_path = get_current_node_folder_path();
     if isempty(node_folder_path)
         error('Node folder path could not be determined.');
     end

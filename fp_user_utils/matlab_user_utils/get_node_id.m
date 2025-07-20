@@ -7,14 +7,14 @@
 %   Example:
 %       % Suppose there's a '.node_id' file in the current directory or a parent
 %       % directory containing 'n_20230615123456_0001'
-%       node_id = get_node_id()
+%       node_id = get_current_node_id()
 %       % node_id will be 'n_20230615123456_0001'
 %
 %   Output:
 %       node_id - String containing the node id if found, otherwise empty.
 %
 %   See also: PWD, FILEREAD, EXIST
-function node_id = get_node_id()
+function node_id = get_current_node_id()
 %GET_NODE_ID Get the node id by searching for a '.node_id' file in the current
 % directory or its parent directories.
 

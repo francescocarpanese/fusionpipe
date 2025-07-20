@@ -126,13 +126,13 @@ Import and call your package's functions from the node's `main.py` script.
 # In <node_id>/code/main.py
 
 # Import the user API to interact with the pipeline
-from python_user_utils.node_api import get_all_parent_node_folder_paths, get_node_id
+from python_user_utils.user_api import get_all_parent_node_folder_paths, get_current_node_id
 
 # Import the function from your package
 from mypackage.dataset import print_parents
 
 if __name__ == "__main__":
-    node_id = get_node_id()
+    node_id = get_current_node_id()
 
     # Get the paths of all parent nodes
     parent_folders = get_all_parent_node_folder_paths(node_id=node_id)

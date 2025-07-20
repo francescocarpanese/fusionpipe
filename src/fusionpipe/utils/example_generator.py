@@ -24,7 +24,7 @@ examples = {
         "code": """
     print("Running python notebook")
     from subprocess import run
-    kernel_name = get_node_id() # This is the name of the kernel that you have been using during developement of this node. Usually the same is the same as the node_id
+    kernel_name = get_current_node_id() # This is the name of the kernel that you have been using during developement of this node. Usually the same is the same as the node_id
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run([
         "uv", "run", "jupyter", "nbconvert", "--to", "notebook", "--execute", "examples/example_notebook.ipynb",

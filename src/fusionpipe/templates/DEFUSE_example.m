@@ -7,9 +7,9 @@ clc
 addpath(genpath(getenv('USER_UTILS_FOLDER_PATH')));
 
 % Get node folder paths
-node_id = get_node_id(); 
-node_folder_code = get_folder_path_code(); % Get folder path of the node
-node_folder_data = get_folder_path_data(); % Get folder path of the node data
+node_id = get_current_node_id(); 
+node_folder_code = get_current_node_folder_path_code(); % Get folder path of the node
+node_folder_data = get_current_node_folder_path_data(); % Get folder path of the node data
 
 % Navigate into the folder containing DEFUSE
 path_defuse_folder = '/home/fbertini/Documents/defuse/'; % Change this to your DEFUSE folder path

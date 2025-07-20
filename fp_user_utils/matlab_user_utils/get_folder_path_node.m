@@ -1,4 +1,4 @@
-function folder_path = get_folder_path_node()
+function folder_path = get_current_node_folder_path()
 %GET_FOLDER_PATH_NODE Get the folder path of the current node.
 %   FOLDER_PATH = GET_FOLDER_PATH_NODE() retrieves the folder path associated
 %   with the current node. The function determines the node ID based on the
@@ -10,10 +10,10 @@ function folder_path = get_folder_path_node()
 %       folder_path - String containing the folder path of the current node.
 %
 %   Example:
-%       path = get_folder_path_node();
+%       path = get_current_node_folder_path();
 %
 %   See also: GET_NODE_ID, CONNECT_TO_DB, GET_NODE_FOLDER_PATH_DB
-node_id = get_node_id();
+node_id = get_current_node_id();
 if isempty(node_id)
     error('Node ID could not be determined from the current working directory.');
 end

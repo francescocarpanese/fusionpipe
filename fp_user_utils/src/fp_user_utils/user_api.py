@@ -1,6 +1,5 @@
 import psycopg2
 import os
-import re
 
 def connect_to_db(db_url=os.environ.get("DATABASE_URL")):
     """
@@ -44,30 +43,8 @@ def get_node_folder_path_db(cur, node_id):
     row = cur.fetchone()
     return row[0] if row else None
 
-def get_all_parent_node_folder_paths(node_id):
-    """
-    Get all parent node folder paths for a given node_id.
 
-    Args:
-        node_id (str): The node ID whose parent folder paths are to be fetched.
-
-    Returns:
-        list: A list of folder paths for all parent nodes.
-    """
-    conn = connect_to_db()
-    cur = conn.cursor()
-
-    parent_paths = []
-    parents = get_node_parents_db(cur, node_id)
-    
-    for parent_id in parents:
-        path = get_node_folder_path_db(cur, parent_id)
-        if path:
-            parent_paths.append(path)
-    
-    return parent_paths
-
-def get_node_id():
+def get_current_node_id():
     """
     Get the node id by searching for a '.node_id' file in the current directory or its parent directories.
 
@@ -87,14 +64,14 @@ def get_node_id():
         current_dir = parent_dir
     return None
 
-def get_folder_path_node():
+def get_current_node_folder_path():
     """
     Get the folder path of the current node.
 
     Returns:
         str: The folder path of the current node.
     """
-    node_id = get_node_id()
+    node_id = get_current_node_id()
     if not node_id:
         raise ValueError("Node ID could not be determined from the current working directory.")
     
@@ -108,33 +85,15 @@ def get_folder_path_node():
     
     return folder_path
 
-def get_folder_path_code():
-    """
-    Get the code folder path of the current node.
 
-    Returns:
-        str: The path to the code folder.
-    """
-    node_folder_path = get_folder_path_node()
-    if not node_folder_path:
-        raise ValueError("Node folder path could not be determined.")
-    
-    # Assuming the code folder is a subfolder named 'code' within the node folder
-    code_folder_path = os.path.join(node_folder_path, 'code')
-    
-    if not os.path.exists(code_folder_path):
-        raise FileNotFoundError(f"Code folder does not exist: {code_folder_path}")
-    
-    return code_folder_path
-
-def get_folder_path_data():
+def get_current_node_folder_path_data():
     """
     Get the data folder path of the current node.
 
     Returns:
         str: The path to the data folder.
     """
-    node_folder_path = get_folder_path_node()
+    node_folder_path = get_current_node_folder_path()
     if not node_folder_path:
         raise ValueError("Node folder path could not be determined.")
     
@@ -146,14 +105,34 @@ def get_folder_path_data():
     
     return data_folder_path
 
-def get_folder_path_reports():
+def get_current_node_folder_path_code():
+    """
+    Get the data folder path of the current node.
+
+    Returns:
+        str: The path to the data folder.
+    """
+    node_folder_path = get_current_node_folder_path()
+    if not node_folder_path:
+        raise ValueError("Node folder path could not be determined.")
+    
+    # Assuming the data folder is a subfolder named 'data' within the node folder
+    code_folder_path = os.path.join(node_folder_path, 'code')
+    
+    if not os.path.exists(code_folder_path):
+        raise FileNotFoundError(f"Data folder does not exist: {code_folder_path}")
+    
+    return code_folder_path
+
+
+def get_current_node_folder_path_reports():
     """
     Get the reports folder path of the current node.
 
     Returns:
         str: The path to the reports folder.
     """
-    node_folder_path = get_folder_path_node()
+    node_folder_path = get_current_node_folder_path()
     if not node_folder_path:
         raise ValueError("Node folder path could not be determined.")
     
@@ -164,3 +143,36 @@ def get_folder_path_reports():
         raise FileNotFoundError(f"Reports folder does not exist: {reports_folder_path}")
     
     return reports_folder_path
+
+
+def get_info_parents(node_id):
+    """
+    Get the parents' information for a given node ID.
+
+    Args:
+        node_id (str): The node ID whose parents' information is to be fetched.
+
+    Returns:
+        list: A list of dictionaries containing parent node information with keys:
+                'node_id', 'node_tag', 'folder_path'.
+    """
+    conn = connect_to_db()
+    cur = conn.cursor()
+
+    parents_info = []
+    parent_ids = get_node_parents_db(cur, node_id)
+
+    for parent_id in parent_ids:
+        cur.execute('SELECT node_tag, folder_path FROM nodes WHERE node_id = %s', (parent_id,))
+        row = cur.fetchone()
+        if row:
+            parents_info.append({
+                'node_id': parent_id,
+                'node_tag': row[0],
+                'folder_path': row[1]
+            })
+
+    cur.close()
+    conn.close()
+
+    return parents_info

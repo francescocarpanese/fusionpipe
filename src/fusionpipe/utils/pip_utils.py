@@ -73,17 +73,21 @@ def init_node_folder(folder_path_nodes, verbose=False):
         env_name = os.path.basename(folder_path_nodes)
         os.system(f"uv init --name {env_name}")
 
-        # Add some package to uv
-        os.system("uv add psycopg2-binary")
+        user_utils_folder = os.path.join(os.environ.get("USER_UTILS_FOLDER_PATH"))
+        os.system(f"uv add --editable {user_utils_folder}")
 
-        # Add the ipykernel package to the virtual environment
-        os.system("uv add ipykernel")
+        # Update the pyproject.toml file to replace the relative path with the absolute path.
+        # This will allow ray to work with the external package.
+        pyproject_file_path = os.path.join(code_folder_path, 'pyproject.toml')
+        if os.path.exists(pyproject_file_path):
+            with open(pyproject_file_path, 'r') as file:
+                pyproject_data = toml.load(file)
 
-        # Add ray
-        os.system("uv add ray[default]")
+            pyproject_data["tool"]["uv"]["sources"]["fp-user-utils"]["path"] = user_utils_folder
 
-        # Add nbconvert for notebook conversion support
-        os.system("uv add nbconvert")
+            # Write the updated data back to the file
+            with open(pyproject_file_path, 'w') as file:
+                toml.dump(pyproject_data, file)
 
         # Install the current environment as a Jupyter kernel
         os.system("uv run python -m ipykernel install --user --name " + env_name + " --display-name " + env_name)

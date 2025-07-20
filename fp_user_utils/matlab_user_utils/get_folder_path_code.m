@@ -1,4 +1,4 @@
-function code_folder_path = get_folder_path_code()
+function code_folder_path = get_current_node_folder_path_code()
 %GET_FOLDER_PATH_CODE Get the code folder path of the current node.
 %   code_folder_path = GET_FOLDER_PATH_CODE() returns the full path to the
 %   'code' subfolder within the current node's folder. The node folder path
@@ -10,11 +10,11 @@ function code_folder_path = get_folder_path_code()
 %       code_folder_path - Full path to the 'code' subfolder (char array)
 %
 %   Example:
-%       codePath = get_folder_path_code();
+%       codePath = get_current_node_folder_path_code();
 %
-%   See also: get_folder_path_node
+%   See also: get_current_node_folder_path
 
-    node_folder_path = get_folder_path_node();
+    node_folder_path = get_current_node_folder_path();
     if isempty(node_folder_path)
         error('Node folder path could not be determined.');
     end

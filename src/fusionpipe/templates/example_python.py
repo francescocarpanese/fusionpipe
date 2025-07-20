@@ -1,23 +1,22 @@
 import os
 import sys
-# Add path to the user_utils module
-sys.path.insert(0, os.environ.get("USER_UTILS_FOLDER_PATH"))
 
-from python_user_utils.node_api import get_all_parent_node_folder_paths, get_node_id, get_folder_path_data, get_folder_path_reports
+from fp_user_utils.user_api import get_current_node_id, get_info_parents, get_current_node_folder_path, get_current_node_folder_path_data
 
 def print_node_parents():
     print("Template fusionpipe")
     # Put here the id of the node, or fetch from the name of the folder
-    node_id = get_node_id()
+    node_id = get_current_node_id()
     # Get the parent folder where you can read the outputs of the parent nodes
-    parent_folders = get_all_parent_node_folder_paths(node_id=node_id)
+    info_parents = get_info_parents(node_id=node_id)
     print(f"Parent folders for node {node_id}:\n")
-    for folder in parent_folders:
-        print(folder)
+    for parent in info_parents:
+        print(parent)
         print('\n')
 
 def save_dummy_output():
-    output_path = os.path.join(get_folder_path_data(), 'dummy.txt') # Get the data folder path for the current node
+    data_folder_path = get_current_node_folder_path()
+    output_path = os.path.join(get_current_node_folder_path_data(), 'dummy.txt') # Get the data folder path for the current node
     with open(output_path, "w") as f:
         f.write("This is a dummy output file for the fusionpipe template.\n")
     print(f"Dummy output saved to {output_path}")

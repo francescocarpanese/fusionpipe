@@ -1,0 +1,20 @@
+[project]
+name = "fp-user-utils"
+version = "0.1.0"
+description = "User utils for fusion pipe"
+readme = "README.md"
+authors = [
+    { name = "Francesco Carpanese", email = "francesco.carpanese@epfl.ch" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "psycopg2-binary>=2.9.10",
+    "ray[default]>=2.48.0",
+    "nbconvert>=7.16.6",
+    "ipython>=9.3.0",
+    "ipykernel>=6.29.5",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

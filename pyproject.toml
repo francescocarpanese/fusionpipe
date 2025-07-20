@@ -26,9 +26,19 @@ dependencies = [
     "toml>=0.10.2",
     "uvicorn>=0.34.2",
     "nbconvert>=7.16.6",
-    "ray[default]>=2.47.1",
+    "ray[default]>=2.48.0",
+    "ipython>=9.3.0",
+    "fp-user-utils",
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.uv.workspace]
+members = [
+    "fp_user_utils",
+]
+
+[tool.uv.sources]
+fp-user-utils = { workspace = true }
