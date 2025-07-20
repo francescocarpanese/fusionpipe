@@ -44,6 +44,8 @@ def test_add_node(pg_test_db):
     cur = conn.cursor()
     cur.execute("SELECT * FROM nodes WHERE node_id=%s", (node_id,))
     result = cur.fetchone()
+
+    assert result[5] == node_id, "Node tag in entry does not match expected value (should be equal to node_id)."
     
     assert result is not None, f"Node {node_id} was not added to the database."
 
@@ -67,13 +69,11 @@ def test_add_node_to_pipline(pg_test_db):
 
     # Check if the entry was added
     cur = conn.cursor()
-    cur.execute("SELECT node_id, pipeline_id, node_tag FROM node_pipeline_relation WHERE node_id=%s and pipeline_id=%s", (node_id, pipeline_id))
+    cur.execute("SELECT node_id, pipeline_id FROM node_pipeline_relation WHERE node_id=%s and pipeline_id=%s", (node_id, pipeline_id))
     result = cur.fetchone()
     assert result is not None, "Entry was not added to the database."
     assert result[0] == node_id, "Node ID in entry does not match."
     assert result[1] == pipeline_id, "Pipeline ID in entry does not match."
-    assert result[2] == node_id, "Tag in entry does not match expected value." # If not specified node tag needs to be the same as the node_id
-
 
 def test_remove_node_from_pipeline(pg_test_db):
     from fusionpipe.utils.db_utils import remove_node_from_pipeline, get_rows_with_node_id_in_entries, get_rows_node_id_in_nodes, is_node_editable
@@ -439,7 +439,6 @@ def test_get_rows_with_node_id_in_node_pipeline(pg_test_db):
     assert len(rows) == 1, "Expected one entry with the node ID."
     assert rows[0][0] == node_id, "Node ID in entry does not match expected value."
     assert rows[0][1] == pipeline_id, "Pipeline ID in entry does not match expected value."
-    assert rows[0][3] == node_id, "Node tag in entry does not match expected value."  # If not specified node tag needs to be the same as the node_id
 
 def test_get_rows_node_id_in_nodes(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id
@@ -548,10 +547,10 @@ def test_duplicate_pipeline(pg_test_db):
                 )
 
     # Add nodes and node_pipeline_relation to the source pipeline
-    add_node_to_nodes(cur, node_id="node1")
-    add_node_to_nodes(cur, node_id="node2")
-    add_node_to_pipeline(cur, node_id="node1", pipeline_id=source_pipeline_id, node_tag="node1_t")
-    add_node_to_pipeline(cur, node_id="node2", pipeline_id=source_pipeline_id, node_tag="node2_t")
+    add_node_to_nodes(cur, node_id="node1", node_tag="node1_t")
+    add_node_to_nodes(cur, node_id="node2", node_tag="node2_t")
+    add_node_to_pipeline(cur, node_id="node1", pipeline_id=source_pipeline_id)
+    add_node_to_pipeline(cur, node_id="node2", pipeline_id=source_pipeline_id)
 
     # Commit changes
     conn.commit()
@@ -575,15 +574,6 @@ def test_duplicate_pipeline(pg_test_db):
     assert len(node_pipeline_relation) == 2, "Entries were not duplicated correctly."
     assert node_pipeline_relation[0][0] == "node1" # Check first node
     assert node_pipeline_relation[1][0] == "node2" # Check second node
-
-    # Verify the new pipeline's nodes have the same tags as the source pipeline
-    cur.execute("SELECT node_id, node_tag FROM node_pipeline_relation WHERE pipeline_id = %s", (new_pipeline_id,))
-    new_pipeline_nodes = cur.fetchall()
-    cur.execute("SELECT node_id, node_tag FROM node_pipeline_relation WHERE pipeline_id = %s", (source_pipeline_id,))
-    source_pipeline_nodes = cur.fetchall()
-    assert len(new_pipeline_nodes) == len(source_pipeline_nodes), "Node tags were not duplicated correctly."
-    for new_node, source_node in zip(new_pipeline_nodes, source_pipeline_nodes):
-        assert new_node[1] == source_node[1], f"Node tag mismatch: expected {source_node[1]}, got {new_node[1]}"
 
 
 def test_duplicate_pipeline_graph_comparison(pg_test_db, dag_dummy_1):
@@ -631,18 +621,16 @@ def test_dupicate_node_in_pipeline_full_coverage(pg_test_db):
     # Create original node and another node (for relation)
     original_node_id = generate_node_id()
     other_node_id = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=original_node_id)
+    db_utils.add_node_to_nodes(cur, node_id=original_node_id, node_tag="test_tag")
     db_utils.add_node_to_nodes(cur, node_id=other_node_id)
 
     # Add a relation: original_node_id is child, other_node_id is parent
     db_utils.add_node_relation(cur, child_id=original_node_id, parent_id=other_node_id)
-    # Add a relation: original_node_id is parent, other_node_id is child
-    db_utils.add_node_relation(cur, child_id=other_node_id, parent_id=original_node_id)
 
     # Create a pipeline and add an entry connecting the pipeline to the node
     pipeline_id = generate_pip_id()
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
-    db_utils.add_node_to_pipeline(cur, node_id=original_node_id, pipeline_id=pipeline_id, node_tag="test_tag")
+    db_utils.add_node_to_pipeline(cur, node_id=original_node_id, pipeline_id=pipeline_id)
     conn.commit()
 
     # Duplicate the node

@@ -130,7 +130,7 @@ psql -U postgres -d fusionpipe_prod1 -c "GRANT CONNECT ON DATABASE fusionpipe_pr
 psql -d fusionpipe_prod1 -c "GRANT USAGE ON SCHEMA public TO fusionpipeusers;"
 ```
 
-- As we want only the admin user to have the possibility to create table in the datanase, revoke some access access to other users.
+- As we want only the admin user to have the possibility to create table in the database, revoke some access access to other users.
 ```bash
 psql -d fusionpipe_prod1 -c "REVOKE CREATE ON SCHEMA public FROM PUBLIC;"
 ```
@@ -143,7 +143,7 @@ psql -d fusionpipe_prod1 -c "REVOKE CREATE ON SCHEMA public FROM fusionpipeusers
 psql -d fusionpipe_prod1 -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO fusionpipeusers;"
 ```
 
-- Grant the possibiliy to possibility to create tables to the `fusionpipeadmin`.
+- Grant the possibiliy to create tables to the `fusionpipeadmin`.
 ```bash
 psql -d fusionpipe_prod1 -c "GRANT CREATE ON SCHEMA public TO fusionpipeadmin;"
 ```

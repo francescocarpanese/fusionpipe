@@ -265,8 +265,8 @@ def graph_dict_to_db(graph_dict, cur):
             position = node_data.get("position", None)
             folder_path = node_data.get("folder_path", None)
 
-            db_utils.add_node_to_nodes(cur, node_id=node_id, status=status, editable=editable, notes=node_notes,folder_path=folder_path)
-            db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, node_tag=node_tag, position_x=position[0], position_y=position[1])
+            db_utils.add_node_to_nodes(cur, node_id=node_id, status=status, editable=editable, notes=node_notes,folder_path=folder_path, node_tag=node_tag)
+            db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, position_x=position[0], position_y=position[1])
 
         # Insert node relations (edges) using parents field
         for child_id, node_data in graph_dict["nodes"].items():
@@ -303,11 +303,19 @@ def graph_to_db(Gnx, cur):
 
         # Add the node to the database
         if not db_utils.check_if_node_exists(cur, node):
-            db_utils.add_node_to_nodes(cur, node_id=node_id, status=status, editable=editable, notes=node_notes, folder_path=folder_path)
+            db_utils.add_node_to_nodes(
+                cur,
+                node_id=node_id,
+                status=status,
+                editable=editable,
+                notes=node_notes,
+                folder_path=folder_path,
+                node_tag=node_tag
+            )
             # If node already existed, parants cannot have change. Children can and will be added later
             for parent in Gnx.predecessors(node):
                 db_utils.add_node_relation(cur, child_id=node_id, parent_id=parent)
-        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pip_id, node_tag=node_tag, 
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pip_id, 
                                      position_x=position[0], position_y=position[1])
 
 def db_to_graph_from_pip_id(cur, pip_id):
@@ -346,7 +354,7 @@ def db_to_graph_from_pip_id(cur, pip_id):
             G.add_edge(parent_id, node_id)
     
         # Add node tag if it exists
-        tag = db_utils.get_node_tag(cur, node_id=node_id, pipeline_id=pip_id)
+        tag = db_utils.get_node_tag(cur, node_id=node_id)
         if tag:
             G.nodes[node_id]['tag'] = tag
         else:
@@ -583,6 +591,8 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
     new_folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"), new_node_id)
     # Update database
     db_utils.update_folder_path_nodes(cur, new_node_id, new_folder_path_nodes)
+    source_node_tag = db_utils.get_node_tag(cur, node_id=source_node_id) + "_copy"
+    db_utils.update_node_tag(cur, node_id=new_node_id, node_tag=source_node_tag)
 
     old_folder_path_nodes = db_utils.get_node_folder_path(cur, node_id=source_node_id)
 

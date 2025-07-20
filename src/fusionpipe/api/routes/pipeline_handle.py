@@ -193,12 +193,12 @@ def update_node_tag(pipeline_id: str, node_id: str, payload: dict, db_conn=Depen
     if node_tag is None:
         raise HTTPException(status_code=400, detail="Missing node_tag")
     try:
-        db_utils.update_node_tag(cur, node_id=node_id, pipeline_id=pipeline_id, node_tag=node_tag)
+        db_utils.update_node_tag(cur, node_id=node_id, node_tag=node_tag)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-    return {"message": f"Node tag updated for node {node_id} in pipeline {pipeline_id}"}
+    return {"message": f"Node tag updated for node {node_id} in pipeline"}
 
 @router.post("/update_node_notes/{pipeline_id}/{node_id}")
 def update_node_notes(pipeline_id: str, node_id: str, payload: dict, db_conn=Depends(get_db)):

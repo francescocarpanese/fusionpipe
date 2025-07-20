@@ -62,7 +62,8 @@ def init_db(conn):
             status TEXT CHECK(status IN ('ready', 'running', 'completed', 'failed', 'staledata')) DEFAULT 'ready',
             editable BOOLEAN DEFAULT TRUE,
             notes TEXT DEFAULT NULL,
-            folder_path TEXT DEFAULT NULL
+            folder_path TEXT DEFAULT NULL,
+            node_tag TEXT
         )
     ''')
 
@@ -96,13 +97,11 @@ def init_db(conn):
     ''')
 
 
-
     cur.execute('''
         CREATE TABLE IF NOT EXISTS node_pipeline_relation (
             node_id TEXT,
             pipeline_id TEXT,
             last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            node_tag TEXT,
             position_x DOUBLE PRECISION DEFAULT 0.0,
             position_y DOUBLE PRECISION DEFAULT 0.0,
             project_id TEXT DEFAULT NULL,
@@ -123,25 +122,25 @@ def add_pipeline(cur, pipeline_id, tag=None, owner=None, notes=None):
     cur.execute('INSERT INTO pipelines (pipeline_id, tag, owner, notes) VALUES (%s, %s, %s, %s)', (pipeline_id, tag, owner, notes))
     return pipeline_id
 
-def add_node_to_nodes(cur, node_id, status='ready', editable=True, notes=None, folder_path=None):
-    cur.execute('INSERT INTO nodes (node_id, status, editable, notes, folder_path) VALUES (%s, %s, %s, %s, %s)', 
-                (node_id, status, bool(editable), notes, folder_path))
+def add_node_to_nodes(cur, node_id, status='ready', editable=True, notes=None, folder_path=None, node_tag=None):
+    if node_tag is None:
+        node_tag = node_id
+    cur.execute('INSERT INTO nodes (node_id, status, editable, notes, folder_path, node_tag) VALUES (%s, %s, %s, %s, %s, %s)', 
+                (node_id, status, bool(editable), notes, folder_path, node_tag))
     return node_id
 
 def remove_node_from_nodes(cur, node_id):
     cur.execute('DELETE FROM nodes WHERE node_id = %s', (node_id,))
     return cur.rowcount
 
-def get_node_tag(cur, pipeline_id, node_id):
-    cur.execute('SELECT node_tag FROM node_pipeline_relation WHERE pipeline_id = %s AND node_id = %s', (pipeline_id, node_id))
+def get_node_tag(cur, node_id):
+    cur.execute('SELECT node_tag FROM nodes WHERE node_id = %s', (node_id,))
     row = cur.fetchone()
     return row[0] if row else None
 
-def add_node_to_pipeline(cur, node_id, pipeline_id, node_tag=None, position_x=0., position_y=0.):
-    if not node_tag:
-        node_tag = node_id
-    cur.execute('INSERT INTO node_pipeline_relation (node_id, pipeline_id, node_tag, position_x, position_y) VALUES (%s, %s, %s, %s, %s)', 
-               (node_id, pipeline_id, node_tag, position_x, position_y))
+def add_node_to_pipeline(cur, node_id, pipeline_id, position_x=0., position_y=0.):
+    cur.execute('INSERT INTO node_pipeline_relation (node_id, pipeline_id, position_x, position_y) VALUES (%s, %s, %s, %s)', 
+               (node_id, pipeline_id, position_x, position_y))
     
     # Check if the node is present in more than one pipeline
     cur.execute('SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id = %s', (node_id,))
@@ -169,8 +168,8 @@ def update_node_status(cur, node_id, status):
     cur.execute('UPDATE nodes SET status = %s WHERE node_id = %s', (status, node_id))
     return cur.rowcount
 
-def update_node_tag(cur, pipeline_id, node_id, node_tag):
-    cur.execute('UPDATE node_pipeline_relation SET node_tag = %s WHERE pipeline_id = %s AND node_id = %s', (node_tag, pipeline_id, node_id))
+def update_node_tag(cur, node_id, node_tag):
+    cur.execute('UPDATE nodes SET node_tag = %s WHERE node_id = %s', (node_tag, node_id))
     return cur.rowcount
 
 def get_node_status(cur, node_id):
@@ -278,8 +277,8 @@ def duplicate_node_pipeline_relation(cur, source_pipeline_id, node_ids, new_pipe
 
     for node_id in node_ids:
         cur.execute('''
-            INSERT INTO node_pipeline_relation (last_update, node_id, pipeline_id, node_tag, position_x, position_y)
-            SELECT last_update, node_id, %s, node_tag, position_x, position_y
+            INSERT INTO node_pipeline_relation (last_update, node_id, pipeline_id, position_x, position_y)
+            SELECT last_update, node_id, %s, position_x, position_y
             FROM node_pipeline_relation
             WHERE pipeline_id = %s AND node_id = %s
         ''', (new_pipeline_id, source_pipeline_id, node_id))
@@ -304,8 +303,8 @@ def duplicate_pipeline(cur, source_pipeline_id, new_pipeline_id):
 
     # Duplicate node_pipeline_relation table with positions
     cur.execute('''
-        INSERT INTO node_pipeline_relation (node_id, pipeline_id, last_update, node_tag, position_x, position_y)
-        SELECT  node_id, %s, last_update, node_tag, position_x, position_y
+        INSERT INTO node_pipeline_relation (node_id, pipeline_id, last_update, position_x, position_y)
+        SELECT  node_id, %s, last_update, position_x, position_y
         FROM node_pipeline_relation
         WHERE pipeline_id = %s
     ''', (new_pipeline_id, source_pipeline_id))
@@ -328,8 +327,8 @@ def dupicate_node_in_pipeline(cur, source_node_id, new_node_id, source_pipeline_
 
     # Duplicate node_pipeline_relation table
     cur.execute('''
-        INSERT INTO node_pipeline_relation (last_update, node_id, pipeline_id, node_tag, position_x, position_y)
-        SELECT last_update, %s, %s, node_tag, position_x, position_y
+        INSERT INTO node_pipeline_relation (last_update, node_id, pipeline_id, position_x, position_y)
+        SELECT last_update, %s, %s, position_x, position_y
         FROM node_pipeline_relation
         WHERE node_id = %s AND pipeline_id = %s
     ''', (new_node_id, target_pipeline_id, source_node_id, source_pipeline_id))    

@@ -323,8 +323,8 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp
     pipeline_id = generate_pip_id()
     node_id = generate_node_id()
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None)
-    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, node_tag="test", position_x=0, position_y=0)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None, node_tag="test")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, position_x=0, position_y=0)
     db_utils.update_folder_path_nodes(cur, node_id, os.path.join(tmp_base_dir, node_id))
     conn.commit()
   
@@ -395,8 +395,8 @@ def test_duplicate_node_in_different_pipeline_w_code_and_data(monkeypatch, pg_te
     node_id = generate_node_id()
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id_src, tag="src", owner="tester", notes="src pipeline")
     db_utils.add_pipeline(cur, pipeline_id=pipeline_id_dst, tag="dst", owner="tester", notes="dst pipeline")
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None)
-    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id_src, node_tag="test", position_x=0, position_y=0)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None, node_tag="test")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id_src, position_x=0, position_y=0)
     db_utils.update_folder_path_nodes(cur, node_id, os.path.join(tmp_base_dir, node_id))
     conn.commit()
 
@@ -571,7 +571,7 @@ def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, pg_test_db, 
     # Case 1: Editable node
     node_id_editable = generate_node_id()
     db_utils.add_node_to_nodes(cur, node_id=node_id_editable, status="ready", editable=1, notes="editable node", folder_path=None)
-    db_utils.add_node_to_pipeline(cur, node_id=node_id_editable, pipeline_id=pipeline_id, node_tag="editable", position_x=0, position_y=0)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id_editable, pipeline_id=pipeline_id, position_x=0, position_y=0)
     db_utils.update_folder_path_nodes(cur, node_id_editable, os.path.join(tmp_base_dir, node_id_editable))
     conn.commit()
     folder_path_nodes = os.path.join(tmp_base_dir, node_id_editable)
@@ -586,7 +586,7 @@ def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, pg_test_db, 
     # Case 2: Non-editable leaf node in non-editable subgraph
     node_id_noneditable = generate_node_id()
     db_utils.add_node_to_nodes(cur, node_id=node_id_noneditable, status="ready", editable=0, notes="non-editable node", folder_path=None)
-    db_utils.add_node_to_pipeline(cur, node_id=node_id_noneditable, pipeline_id=pipeline_id, node_tag="noneditable", position_x=1, position_y=1)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id_noneditable, pipeline_id=pipeline_id, position_x=1, position_y=1)
     conn.commit()
     # Should delete node from pipeline (no error)
     delete_node_from_pipeline_with_editable_logic(cur, pipeline_id, node_id_noneditable)
@@ -596,10 +596,10 @@ def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, pg_test_db, 
     # Case 3: Non-editable node that is not a leaf in non-editable subgraph
     parent_id = generate_node_id()
     child_id = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=parent_id, status="ready", editable=0, notes="parent", folder_path=None)
-    db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", editable=0, notes="child", folder_path=None)
-    db_utils.add_node_to_pipeline(cur, node_id=parent_id, pipeline_id=pipeline_id, node_tag="parent", position_x=2, position_y=2)
-    db_utils.add_node_to_pipeline(cur, node_id=child_id, pipeline_id=pipeline_id, node_tag="child", position_x=3, position_y=3)
+    db_utils.add_node_to_nodes(cur, node_id=parent_id, status="ready", editable=0, notes="parent", folder_path=None, node_tag="parent")
+    db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", editable=0, notes="child", folder_path=None, node_tag="child")
+    db_utils.add_node_to_pipeline(cur, node_id=parent_id, pipeline_id=pipeline_id, position_x=2, position_y=2)
+    db_utils.add_node_to_pipeline(cur, node_id=child_id, pipeline_id=pipeline_id, position_x=3, position_y=3)
     db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
     conn.commit()
     # Should raise ValueError because parent_id is not a leaf
