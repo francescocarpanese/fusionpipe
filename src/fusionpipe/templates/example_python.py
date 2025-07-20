@@ -41,6 +41,8 @@ def run_ray_example():
 
     @ray.remote
     def process_item(item):
+        # Test import of user utils works
+        print(get_current_node_id())
         # Simulate a computation (e.g., multiply value by 2)
         return {"id": item["id"], "processed_value": item["value"] * 2}
 
