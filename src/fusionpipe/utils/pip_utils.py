@@ -207,7 +207,7 @@ def delete_node_folder(node_folder_path, verbose=False):
             print(f"Node folder does not exist: {node_folder_path}")
 
 
-def graph_to_dict(graph):
+def pipeline_graph_to_dict(graph):
     """
     Convert a NetworkX directed graph to a dictionary format suitable for serialization.
     """
@@ -233,6 +233,29 @@ def graph_to_dict(graph):
         }
     return pipeline_data
 
+
+def project_graph_to_dict(graph):
+    """
+    Convert a NetworkX directed graph to a dictionary format suitable for serialization.
+    """
+
+    project_data = {
+        'project_id': graph.graph.get('project_id'),  # This is the tag that can be given to the project
+        'nodes': {},
+        'notes': graph.graph.get('notes', None),  # Optional notes for the project
+        'tag': graph.graph.get('tag', None),  # Optional tag for the project
+        'owner': graph.graph.get('owner', None),  # Optional owner for the project
+    }
+    for node in graph.nodes:
+        parents = list(graph.predecessors(node))
+        project_data['nodes'][node] = {
+            'parents': parents,
+            'tag': graph.nodes[node].get('tag', None),  # Optional tag for the node
+            'notes': graph.nodes[node].get('notes', None),  # Optional notes for the node
+        }
+    return project_data
+
+
 def graph_dict_to_json(graph_dict, file_path, verbose=False):
     """
     Serialize a graph dictionary to a JSON file.
@@ -255,9 +278,9 @@ def graph_dict_to_db(graph_dict, cur):
         # If the project does not exist, create it
         db_utils.add_project(cur, project_id=project_id)
 
-    if not db_utils.check_pipeline_exists(cur, pipeline_id):
+    if not db_utils.check_if_pipeline_exists(cur, pipeline_id):
         # If the pipeline does not exist, create it
-        db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag=tag, owner=owner, notes=notes)
+        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag=tag, owner=owner, notes=notes)
 
 
         # Insert nodes using graph_dict fields
@@ -277,10 +300,10 @@ def graph_dict_to_db(graph_dict, cur):
             for parent_id in node_data.get("parents", []):
                 db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
 
-        db_utils.add_pipeline_to_project(cur, project_id=project_id, pipeline_id=pipeline_id)
+        db_utils.add_project_to_pipeline(cur, project_id=project_id, pipeline_id=pipeline_id)
         return cur
 
-def graph_to_db(Gnx, cur):
+def pipeline_graph_to_db(Gnx, cur):
     """
     - This function can be used to add a graph to the database.
     - This will also work to add a subgraph to an existing pipeline.
@@ -292,8 +315,8 @@ def graph_to_db(Gnx, cur):
     notes = Gnx.graph.get('notes', None)
 
     # Check if the pipeline already exists, if not, add it
-    if not db_utils.check_pipeline_exists(cur, pip_id):
-        db_utils.add_pipeline(cur, pipeline_id=pip_id, tag=graph_tag, owner=owner, notes=notes)
+    if not db_utils.check_if_pipeline_exists(cur, pip_id):
+        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pip_id, tag=graph_tag, owner=owner, notes=notes)
 
     # Add nodes and their dependencies directly from the graph
     for node in Gnx.nodes:
@@ -322,9 +345,44 @@ def graph_to_db(Gnx, cur):
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pip_id, 
                                      position_x=position[0], position_y=position[1])
 
-def db_to_graph_from_pip_id(cur, pip_id):
+
+def project_graph_to_db(Gnx, cur):
+    """
+    - This function can be used to add a graph to the database.
+    - This will also work to add a subgraph to an existing pipeline.
+    """
+    # Add the project to the database
+    project_id = Gnx.graph['project_id']
+    graph_tag = Gnx.graph.get('tag', None)
+    owner = Gnx.graph.get('owner', None)
+    notes = Gnx.graph.get('notes', None)
+
+    # Check if the project already exists, if not, add it
+    if not db_utils.check_project_exists(cur, project_id):
+        db_utils.add_project(cur, project_id=project_id, tag=graph_tag, owner=owner, notes=notes)
+
+    # Add pipeline and their dependencies directly from the graph
+    for pipeline_id in Gnx.nodes:
+        pipeline_notes = Gnx.nodes[pipeline_id].get('notes', "")  # Optional notes for the pipeline
+        pipeline_tag = Gnx.nodes[pipeline_id].get('tag', None)  # Optional tag for the pipeline
+
+        # Add the pipeline to the database
+        if not db_utils.check_if_pipeline_exists(cur, pipeline_id):
+            db_utils.add_pipeline_to_pipelines(
+                cur,
+                pipeline_id=pipeline_id,
+                tag=pipeline_tag,
+                notes=pipeline_notes,
+                project_id=project_id
+                )
+            # If node already existed, parents cannot have changed. Children can and will be added later
+            for parent in Gnx.predecessors(pipeline_id):
+                db_utils.add_pipeline_relation(cur, child_id=pipeline_id, parent_id=parent)
+
+
+def db_to_pipeline_graph_from_pip_id(cur, pip_id):
     # Load the pipeline from the database
-    if not db_utils.check_pipeline_exists(cur, pip_id):
+    if not db_utils.check_if_pipeline_exists(cur, pip_id):
         raise ValueError(f"Pipeline with ID {pip_id} does not exist in the database.")
  
     # Create a directed graph
@@ -366,9 +424,45 @@ def db_to_graph_from_pip_id(cur, pip_id):
 
     return G
 
+
+def db_to_project_graph_from_project_id(cur, project_id):
+    # Load the pipeline from the database
+    if not db_utils.check_if_project_exists(cur, project_id):
+        raise ValueError(f"Project with ID {project_id} does not exist in the database.")
+
+    # Create a directed graph
+    G = nx.DiGraph()
+    G.graph['project_id'] = project_id  # Set the graph ID from the pipeline data
+    G.graph['notes'] = db_utils.get_project_notes(cur, project_id=project_id)  # Optional notes for the project
+    G.graph['tag'] = db_utils.get_project_tag(cur, project_id=project_id)  # Set the graph tag from the project data
+    G.graph['owner'] = db_utils.get_project_owner(cur, project_id=project_id)  # Optional owner for the project
+
+    # Add nodes and their dependencies
+    for pipeline_id in db_utils.get_all_pipelines_from_project_id(cur, project_id=project_id):
+        G.add_node(pipeline_id)  # Add node with attributes
+        G.nodes[pipeline_id]['notes'] = db_utils.get_pipeline_notes(cur, pipeline_id=pipeline_id)
+
+        # Add edges based on parent relationships
+        for parent_id in db_utils.get_pipeline_parents(cur, pipeline_id=pipeline_id):
+            G.add_edge(parent_id, pipeline_id)
+
+        # Add node tag if it exists
+        tag = db_utils.get_pipeline_tag(cur, pipeline_id=pipeline_id)
+        if tag:
+            G.nodes[pipeline_id]['tag'] = tag
+        else:
+            G.nodes[pipeline_id]['tag'] = ""
+
+    return G
+
+
 def db_to_graph_dict_from_pip_id(cur, pip_id):
-    graph = db_to_graph_from_pip_id(cur, pip_id)
-    return graph_to_dict(graph)
+    graph = db_to_pipeline_graph_from_pip_id(cur, pip_id)
+    return pipeline_graph_to_dict(graph)
+
+def db_to_project_dict_from_project_id(cur, project_id):
+    graph = db_to_project_graph_from_project_id(cur, project_id)
+    return project_graph_to_dict(graph)
 
 
 def dict_to_graph(graph_dict):
@@ -470,7 +564,7 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
     from fusionpipe.utils import db_utils
 
     # Get the original graph from the database
-    original_graph = db_to_graph_from_pip_id(cur, pipeline_id)
+    original_graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
     
     # Generate a new pipeline ID and tag
     new_pip_id = generate_pip_id()
@@ -507,7 +601,10 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
         new_graph.add_edge(u_new, v_new)
 
     # Add the new graph to the database
-    graph_to_db(new_graph, cur)
+    pipeline_graph_to_db(new_graph, cur)
+
+    # Add pipeline-to-project relation for the new pipeline
+    db_utils.add_pipeline_relation(cur, child_id=new_pip_id, parent_id=pipeline_id)
 
     return new_pip_id
 
@@ -521,7 +618,7 @@ def delete_node_from_pipeline_with_editable_logic(cur,pipeline_id, node_id):
         return
 
     # Get the pipeline graph from the database
-    graph = db_to_graph_from_pip_id(cur, pipeline_id)
+    graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
 
     # Get subgraph of non-editable nodes
     non_editable_nodes = [n for n in graph.nodes if not graph.nodes[n].get('editable', True)]
@@ -554,7 +651,7 @@ def get_all_children_nodes(cur, pipeline_id, node_id):
     """
     Get all children of a node in the pipeline.
     """
-    graph = db_to_graph_from_pip_id(cur, pipeline_id)
+    graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
     return list(nx.descendants(graph, node_id))
 
 def copy_with_permissions(src, dst, *, follow_symlinks=True):
@@ -673,7 +770,7 @@ def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_p
     if isinstance(source_node_ids, str):
         source_node_ids = [source_node_ids]
     # Get the pipeline graph
-    graph = db_to_graph_from_pip_id(cur, source_pipeline_id)
+    graph = db_to_pipeline_graph_from_pip_id(cur, source_pipeline_id)
     # Get all nodes in the subtree(s)
     subtree_nodes = set()
     for root in source_node_ids:
@@ -763,7 +860,7 @@ def update_stale_status_for_pipeline_nodes(cur, pipeline_id):
     This is done recursively using the NetworkX graph structure.
     """
     # Build the graph from the database
-    G = db_to_graph_from_pip_id(cur, pipeline_id)
+    G = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
     # Traverse in topological order (parents before children)
     for node_id in nx.topological_sort(G):
         # Check all parents
@@ -797,7 +894,7 @@ def add_node_relation_safe(cur, pipeline_id, parent_id, child_id):
     import networkx as nx
 
     # Get the current pipeline graph
-    graph = db_to_graph_from_pip_id(cur, pipeline_id)
+    graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
 
     # Check if the child node is editable
     if not db_utils.is_node_editable(cur, node_id=child_id):
@@ -833,7 +930,7 @@ def merge_pipelines(cur, source_pipeline_ids):
     # Generate a new pipeline ID
     target_pipeline_id = generate_pip_id()
     # Create the new pipeline in the database
-    db_utils.add_pipeline(cur, pipeline_id=target_pipeline_id, tag=target_pipeline_id)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=target_pipeline_id, tag=target_pipeline_id)
 
     # Keep track of already duplicated nodes
     duplicated_nodes = set()

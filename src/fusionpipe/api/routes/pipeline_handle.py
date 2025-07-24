@@ -21,7 +21,7 @@ def create_pipeline(db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     pipeline_id = pip_utils.generate_pip_id()
     try:
-        db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag=None)
+        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag=None)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
@@ -87,7 +87,7 @@ def get_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
 def get_project(project_id: str, db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     try:
-        project_dict = db_utils.get_project_dict(cur, project_id)
+        project_dict = pip_utils.db_to_project_dict_from_project_id(cur, project_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return JSONResponse(

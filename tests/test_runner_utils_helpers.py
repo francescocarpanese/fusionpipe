@@ -33,7 +33,7 @@ class TestPipelineHelperFunctions:
         """Test basic pipeline state initialization"""
         mock_cur = Mock()
         
-        with patch('fusionpipe.utils.db_utils.check_pipeline_exists', return_value=True), \
+        with patch('fusionpipe.utils.db_utils.check_if_pipeline_exists', return_value=True), \
              patch('fusionpipe.utils.db_utils.get_all_nodes_from_pip_id', return_value=['node1', 'node2', 'node3']):
             
             all_nodes, excluded_nodes = runner_utils._initialize_pipeline_state(mock_cur, 'pipeline1')
@@ -45,7 +45,7 @@ class TestPipelineHelperFunctions:
         """Test pipeline state initialization with non-existent pipeline"""
         mock_cur = Mock()
         
-        with patch('fusionpipe.utils.db_utils.check_pipeline_exists', return_value=False):
+        with patch('fusionpipe.utils.db_utils.check_if_pipeline_exists', return_value=False):
             with pytest.raises(ValueError, match="Pipeline pipeline1 does not exist"):
                 runner_utils._initialize_pipeline_state(mock_cur, 'pipeline1')
 
@@ -53,7 +53,7 @@ class TestPipelineHelperFunctions:
         """Test pipeline state initialization with last_node_id"""
         mock_cur = Mock()
         
-        with patch('fusionpipe.utils.db_utils.check_pipeline_exists', return_value=True), \
+        with patch('fusionpipe.utils.db_utils.check_if_pipeline_exists', return_value=True), \
              patch('fusionpipe.utils.db_utils.get_all_nodes_from_pip_id', return_value=['node1', 'node2', 'node3']), \
              patch('fusionpipe.utils.pip_utils.get_all_children_nodes', return_value=['node3']):
             
@@ -66,7 +66,7 @@ class TestPipelineHelperFunctions:
         """Test pipeline state initialization with invalid last_node_id"""
         mock_cur = Mock()
         
-        with patch('fusionpipe.utils.db_utils.check_pipeline_exists', return_value=True), \
+        with patch('fusionpipe.utils.db_utils.check_if_pipeline_exists', return_value=True), \
              patch('fusionpipe.utils.db_utils.get_all_nodes_from_pip_id', return_value=['node1', 'node2']):
             
             with pytest.raises(ValueError, match="last_node_id node3 is not in pipeline pipeline1"):

@@ -48,11 +48,22 @@ def init_db(conn):
     cur = conn.cursor()
 
     cur.execute('''
+        CREATE TABLE IF NOT EXISTS projects (
+            project_id TEXT PRIMARY KEY,
+            tag TEXT DEFAULT NULL,
+            notes TEXT DEFAULT NULL,
+            owner TEXT DEFAULT NULL
+        )
+    ''')    
+
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS pipelines (
             pipeline_id TEXT PRIMARY KEY,
             tag TEXT UNIQUE DEFAULT NULL,
             owner TEXT DEFAULT NULL,
-            notes TEXT DEFAULT NULL
+            notes TEXT DEFAULT NULL,
+            project_id TEXT DEFAULT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(project_id)
         )
     ''')
 
@@ -77,14 +88,6 @@ def init_db(conn):
         )
     ''')    
 
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS projects (
-            project_id TEXT PRIMARY KEY,
-            tag TEXT DEFAULT NULL,
-            notes TEXT DEFAULT NULL,
-            owner TEXT DEFAULT NULL
-        )
-    ''')    
 
     cur.execute('''
         CREATE TABLE IF NOT EXISTS node_relation (
@@ -104,11 +107,19 @@ def init_db(conn):
             last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             position_x DOUBLE PRECISION DEFAULT 0.0,
             position_y DOUBLE PRECISION DEFAULT 0.0,
-            project_id TEXT DEFAULT NULL,
             FOREIGN KEY (node_id) REFERENCES nodes(node_id),
             FOREIGN KEY (pipeline_id) REFERENCES pipelines(pipeline_id),
-            FOREIGN KEY (project_id) REFERENCES projects(project_id),
             PRIMARY KEY (node_id, pipeline_id)
+        )
+    ''')
+
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS pipeline_relation (
+            id SERIAL PRIMARY KEY,
+            child_id TEXT,
+            parent_id TEXT DEFAULT NULL,
+            FOREIGN KEY (child_id) REFERENCES pipelines(pipeline_id),
+            FOREIGN KEY (parent_id) REFERENCES pipelines(pipeline_id)
         )
     ''')
 
@@ -116,10 +127,10 @@ def init_db(conn):
     return cur
 
 
-def add_pipeline(cur, pipeline_id, tag=None, owner=None, notes=None):
+def add_pipeline_to_pipelines(cur, pipeline_id, tag=None, owner=None, notes=None, project_id=None):
     if tag is None:
         tag = pipeline_id
-    cur.execute('INSERT INTO pipelines (pipeline_id, tag, owner, notes) VALUES (%s, %s, %s, %s)', (pipeline_id, tag, owner, notes))
+    cur.execute('INSERT INTO pipelines (pipeline_id, tag, owner, notes, project_id) VALUES (%s, %s, %s, %s, %s)', (pipeline_id, tag, owner, notes, project_id))
     return pipeline_id
 
 def add_node_to_nodes(cur, node_id, status='ready', editable=True, notes=None, folder_path=None, node_tag=None):
@@ -182,12 +193,16 @@ def get_pipeline_tag(cur, pipeline_id):
     row = cur.fetchone()
     return row[0] if row else None
 
-def check_pipeline_exists(cur, pipeline_id):
+def check_if_pipeline_exists(cur, pipeline_id):
     cur.execute('SELECT 1 FROM pipelines WHERE pipeline_id = %s', (pipeline_id,))
     return cur.fetchone() is not None
 
 def get_all_nodes_from_pip_id(cur, pipeline_id):
     cur.execute('SELECT node_id FROM node_pipeline_relation WHERE pipeline_id = %s', (pipeline_id,))
+    return [row[0] for row in cur.fetchall()]
+
+def get_all_pipelines_from_project_id(cur, project_id):
+    cur.execute('SELECT pipeline_id FROM pipelines WHERE project_id = %s', (project_id,))
     return [row[0] for row in cur.fetchall()]
 
 def get_all_nodes_from_nodes(cur):
@@ -196,6 +211,10 @@ def get_all_nodes_from_nodes(cur):
 
 def check_if_node_exists(cur, node_id):
     cur.execute('SELECT 1 FROM nodes WHERE node_id = %s', (node_id,))
+    return cur.fetchone() is not None
+
+def check_if_project_exists(cur, project_id):
+    cur.execute('SELECT 1 FROM projects WHERE project_id = %s', (project_id,))
     return cur.fetchone() is not None
 
 def get_nodes_without_pipeline(cur):
@@ -597,7 +616,7 @@ def add_project(cur, project_id, tag=None, notes=None, owner=None):
     cur.execute('INSERT INTO projects (project_id, tag, notes, owner) VALUES (%s, %s, %s, %s)', (project_id, tag, notes, owner))
     return project_id
 
-def add_pipeline_to_project(cur, project_id, pipeline_id):
+def add_project_to_pipeline(cur, project_id, pipeline_id):
     """
     Add a project to a pipeline.
     :param cur: Database cursor
@@ -605,7 +624,7 @@ def add_pipeline_to_project(cur, project_id, pipeline_id):
     :param pipeline_id: ID of the pipeline to associate with the project
     :return: Number of rows affected
     """
-    cur.execute('UPDATE node_pipeline_relation SET project_id = %s WHERE pipeline_id = %s', (project_id, pipeline_id))
+    cur.execute('UPDATE pipelines SET project_id = %s WHERE pipeline_id = %s', (project_id, pipeline_id))
     return cur.rowcount
 
 def remove_project_from_pipeline(cur, project_id, pipeline_id):
@@ -616,7 +635,7 @@ def remove_project_from_pipeline(cur, project_id, pipeline_id):
     :param pipeline_id: ID of the pipeline to disassociate from the project
     :return: Number of rows affected
     """
-    cur.execute('UPDATE node_pipeline_relation SET project_id = NULL WHERE project_id = %s AND pipeline_id = %s', (project_id, pipeline_id))
+    cur.execute('UPDATE pipelines SET project_id = NULL WHERE pipeline_id = %s', (pipeline_id,))
     return cur.rowcount
 
 def remove_project_from_all_pipelines(cur, project_id):
@@ -636,7 +655,8 @@ def get_all_projects(cur):
     :return: List of all projects as dictionaries
     """
     cur.execute('SELECT * FROM projects')
-    return [dict(row) for row in cur.fetchall()]  # Convert rows to dictionaries for easier access
+    columns = [desc[0] for desc in cur.description]
+    return [dict(zip(columns, row)) for row in cur.fetchall()]  # Convert rows to dictionaries for easier access
 
 def check_project_exists(cur, project_id):
     """
@@ -657,7 +677,11 @@ def get_project_by_id(cur, project_id):
     """
     cur.execute('SELECT * FROM projects WHERE project_id = %s', (project_id,))
     row = cur.fetchone()
-    return dict(row) if row else None  # Convert row to dictionary if found, else return None
+    if row:
+        colnames = [desc[0] for desc in cur.description]
+        return dict(zip(colnames, row))
+    else:
+        return None  # Return None if not found
 
 def remove_project(cur, project_id):
     """
@@ -692,7 +716,6 @@ def update_project_notes(cur, project_id, notes):
     cur.execute('UPDATE projects SET notes = %s WHERE project_id = %s', (notes, project_id))
     return cur.rowcount
 
-
 def get_pipeline_ids_by_project(cur, project_id):
     """
     Get all pipeline IDs associated with a specific project.
@@ -700,7 +723,7 @@ def get_pipeline_ids_by_project(cur, project_id):
     :param project_id: ID of the project to query
     :return: List of pipeline IDs associated with the project
     """
-    cur.execute('SELECT DISTINCT pipeline_id FROM node_pipeline_relation WHERE project_id = %s', (project_id,))
+    cur.execute('SELECT DISTINCT pipeline_id FROM pipelines WHERE project_id = %s', (project_id,))
     return [row[0] for row in cur.fetchall()]  # Return only the pipeline IDs
 
 def get_all_project_ids_tags_dict(cur):
@@ -714,8 +737,8 @@ def remove_project_from_everywhere(cur, project_id):
     :param project_id: ID of the project to remove
     :return: Number of rows affected
     """
+    cur.execute('UPDATE pipelines SET project_id = NULL WHERE project_id = %s', (project_id,))    
     cur.execute('DELETE FROM projects WHERE project_id = %s', (project_id,))
-    cur.execute('UPDATE node_pipeline_relation SET project_id = NULL WHERE project_id = %s', (project_id,))
     return cur.rowcount
 
 def get_project_id_by_pipeline(cur, pipeline_id):
@@ -725,19 +748,75 @@ def get_project_id_by_pipeline(cur, pipeline_id):
     :param pipeline_id: ID of the pipeline to query
     :return: Project ID associated with the pipeline, or empty string if not found
     """
-    cur.execute('SELECT project_id FROM node_pipeline_relation WHERE pipeline_id = %s LIMIT 1', (pipeline_id,))
+    cur.execute('SELECT project_id FROM pipelines WHERE pipeline_id = %s', (pipeline_id,))
     row = cur.fetchone()
     return row[0] if row and row[0] is not None else ""
 
-def get_project_dict(cur, project_id):
+def add_pipeline_relation(cur, child_id, parent_id=None):
     """
-    Get a project's id, tag, and notes as a dictionary.
+    Add a relation between pipelines.
+    :param cur: Database cursor
+    :param child_id: ID of the child pipeline
+    :param parent_id: ID of the parent pipeline (optional)
+    :return: Number of rows affected
+    """
+    cur.execute('INSERT INTO pipeline_relation (child_id, parent_id) VALUES (%s, %s)', (child_id, parent_id))
+    return cur.rowcount
+
+def remove_pipeline_relation(cur, child_id, parent_id=None):
+    """
+    Remove a relation between pipelines.
+    :param cur: Database cursor
+    :param child_id: ID of the child pipeline
+    :param parent_id: ID of the parent pipeline (optional)
+    :return: Number of rows affected
+    """
+    if parent_id:
+        cur.execute('DELETE FROM pipeline_relation WHERE child_id = %s AND parent_id = %s', (child_id, parent_id))
+    else:
+        cur.execute('DELETE FROM pipeline_relation WHERE child_id = %s', (child_id,))
+    return cur.rowcount
+
+
+def get_pipeline_parents(cur, pipeline_id):
+    """
+    Get all parent pipelines of a given pipeline.
+    :param cur: Database cursor
+    :param pipeline_id: ID of the pipeline to query
+    :return: List of parent pipeline IDs
+    """
+    cur.execute('SELECT parent_id FROM pipeline_relation WHERE child_id = %s', (pipeline_id,))
+    return [row[0] for row in cur.fetchall()]
+
+def get_project_notes(cur, project_id):
+    """
+    Get the notes of a specific project.
     :param cur: Database cursor
     :param project_id: ID of the project to query
-    :return: Dictionary with keys 'project_id', 'tag', 'notes', or None if not found
+    :return: Notes of the project, or None if not found
     """
-    cur.execute('SELECT project_id, tag, notes FROM projects WHERE project_id = %s', (project_id,))
+    cur.execute('SELECT notes FROM projects WHERE project_id = %s', (project_id,))
     row = cur.fetchone()
-    if row:
-        return {'project_id': row[0], 'tag': row[1], 'notes': row[2]}
-    return None
+    return row[0] if row else None
+
+def get_project_owner(cur, project_id):
+    """
+    Get the owner of a specific project.
+    :param cur: Database cursor
+    :param project_id: ID of the project to query
+    :return: Owner of the project, or None if not found
+    """
+    cur.execute('SELECT owner FROM projects WHERE project_id = %s', (project_id,))
+    row = cur.fetchone()
+    return row[0] if row else None
+
+def get_project_tag(cur, project_id):
+    """
+    Get the tag of a specific project.
+    :param cur: Database cursor
+    :param project_id: ID of the project to query
+    :return: Tag of the project, or None if not found
+    """
+    cur.execute('SELECT tag FROM projects WHERE project_id = %s', (project_id,))
+    row = cur.fetchone()
+    return row[0] if row else None

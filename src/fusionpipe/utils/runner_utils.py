@@ -899,7 +899,7 @@ def _initialize_pipeline_state(cur, pipeline_id, last_node_id=None):
         ValueError: If pipeline doesn't exist or last_node_id is invalid
     """
     # Validate pipeline exists
-    if not db_utils.check_pipeline_exists(cur, pipeline_id):
+    if not db_utils.check_if_pipeline_exists(cur, pipeline_id):
         raise ValueError(f"Pipeline {pipeline_id} does not exist")
     
     all_nodes = set(db_utils.get_all_nodes_from_pip_id(cur, pipeline_id))

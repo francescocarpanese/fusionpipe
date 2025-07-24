@@ -90,6 +90,32 @@ def dag_dummy_1():
             G.nodes[node]['status'] = "ready"            
     return G
 
+
+@pytest.fixture
+def dag_dummy_project():
+    import networkx as nx
+    from fusionpipe.utils.pip_utils import NodeState 
+    # Create a simple directed acyclic graph (DAG) for testing
+    G = nx.DiGraph()
+    G.add_edges_from([
+        ("pip_1", "pip_2"),
+        ("pip_1", "pip_3"),
+        ("pip_3", "pip_4"),
+    ])
+    G.add_node("pip_5")  # Add a node with no edges
+    G.name = "pro_12345"
+    G.graph['project_id'] = "pro_12345"
+    G.graph['notes'] = "A simple test project DAG"
+    G.graph['tag'] = "test_tag"
+    G.graph['owner'] = "test_group"
+
+    # Add a 'status' attribute to each node using NodeState
+    for node in G.nodes:
+        G.nodes[node]['tag'] = 'test_tag' + node
+        G.nodes[node]['notes'] = 'test notes'
+    return G
+
+
 @pytest.fixture
 def dict_dummy_1():
     # Create a simple dictionary for testing identical to dag_dummy_1
@@ -105,6 +131,23 @@ def dict_dummy_1():
             "C": {"status": "completed", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_C'},
             "D": {"status": "staledata", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_D'},
             "E": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0,], 'folder_path': 'dummy_folder_path_E'}
+        }
+    }
+
+@pytest.fixture
+def dict_dummy_project():
+    # Create a simple dictionary for testing identical to dag_dummy_project
+    return {
+        "project_id": "pro_12345",
+        "notes": "A simple test project DAG",
+        "tag": "test_tag",
+        "owner": "test_group",
+        "nodes": {
+            "pip_1": {"tag": "test_tagpip_1", "notes": "test notes", "parents": []},
+            "pip_2": {"tag": "test_tagpip_2", "notes": "test notes", "parents": ["pip_1"]},
+            "pip_3": {"tag": "test_tagpip_3", "notes": "test notes", "parents": ["pip_1"]},
+            "pip_4": {"tag": "test_tagpip_4", "notes": "test notes", "parents": ["pip_3"]},
+            "pip_5": {"tag": "test_tagpip_5", "notes": "test notes", "parents": []}
         }
     }
 

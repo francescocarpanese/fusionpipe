@@ -11,7 +11,7 @@ def test_add_pipeline(pg_test_db):
     cur = db_utils.init_db(conn)
 
     pip_id = generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pip_id, tag="test_pipeline", owner="test_user", notes="This is a test pipeline.")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pip_id, tag="test_pipeline", owner="test_user", notes="This is a test pipeline.")
     
     # Commit and close the connection
     conn.commit()
@@ -61,7 +61,7 @@ def test_add_node_to_pipline(pg_test_db):
     node_id = generate_node_id()
     pipeline_id = generate_pip_id()
     db_utils.add_node_to_nodes(cur, node_id=node_id)
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Add entry to node_pipeline_relation table
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
@@ -88,8 +88,8 @@ def test_remove_node_from_pipeline(pg_test_db):
     pipeline_id1 = generate_pip_id()
     pipeline_id2 = generate_pip_id()
     db_utils.add_node_to_nodes(cur, node_id=node_id)
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id1, tag="test_pipeline_1")
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id2, tag="test_pipeline_2")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1, tag="test_pipeline_1")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2, tag="test_pipeline_2")
     # Add a tag to the node
     tag = "test_tag"
 
@@ -258,7 +258,7 @@ def test_get_pipeline_tag(pg_test_db):
     # Add a pipeline with a specific tag
     pipeline_id = generate_pip_id()
     tag = "my_test_tag"
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag=tag)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag=tag)
     conn.commit()
 
     # Test get_pipeline_tag returns the correct tag
@@ -283,7 +283,7 @@ def test_get_all_nodes_from_pip_id(pg_test_db):
     # Create a pipeline and nodes
     pipeline_id = generate_pip_id()
     node_ids = [generate_node_id() for _ in range(3)]
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     for node_id in node_ids:
         db_utils.add_node_to_nodes(cur, node_id=node_id)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
@@ -295,7 +295,7 @@ def test_get_all_nodes_from_pip_id(pg_test_db):
 
     # Test with a pipeline that has no nodes
     empty_pipeline_id = generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=empty_pipeline_id, tag="empty_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=empty_pipeline_id, tag="empty_pipeline")
     conn.commit()
     result_empty = db_utils.get_all_nodes_from_pip_id(cur, empty_pipeline_id)
     assert result_empty == [], "Expected empty list for pipeline with no nodes"
@@ -318,7 +318,7 @@ def test_get_nodes_without_pipeline(pg_test_db):
 
     # Create a pipeline and associate one node with it
     pipeline_id = generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     db_utils.add_node_to_pipeline(cur, node_id=node_ids[0], pipeline_id=pipeline_id)
     conn.commit()
 
@@ -368,7 +368,7 @@ def test_remove_node_from_everywhere(pg_test_db):
     node_id = generate_node_id()
     pipeline_id = generate_pip_id()
     db_utils.add_node_to_nodes(cur, node_id=node_id)
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Add the node to node_pipeline_relation
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
@@ -400,7 +400,7 @@ def from_node_pipeline_relation(pg_test_db):
     node_id = generate_node_id()
     pipeline_id = generate_pip_id()
     db_utils.add_node_to_nodes(cur, node_id=node_id)
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Add the node to node_pipeline_relation
     entry_id = db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
@@ -428,7 +428,7 @@ def test_get_rows_with_node_id_in_node_pipeline(pg_test_db):
     node_id = generate_node_id()
     pipeline_id = generate_pip_id()
     db_utils.add_node_to_nodes(cur, node_id=node_id)
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Add the node to node_pipeline_relation
     entry_id = db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
@@ -490,7 +490,7 @@ def test_get_rows_with_pipeline_id_in_node_pipeline(pg_test_db):
     # Create a pipeline and nodes
     pipeline_id = generate_pip_id()
     node_ids = [generate_node_id() for _ in range(2)]
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     for node_id in node_ids:
         db_utils.add_node_to_nodes(cur, node_id=node_id)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
@@ -517,7 +517,7 @@ def test_get_rows_with_pipeline_id_in_pipelines(pg_test_db):
     # Create a pipeline
     pipeline_id = generate_pip_id()
     tag = "test_pipeline"
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag=tag)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag=tag)
     conn.commit()
 
     # Get rows with the pipeline ID in pipelines
@@ -532,14 +532,14 @@ def test_get_rows_with_pipeline_id_in_pipelines(pg_test_db):
 
 def test_duplicate_pipeline(pg_test_db):
     from fusionpipe.utils import db_utils
-    from fusionpipe.utils.db_utils import add_pipeline, add_node_to_pipeline, duplicate_pipeline, add_node_to_nodes
+    from fusionpipe.utils.db_utils import add_pipeline_to_pipelines, add_node_to_pipeline, duplicate_pipeline, add_node_to_nodes
 
     conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Add a source pipeline
     source_pipeline_id = "source_pipeline"
-    add_pipeline( cur,
+    add_pipeline_to_pipelines( cur,
                   pipeline_id=source_pipeline_id,
                   tag="v1.0",
                   owner="group1",
@@ -578,7 +578,7 @@ def test_duplicate_pipeline(pg_test_db):
 
 def test_duplicate_pipeline_graph_comparison(pg_test_db, dag_dummy_1):
     from fusionpipe.utils import db_utils
-    from fusionpipe.utils.pip_utils import graph_to_db, db_to_graph_from_pip_id
+    from fusionpipe.utils.pip_utils import pipeline_graph_to_db, db_to_pipeline_graph_from_pip_id
     import networkx as nx
 
     # Setup database
@@ -587,7 +587,7 @@ def test_duplicate_pipeline_graph_comparison(pg_test_db, dag_dummy_1):
 
     # Add the original graph to the database
     original_graph = dag_dummy_1
-    graph_to_db(original_graph, cur)
+    pipeline_graph_to_db(original_graph, cur)
     conn.commit()
 
     # Duplicate the pipeline
@@ -597,8 +597,8 @@ def test_duplicate_pipeline_graph_comparison(pg_test_db, dag_dummy_1):
     conn.commit()
 
     # Load the original and duplicated pipelines as graphs
-    original_graph_loaded = db_to_graph_from_pip_id(cur, original_pipeline_id)
-    duplicated_graph_loaded = db_to_graph_from_pip_id(cur, new_pipeline_id)
+    original_graph_loaded = db_to_pipeline_graph_from_pip_id(cur, original_pipeline_id)
+    duplicated_graph_loaded = db_to_pipeline_graph_from_pip_id(cur, new_pipeline_id)
 
     # Compare the graphs
     assert nx.is_isomorphic(
@@ -629,7 +629,7 @@ def test_dupicate_node_in_pipeline_full_coverage(pg_test_db):
 
     # Create a pipeline and add an entry connecting the pipeline to the node
     pipeline_id = generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     db_utils.add_node_to_pipeline(cur, node_id=original_node_id, pipeline_id=pipeline_id)
     conn.commit()
 
@@ -730,7 +730,7 @@ def test_duplicate_node_in_pipeline_with_relations(pg_test_db):
 
     # Create a pipeline and add an entry connecting the pipeline to the source node
     pipeline_id = generate_node_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Duplicate node with relations
     db_utils.duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id, pipeline_id, pipeline_id, parents=True, childrens=True)
@@ -766,7 +766,7 @@ def test_get_pipelines_with_node(pg_test_db):
     pipeline_ids = [generate_pip_id() for _ in range(3)]
     db_utils.add_node_to_nodes(cur, node_id=node_id)
     for pipeline_id in pipeline_ids:
-        db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag=f"pipeline_{pipeline_id}")
+        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag=f"pipeline_{pipeline_id}")
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
@@ -796,7 +796,7 @@ def test_count_pipeline_with_node(pg_test_db):
     pipeline_ids = [generate_pip_id() for _ in range(3)]
     db_utils.add_node_to_nodes(cur, node_id=node_id)
     for pipeline_id in pipeline_ids:
-        db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag=f"pipeline_{pipeline_id}")
+        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag=f"pipeline_{pipeline_id}")
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
@@ -830,7 +830,7 @@ def test_is_node_editable(pg_test_db):
 
     # Test case: Node belongs to one pipeline
     pipeline_id = generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
@@ -839,7 +839,7 @@ def test_is_node_editable(pg_test_db):
 
     # Test case: Node belongs to more than one pipeline
     another_pipeline_id = generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=another_pipeline_id, tag="another_test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=another_pipeline_id, tag="another_test_pipeline")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=another_pipeline_id)
     conn.commit()
 
@@ -865,8 +865,8 @@ def test_update_editable_status_for_all_nodes(pg_test_db):
     # Create pipelines
     pipeline1 = generate_pip_id()
     pipeline2 = generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline1, tag="pipeline1")
-    db_utils.add_pipeline(cur, pipeline_id=pipeline2, tag="pipeline2")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline1, tag="pipeline1")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline2, tag="pipeline2")
 
     # Associate nodes with pipelines
     db_utils.add_node_to_pipeline(cur, node_id=node1, pipeline_id=pipeline1)
@@ -899,7 +899,7 @@ def test_get_pipeline_notes_existing_and_nonexistent(pg_test_db):
     # Add a pipeline with notes
     pipeline_id = generate_pip_id()
     notes = "This is a test note."
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline", notes=notes)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline", notes=notes)
     conn.commit()
 
     # Test: get notes for existing pipeline
@@ -908,7 +908,7 @@ def test_get_pipeline_notes_existing_and_nonexistent(pg_test_db):
 
     # Test: get notes for pipeline with no notes
     pipeline_id_no_notes = generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id_no_notes, tag="no_notes_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id_no_notes, tag="no_notes_pipeline")
     conn.commit()
     fetched_notes_none = db_utils.get_pipeline_notes(cur, pipeline_id_no_notes)
     assert fetched_notes_none is None, "Expected None for pipeline with no notes"
@@ -927,7 +927,7 @@ def test_get_pipeline_owner_existing_and_nonexistent(pg_test_db):
     # Add a pipeline with an owner
     pipeline_id = generate_pip_id()
     owner = "test_owner"
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline", owner=owner)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline", owner=owner)
     conn.commit()
 
     # Test: get owner for existing pipeline
@@ -936,7 +936,7 @@ def test_get_pipeline_owner_existing_and_nonexistent(pg_test_db):
 
     # Test: get owner for pipeline with no owner
     pipeline_id_no_owner = generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id_no_owner, tag="no_owner_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id_no_owner, tag="no_owner_pipeline")
     conn.commit()
     fetched_owner_none = db_utils.get_pipeline_owner(cur, pipeline_id_no_owner)
     assert fetched_owner_none is None, "Expected None for pipeline with no owner"
@@ -984,7 +984,7 @@ def test_remove_pipeline_removes_pipeline_from_everywhere(pg_test_db):
     # Create a pipeline and related data
     pipeline_id = generate_pip_id()
     node_id = generate_node_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline", owner="owner", notes="notes")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline", owner="owner", notes="notes")
     db_utils.add_node_to_nodes(cur, node_id=node_id)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
@@ -1028,7 +1028,7 @@ def test_sanitize_node_relation(pg_test_db):
     db_utils.add_node_to_nodes(cur, node_id=node5, editable=False)  # Not editable
     db_utils.add_node_to_nodes(cur, node_id=node6, editable=False)  # Not editable
     db_utils.add_node_to_nodes(cur, node_id=node7)
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     db_utils.add_node_to_pipeline(cur, node_id=node1, pipeline_id=pipeline_id)
     db_utils.add_node_to_pipeline(cur, node_id=node2, pipeline_id=pipeline_id)
     db_utils.add_node_to_pipeline(cur, node_id=node7, pipeline_id=pipeline_id)
@@ -1071,7 +1071,7 @@ def test_remove_pipeline_from_everywhere(pg_test_db):
     # Create a pipeline and related data
     pipeline_id = generate_pip_id()
     node_id = generate_node_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline", owner="owner", notes="notes")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline", owner="owner", notes="notes")
     db_utils.add_node_to_nodes(cur, node_id=node_id)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
@@ -1167,8 +1167,8 @@ def test_duplicate_node_pipeline_relation(pg_test_db):
     source_pipeline_id = generate_pip_id()
     target_pipeline_id = generate_pip_id()
     node_ids = [generate_node_id() for _ in range(2)]
-    db_utils.add_pipeline(cur, pipeline_id=source_pipeline_id, tag="source_pipeline")
-    db_utils.add_pipeline(cur, pipeline_id=target_pipeline_id, tag="target_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=source_pipeline_id, tag="source_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=target_pipeline_id, tag="target_pipeline")
     for node_id in node_ids:
         db_utils.add_node_to_nodes(cur, node_id=node_id)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=source_pipeline_id)
@@ -1233,7 +1233,7 @@ def test_clear_all_tables(pg_test_db):
     # Add data to all tables
     pipeline_id = generate_pip_id()
     node_id = generate_node_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     db_utils.add_node_to_nodes(cur, node_id=node_id)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     db_utils.add_node_relation(cur, child_id=node_id, parent_id=node_id)
@@ -1276,3 +1276,404 @@ def test_get_all_tables_names(pg_test_db):
         "processes"
     }
     assert expected_tables.issubset(set(table_names)), f"Missing tables: {expected_tables - set(table_names)}"
+
+def test_add_and_remove_project_to_pipeline(pg_test_db):
+    from fusionpipe.utils import db_utils
+    from fusionpipe.utils.pip_utils import generate_pip_id
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add a project and a pipeline
+    project_id = "proj_123"
+    pipeline_id = generate_pip_id()
+    db_utils.add_project(cur, project_id=project_id, tag="test_project", notes="project notes", owner="owner1")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    conn.commit()
+
+    # Associate project with pipeline
+    rows_updated = db_utils.add_project_to_pipeline(cur, project_id, pipeline_id)
+    conn.commit()
+    assert rows_updated == 1, "Project was not added to pipeline."
+
+    # Verify association
+    cur.execute("SELECT project_id FROM pipelines WHERE pipeline_id=%s", (pipeline_id,))
+    result = cur.fetchone()
+    assert result is not None, "Pipeline not found."
+    assert result[0] == project_id, "Project ID not associated with pipeline."
+
+    # Remove project from pipeline
+    rows_updated = db_utils.remove_project_from_pipeline(cur, project_id, pipeline_id)
+    conn.commit()
+    assert rows_updated == 1, "Project was not removed from pipeline."
+
+    # Verify removal
+    cur.execute("SELECT project_id FROM pipelines WHERE pipeline_id=%s", (pipeline_id,))
+    result = cur.fetchone()
+    assert result is not None, "Pipeline not found after removal."
+    assert result[0] is None, "Project ID was not removed from pipeline."
+
+def test_get_all_projects(pg_test_db):
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add projects
+    projects = [
+        {"project_id": "proj1", "tag": "tag1", "notes": "notes1", "owner": "owner1"},
+        {"project_id": "proj2", "tag": "tag2", "notes": "notes2", "owner": "owner2"},
+    ]
+    for p in projects:
+        db_utils.add_project(cur, **p)
+    conn.commit()
+
+    # Get all projects
+    result = db_utils.get_all_projects(cur)
+    project_ids = {proj["project_id"] for proj in result}
+    assert "proj1" in project_ids and "proj2" in project_ids, f"Projects not found: {project_ids}"
+
+def test_check_project_exists(pg_test_db):
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add a project
+    db_utils.add_project(cur, project_id="proj_exists", tag="tag", notes="notes", owner="owner")
+    conn.commit()
+
+    # Check existence
+    assert db_utils.check_project_exists(cur, "proj_exists") is True
+    assert db_utils.check_project_exists(cur, "proj_missing") is False
+
+def test_get_project_by_id(pg_test_db):
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add a project
+    db_utils.add_project(cur, project_id="proj_id", tag="tag", notes="notes", owner="owner")
+    conn.commit()
+
+    # Get project by id
+    proj = db_utils.get_project_by_id(cur, "proj_id")
+    assert proj is not None, "Project not found"
+    assert proj["project_id"] == "proj_id"
+    assert proj["tag"] == "tag"
+    assert proj["notes"] == "notes"
+    assert proj["owner"] == "owner"
+
+    # Non-existent project
+    assert db_utils.get_project_by_id(cur, "missing_id") is None
+
+def test_remove_project(pg_test_db):
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add and remove project
+    db_utils.add_project(cur, project_id="proj_del", tag="tag", notes="notes", owner="owner")
+    conn.commit()
+    rows_deleted = db_utils.remove_project(cur, "proj_del")
+    conn.commit()
+    assert rows_deleted == 1, "Project was not deleted"
+    assert db_utils.get_project_by_id(cur, "proj_del") is None
+
+
+def test_update_project_tag(pg_test_db):
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add a project
+    project_id = "proj_tag_update"
+    db_utils.add_project(cur, project_id=project_id, tag="old_tag", notes="notes", owner="owner")
+    conn.commit()
+
+    # Update the tag
+    rows_updated = db_utils.update_project_tag(cur, project_id, "new_tag")
+    conn.commit()
+    assert rows_updated == 1, "Project tag was not updated"
+
+    # Verify the tag was updated
+    cur.execute("SELECT tag FROM projects WHERE project_id=%s", (project_id,))
+    result = cur.fetchone()
+    assert result is not None, "Project not found"
+    assert result[0] == "new_tag", f"Expected tag 'new_tag', got '{result[0]}'"
+
+def test_update_project_notes(pg_test_db):
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add a project
+    project_id = "proj_notes_update"
+    db_utils.add_project(cur, project_id=project_id, tag="tag", notes="old_notes", owner="owner")
+    conn.commit()
+
+    # Update the notes
+    rows_updated = db_utils.update_project_notes(cur, project_id, "new_notes")
+    conn.commit()
+    assert rows_updated == 1, "Project notes were not updated"
+
+    # Verify the notes were updated
+    cur.execute("SELECT notes FROM projects WHERE project_id=%s", (project_id,))
+    result = cur.fetchone()
+    assert result is not None, "Project not found"
+    assert result[0] == "new_notes", f"Expected notes 'new_notes', got '{result[0]}'"
+
+def test_get_pipeline_ids_by_project(pg_test_db):
+    from fusionpipe.utils.pip_utils import generate_pip_id
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add a project
+    project_id = "proj_test"
+    db_utils.add_project(cur, project_id=project_id, tag="tag", notes="notes", owner="owner")
+    conn.commit()
+
+    # Add pipelines and associate them with the project
+    pipeline_ids = [generate_pip_id() for _ in range(3)]
+    for pid in pipeline_ids:
+        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pid, tag=f"pipeline_{pid}")
+        db_utils.add_project_to_pipeline(cur, project_id, pid)
+    conn.commit()
+
+    # Add a pipeline not associated with the project
+    unrelated_pipeline_id = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=unrelated_pipeline_id, tag="unrelated")
+    conn.commit()
+
+    # Get pipeline IDs by project
+    result = db_utils.get_pipeline_ids_by_project(cur, project_id)
+    assert set(result) == set(pipeline_ids), f"Expected {pipeline_ids}, got {result}"
+
+    # Test with project that has no pipelines
+    db_utils.add_project(cur, project_id="proj_empty", tag="tag", notes="notes", owner="owner")
+    conn.commit()
+    result_empty = db_utils.get_pipeline_ids_by_project(cur, "proj_empty")
+    assert result_empty == [], f"Expected empty list, got {result_empty}"
+
+    # Test with non-existent project
+    result_none = db_utils.get_pipeline_ids_by_project(cur, "missing_proj")
+    assert result_none == [], f"Expected empty list for missing project, got {result_none}"
+
+
+def test_remove_project_from_everywhere(pg_test_db):
+    from fusionpipe.utils.pip_utils import generate_pip_id
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add a project and pipelines associated with it
+    project_id = "proj_remove_everywhere"
+    pipeline_ids = [generate_pip_id() for _ in range(2)]
+    db_utils.add_project(cur, project_id=project_id, tag="tag", notes="notes", owner="owner")
+    for pid in pipeline_ids:
+        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pid, tag=f"pipeline_{pid}")
+        db_utils.add_project_to_pipeline(cur, project_id, pid)
+    conn.commit()
+
+    # Remove project from everywhere
+    rows_affected = db_utils.remove_project_from_everywhere(cur, project_id)
+    conn.commit()
+
+    # Project should be removed from projects table
+    assert db_utils.get_project_by_id(cur, project_id) is None, "Project was not removed from projects table."
+
+    # Pipelines should have project_id set to NULL
+    for pid in pipeline_ids:
+        cur.execute("SELECT project_id FROM pipelines WHERE pipeline_id=%s", (pid,))
+        result = cur.fetchone()
+        assert result is not None, "Pipeline not found after project removal."
+        assert result[0] is None, f"Project ID was not removed from pipeline {pid}."
+
+    # Return value should be 1 (number of rows deleted from projects)
+    assert rows_affected == 1, f"Expected 1 row deleted from projects, got {rows_affected}"
+
+def test_get_project_id_by_pipeline(pg_test_db):
+    from fusionpipe.utils.pip_utils import generate_pip_id
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add a project and a pipeline, associate them
+    project_id = "proj_for_pipeline"
+    pipeline_id = generate_pip_id()
+    db_utils.add_project(cur, project_id=project_id, tag="tag", notes="notes", owner="owner")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="pipeline_tag")
+    db_utils.add_project_to_pipeline(cur, project_id, pipeline_id)
+    conn.commit()
+
+    # Should return the correct project_id
+    result = db_utils.get_project_id_by_pipeline(cur, pipeline_id)
+    assert result == project_id, f"Expected project_id '{project_id}', got '{result}'"
+
+    # Pipeline with no project
+    pipeline_id_no_project = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id_no_project, tag="no_project")
+    conn.commit()
+    result_none = db_utils.get_project_id_by_pipeline(cur, pipeline_id_no_project)
+    assert result_none == "", f"Expected empty string for pipeline with no project, got '{result_none}'"
+
+    # Non-existent pipeline
+    result_missing = db_utils.get_project_id_by_pipeline(cur, "missing_pipeline")
+    assert result_missing == "", f"Expected empty string for missing pipeline, got '{result_missing}'"
+
+
+def test_add_pipeline_relation_and_remove(pg_test_db):
+    from fusionpipe.utils.pip_utils import generate_pip_id
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add two pipelines
+    parent_id = generate_pip_id()
+    child_id = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=parent_id, tag="parent_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=child_id, tag="child_pipeline")
+    conn.commit()
+
+    # Add relation between pipelines
+    rows_added = db_utils.add_pipeline_relation(cur, child_id=child_id, parent_id=parent_id)
+    conn.commit()
+    assert rows_added == 1, "Pipeline relation was not added."
+
+    # Verify relation exists
+    cur.execute("SELECT child_id, parent_id FROM pipeline_relation WHERE child_id=%s AND parent_id=%s", (child_id, parent_id))
+    result = cur.fetchone()
+    assert result is not None, "Pipeline relation not found."
+    assert result[0] == child_id and result[1] == parent_id, "Pipeline relation values do not match."
+
+    # Remove relation by child_id and parent_id
+    rows_removed = db_utils.remove_pipeline_relation(cur, child_id=child_id, parent_id=parent_id)
+    conn.commit()
+    assert rows_removed == 1, "Pipeline relation was not removed."
+
+    # Verify relation is removed
+    cur.execute("SELECT * FROM pipeline_relation WHERE child_id=%s AND parent_id=%s", (child_id, parent_id))
+    assert cur.fetchone() is None, "Pipeline relation was not deleted."
+
+def test_add_pipeline_relation_with_null_parent_and_remove(pg_test_db):
+    from fusionpipe.utils.pip_utils import generate_pip_id
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add a pipeline
+    child_id = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=child_id, tag="child_pipeline")
+    conn.commit()
+
+    # Add relation with parent_id=None
+    rows_added = db_utils.add_pipeline_relation(cur, child_id=child_id, parent_id=None)
+    conn.commit()
+    assert rows_added == 1, "Pipeline relation with null parent was not added."
+
+    # Verify relation exists
+    cur.execute("SELECT child_id, parent_id FROM pipeline_relation WHERE child_id=%s", (child_id,))
+    result = cur.fetchone()
+    assert result is not None, "Pipeline relation with null parent not found."
+    assert result[0] == child_id and result[1] is None, "Pipeline relation values do not match for null parent."
+
+    # Remove relation by child_id only
+    rows_removed = db_utils.remove_pipeline_relation(cur, child_id=child_id)
+    conn.commit()
+    assert rows_removed == 1, "Pipeline relation with null parent was not removed."
+
+    # Verify relation is removed
+    cur.execute("SELECT * FROM pipeline_relation WHERE child_id=%s", (child_id,))
+    assert cur.fetchone() is None, "Pipeline relation with null parent was not deleted."
+
+def test_get_pipeline_parents(pg_test_db):
+    from fusionpipe.utils.pip_utils import generate_pip_id
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add pipelines
+    parent_id1 = generate_pip_id()
+    parent_id2 = generate_pip_id()
+    child_id = generate_pip_id()
+    unrelated_id = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=parent_id1, tag="parent1")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=parent_id2, tag="parent2")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=child_id, tag="child")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=unrelated_id, tag="unrelated")
+    conn.commit()
+
+    # Add relations: child_id has two parents
+    db_utils.add_pipeline_relation(cur, child_id=child_id, parent_id=parent_id1)
+    db_utils.add_pipeline_relation(cur, child_id=child_id, parent_id=parent_id2)
+    conn.commit()
+
+    # Test: get parents for child_id
+    parents = db_utils.get_pipeline_parents(cur, child_id)
+    assert set(parents) == set([parent_id1, parent_id2]), f"Expected parents {parent_id1}, {parent_id2}, got {parents}"
+
+    # Test: pipeline with no parents
+    no_parents = db_utils.get_pipeline_parents(cur, parent_id1)
+    assert no_parents == [], f"Expected no parents for {parent_id1}, got {no_parents}"
+
+    # Test: pipeline with no relation at all
+    no_parents_unrelated = db_utils.get_pipeline_parents(cur, unrelated_id)
+    assert no_parents_unrelated == [], f"Expected no parents for {unrelated_id}, got {no_parents_unrelated}"
+
+    # Test: pipeline with parent_id=None (root pipeline)
+    root_pipeline_id = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=root_pipeline_id, tag="root")
+    db_utils.add_pipeline_relation(cur, child_id=root_pipeline_id, parent_id=None)
+    conn.commit()
+    parents_root = db_utils.get_pipeline_parents(cur, root_pipeline_id)
+    assert parents_root == [None], f"Expected [None] for root pipeline, got {parents_root}"
+
+
+def test_get_all_pipelines_from_project_id(pg_test_db):
+    from fusionpipe.utils import db_utils
+    from fusionpipe.utils.pip_utils import generate_pip_id
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add a project
+    project_id = "proj_for_pipelines"
+    db_utils.add_project(cur, project_id=project_id, tag="tag", notes="notes", owner="owner")
+    conn.commit()
+
+    # Add pipelines and associate them with the project
+    pipeline_ids = ["pipeline1", "pipeline2", "pipeline3"]
+    for pid in pipeline_ids:
+        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pid, tag=f"tag_{pid}")
+        db_utils.add_project_to_pipeline(cur, project_id, pid)
+    conn.commit()
+
+    # Add a pipeline not associated with the project
+    unrelated_pipeline_id = "unrelated_pipeline"
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=unrelated_pipeline_id, tag="unrelated")
+    conn.commit()
+
+    # Get all pipelines for the project
+    result = db_utils.get_all_pipelines_from_project_id(cur, project_id)
+    assert set(result) == set(pipeline_ids), f"Expected {pipeline_ids}, got {result}"
+
+    # Test with project that has no pipelines
+    db_utils.add_project(cur, project_id="proj_empty", tag="tag", notes="notes", owner="owner")
+    conn.commit()
+    result_empty = db_utils.get_all_pipelines_from_project_id(cur, "proj_empty")
+    assert result_empty == [], f"Expected empty list, got {result_empty}"
+
+    # Test with non-existent project
+    result_none = db_utils.get_all_pipelines_from_project_id(cur, "missing_proj")
+    assert result_none == [], f"Expected empty list for missing project, got {result_none}"
