@@ -13,7 +13,9 @@
     type Edge,
   } from "@xyflow/svelte";
 
-  
+  import ProjectGraph from "./ProjectGraph.svelte";
+  import PipelineGraph from "./PipelineGraph.svelte";
+
   import { Textarea } from "flowbite-svelte";
   import "@xyflow/svelte/dist/style.css";
   import SvelteSelect from "svelte-select";
@@ -1811,7 +1813,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       </Navbar>
 
       <div class="main-content" bind:clientWidth bind:clientHeight>
-    <SvelteFlow
+    <!-- <SvelteFlow
       nodes={projectNodes}
       edges={projectEdges}
       fitView
@@ -1825,7 +1827,21 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
           "None"}<br />
       </Panel>
       <Controls />
-    </SvelteFlow>
+    </SvelteFlow> -->
+
+<ProjectGraph
+  nodes={projectNodes}
+  edges={projectEdges}
+  currentProjectId={currentProjectId}
+  ids_tags_dict_projects={ids_tags_dict_projects}
+  nodeTypes={nodeTypes}
+  onUpdate={(e) => {
+    projectNodes = e.detail.nodes;
+    projectEdges = e.detail.edges;
+  }}
+/>
+
+
       </div>
     </div>
     
