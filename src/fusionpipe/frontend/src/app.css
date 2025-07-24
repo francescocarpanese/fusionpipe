@@ -137,3 +137,36 @@ html, body, #app {
 .custom-node .line {
   white-space: nowrap;
 }
+
+
+.two-column-wrapper {
+  display: flex;
+  height: 100vh;
+}
+
+.left-column {
+  flex: 0 0 30%;
+  display: flex;
+  flex-direction: column;
+}
+.right-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.right-column {
+  border-left: 1px solid #e5e7eb;
+}
+
+.column-header {
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+}
+
+.column-content {
+  flex: 1;
+  padding: 1rem;
+  overflow: auto;
+}

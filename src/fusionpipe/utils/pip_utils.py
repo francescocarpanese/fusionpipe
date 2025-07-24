@@ -313,10 +313,11 @@ def pipeline_graph_to_db(Gnx, cur):
     graph_tag = Gnx.graph.get('tag', None)
     owner = Gnx.graph.get('owner', None)
     notes = Gnx.graph.get('notes', None)
+    project_id = Gnx.graph.get('project_id', None)
 
     # Check if the pipeline already exists, if not, add it
     if not db_utils.check_if_pipeline_exists(cur, pip_id):
-        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pip_id, tag=graph_tag, owner=owner, notes=notes)
+        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pip_id, tag=graph_tag, owner=owner, notes=notes, project_id=project_id)
 
     # Add nodes and their dependencies directly from the graph
     for node in Gnx.nodes:

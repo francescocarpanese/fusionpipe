@@ -17,11 +17,12 @@ def get_db():
         db.close()
 
 @router.post("/create_pipeline")
-def create_pipeline(db_conn=Depends(get_db)):
+def create_pipeline(payload: dict, db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     pipeline_id = pip_utils.generate_pip_id()
+    project_id = payload.get("project_id")
     try:
-        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag=None)
+        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag=None, project_id=project_id)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
@@ -481,7 +482,7 @@ def add_pipeline_to_project_route(payload: dict, db_conn=Depends(get_db)):
         raise HTTPException(status_code=400, detail="Missing project_id or pipeline_id")
     cur = db_conn.cursor()
     try:
-        rows_affected = db_utils.add_pipeline_to_project(cur, project_id, pipeline_id)
+        rows_affected = db_utils.add_project_to_pipeline(cur, project_id, pipeline_id)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
