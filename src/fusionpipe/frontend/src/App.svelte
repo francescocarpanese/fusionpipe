@@ -887,6 +887,28 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       currentProjectId = pipeline.project_id || "";
       selectedPipelineDropdown = null;
 
+      // Set status property to "active" for the projectNode that matches the pipeline id,
+      // and set the background color accordingly
+      projectNodes = projectNodes.map((node) => {
+        if (node.id === pipelineId) {
+          return {
+        ...node,
+        data: {
+          ...node.data,
+        },
+        style: `background: ${getNodeColor("completed")}`,
+          };
+        } else {
+          return {
+        ...node,
+        data: {
+          ...node.data,
+        },
+        style: `background: ${getNodeColor("")}`,
+          };
+        }
+      });
+
     } catch (error) {
       console.error("Error loading selected pipeline:", error);
     }
@@ -932,7 +954,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
   }  
 
   // Load the selected pipeline when the component mounts or when currentPipelineId changes
-  async function loadSelectedPipeline() {
+  async function loadSelectedDropdownPipeline() {
     const pipelineId =
       typeof currentPipelineId === "string"
         ? currentPipelineId
@@ -945,6 +967,31 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
     await loadPipeline(pipelineId);
   }
+
+  // Load the selected pipeline when the component mounts or when currentPipelineId changes
+  async function loadSelectedGraphPipeline() {
+    const selectedNode = projectNodes.find((node) => node.selected);
+    if (!selectedNode) {
+      console.error("No node selected");
+      return;
+    }
+
+    const selectedCount = projectNodes.filter((node) => node.selected).length;
+    if (selectedCount !== 1) {
+      alert("Please select exactly one pipeline node to load.");
+      return;
+    }
+
+    if (!selectedNode.id) {
+      console.error("Selected node has no ID");
+      return;
+    }
+
+    const pipelineId = selectedNode.id;        
+
+    await loadPipeline(pipelineId);
+  }
+
 
   // Load the selected project when the component mounts or when currentProjectId changes
   async function loadSelectedProject() {
@@ -1706,12 +1753,15 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
               bind:value={selectedPipelineDropdown}
               placeholder="Select a pipeline..."
               maxItems={5}
-              on:select={loadSelectedPipeline}
+              on:select={loadSelectedDropdownPipeline}
             />
           </div>
         </DropdownItem>
 
         <DropdownDivider />
+        <DropdownItem onclick={loadSelectedGraphPipeline}
+          >Load selected Pipeline</DropdownItem
+        >        
         <DropdownItem onclick={() => (isHiddenPipelinePanel = false)}
           >Open selected pipeline panel</DropdownItem
         >
