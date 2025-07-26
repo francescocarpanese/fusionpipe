@@ -1677,3 +1677,48 @@ def test_get_all_pipelines_from_project_id(pg_test_db):
     # Test with non-existent project
     result_none = db_utils.get_all_pipelines_from_project_id(cur, "missing_proj")
     assert result_none == [], f"Expected empty list for missing project, got {result_none}"
+
+
+def test_is_pipeline_editable(pg_test_db):
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Create a pipeline
+    pipeline_id = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    conn.commit()
+
+    # Test case: Pipeline with no nodes
+    is_editable = db_utils.is_pipeline_editable(cur, pipeline_id)
+    assert is_editable is False, f"Expected pipeline {pipeline_id} to be non-editable when it has no nodes."
+
+    # Add a node to the pipeline
+    node_id = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    conn.commit()
+
+    # Test case: Pipeline with one editable node
+    is_editable = db_utils.is_pipeline_editable(cur, pipeline_id)
+    assert is_editable is True, f"Expected pipeline {pipeline_id} to be editable when it has at least one editable node."
+
+    # Add another node to the pipeline and set it to non-editable
+    another_node_id = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=another_node_id, editable=False)
+    db_utils.add_node_to_pipeline(cur, node_id=another_node_id, pipeline_id=pipeline_id)
+    conn.commit()
+
+    # Test case: Pipeline with one editable and one non-editable node
+    is_editable = db_utils.is_pipeline_editable(cur, pipeline_id)
+    assert is_editable is True, f"Expected pipeline {pipeline_id} to remain editable when it has at least one editable node."
+
+    # Update the first node to be non-editable
+    db_utils.update_editable_status(cur, node_id=node_id, editable=False)
+    conn.commit()
+
+    # Test case: Pipeline with no editable nodes
+    is_editable = db_utils.is_pipeline_editable(cur, pipeline_id)
+    assert is_editable is False, f"Expected pipeline {pipeline_id} to be non-editable when all its nodes are non-editable."

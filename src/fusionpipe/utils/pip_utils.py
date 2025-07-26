@@ -219,6 +219,7 @@ def pipeline_graph_to_dict(graph):
         'tag': graph.graph.get('tag', None),  # Optional tag for the pipeline
         'owner': graph.graph.get('owner', None),  # Optional owner for the pipeline
         'project_id': graph.graph.get('project_id', ""),  # Optional list of project IDs associated with the pipeline
+        'editable': graph.graph.get('editable', True),  # Optional editable status for the pipeline
     }
     for node in graph.nodes:
         parents = list(graph.predecessors(node))
@@ -266,46 +267,10 @@ def graph_dict_to_json(graph_dict, file_path, verbose=False):
     if verbose:
         print(f"Graph data saved to {file_path}")
 
-def graph_dict_to_db(graph_dict, cur):
-    # Insert pipeline using graph_dict fields
-    pipeline_id = graph_dict["pipeline_id"]
-    tag = graph_dict["tag"]
-    owner = graph_dict["owner"]
-    notes = graph_dict["notes"]
-    project_id = graph_dict.get("project_id", "")
-
-    if not db_utils.check_project_exists(cur, project_id):
-        # If the project does not exist, create it
-        db_utils.add_project(cur, project_id=project_id)
-
-    if not db_utils.check_if_pipeline_exists(cur, pipeline_id):
-        # If the pipeline does not exist, create it
-        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag=tag, owner=owner, notes=notes)
-
-
-        # Insert nodes using graph_dict fields
-        for node_id, node_data in graph_dict["nodes"].items():
-            status = node_data["status"]
-            editable = int(node_data["editable"])
-            node_notes = node_data["notes"]
-            node_tag = node_data["tag"]
-            position = node_data.get("position", None)
-            folder_path = node_data.get("folder_path", None)
-
-            db_utils.add_node_to_nodes(cur, node_id=node_id, status=status, editable=editable, notes=node_notes,folder_path=folder_path, node_tag=node_tag)
-            db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, position_x=position[0], position_y=position[1])
-
-        # Insert node relations (edges) using parents field
-        for child_id, node_data in graph_dict["nodes"].items():
-            for parent_id in node_data.get("parents", []):
-                db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
-
-        db_utils.add_project_to_pipeline(cur, project_id=project_id, pipeline_id=pipeline_id)
-        return cur
 
 def pipeline_graph_to_db(Gnx, cur):
     """
-    - This function can be used to add a graph to the database.
+    - This function can be used to add a pipeline graph to the pipelines table
     - This will also work to add a subgraph to an existing pipeline.
     """
     # Add the pipeline to the database
@@ -313,11 +278,16 @@ def pipeline_graph_to_db(Gnx, cur):
     graph_tag = Gnx.graph.get('tag', None)
     owner = Gnx.graph.get('owner', None)
     notes = Gnx.graph.get('notes', None)
-    project_id = Gnx.graph.get('project_id', None)
+    project_id = Gnx.graph.get('project_id', generate_project_id())
+    editable = Gnx.graph.get('editable', True)
 
+    # Check if the project associated with the pipeline exists, if not, add it
+    if project_id and not db_utils.check_if_project_exists(cur, project_id):
+        db_utils.add_project(cur, project_id=project_id)
+    
     # Check if the pipeline already exists, if not, add it
     if not db_utils.check_if_pipeline_exists(cur, pip_id):
-        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pip_id, tag=graph_tag, owner=owner, notes=notes, project_id=project_id)
+        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pip_id, tag=graph_tag, owner=owner, notes=notes, project_id=project_id, editable=editable)
 
     # Add nodes and their dependencies directly from the graph
     for node in Gnx.nodes:
@@ -393,6 +363,7 @@ def db_to_pipeline_graph_from_pip_id(cur, pip_id):
     G.graph['tag'] = db_utils.get_pipeline_tag(cur, pipeline_id=pip_id)  # Set the graph tag from the pipeline data
     G.graph['owner'] = db_utils.get_pipeline_owner(cur, pipeline_id=pip_id)  # Optional owner for the pipeline
     G.graph['project_id'] = db_utils.get_project_id_by_pipeline(cur, pipeline_id=pip_id)  # Optional list of project IDs associated with the pipeline
+    G.graph['editable'] = db_utils.get_pipeline_editable_status(cur, pipeline_id=pip_id)  # Optional editable status for the pipeline
 
     # Add nodes and their dependencies
     for node_id in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id=pip_id):
@@ -457,7 +428,7 @@ def db_to_project_graph_from_project_id(cur, project_id):
     return G
 
 
-def db_to_graph_dict_from_pip_id(cur, pip_id):
+def db_to_pipeline_dict_from_pip_id(cur, pip_id):
     graph = db_to_pipeline_graph_from_pip_id(cur, pip_id)
     return pipeline_graph_to_dict(graph)
 

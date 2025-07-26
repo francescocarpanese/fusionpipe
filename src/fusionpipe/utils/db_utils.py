@@ -63,6 +63,7 @@ def init_db(conn):
             owner TEXT DEFAULT NULL,
             notes TEXT DEFAULT NULL,
             project_id TEXT DEFAULT NULL,
+            editable BOOLEAN DEFAULT TRUE,
             FOREIGN KEY (project_id) REFERENCES projects(project_id)
         )
     ''')
@@ -127,10 +128,10 @@ def init_db(conn):
     return cur
 
 
-def add_pipeline_to_pipelines(cur, pipeline_id, tag=None, owner=None, notes=None, project_id=None):
+def add_pipeline_to_pipelines(cur, pipeline_id, tag=None, owner=None, notes=None, project_id=None, editable=True):
     if tag is None:
         tag = pipeline_id
-    cur.execute('INSERT INTO pipelines (pipeline_id, tag, owner, notes, project_id) VALUES (%s, %s, %s, %s, %s)', (pipeline_id, tag, owner, notes, project_id))
+    cur.execute('INSERT INTO pipelines (pipeline_id, tag, owner, notes, project_id, editable) VALUES (%s, %s, %s, %s, %s, %s)', (pipeline_id, tag, owner, notes, project_id, editable))
     return pipeline_id
 
 def add_node_to_nodes(cur, node_id, status='ready', editable=True, notes=None, folder_path=None, node_tag=None):
@@ -820,3 +821,38 @@ def get_project_tag(cur, project_id):
     cur.execute('SELECT tag FROM projects WHERE project_id = %s', (project_id,))
     row = cur.fetchone()
     return row[0] if row else None
+
+def is_pipeline_editable(cur, pipeline_id):
+    """
+    Set the editable status of a pipeline based on the editable status of its nodes.
+    If at least one node in the pipeline is editable, the pipeline is set to editable.
+    :param cur: Database cursor
+    :param pipeline_id: ID of the pipeline to check
+    :return: True if the pipeline is editable, False otherwise
+    """
+    # Check if at least one node in the pipeline is editable
+    cur.execute('''
+        SELECT EXISTS (
+            SELECT 1
+            FROM node_pipeline_relation npr
+            JOIN nodes n ON npr.node_id = n.node_id
+            WHERE npr.pipeline_id = %s AND n.editable = TRUE
+        )
+    ''', (pipeline_id,))
+    is_editable = cur.fetchone()[0]
+
+    # Update the pipeline's editable status
+    cur.execute('UPDATE pipelines SET editable = %s WHERE pipeline_id = %s', (is_editable, pipeline_id))
+    return bool(is_editable)
+
+
+def get_pipeline_editable_status(cur, pipeline_id):
+    """
+    Get the editable status of a specific pipeline.
+    :param cur: Database cursor
+    :param pipeline_id: ID of the pipeline to query
+    :return: Editable status of the pipeline (True or False)
+    """
+    cur.execute('SELECT editable FROM pipelines WHERE pipeline_id = %s', (pipeline_id,))
+    row = cur.fetchone()
+    return bool(row[0]) if row else None  # Return True or False based on the editable status

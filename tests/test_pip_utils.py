@@ -117,7 +117,7 @@ def test_graph_dict_to_json(tmp_base_dir, dict_dummy_1):
     assert loaded == dict_dummy_1, "JSON file content does not match the original dictionary."
 
 
-def test_graph_to_db_and_db_to_graph_roundtrip(pg_test_db, dag_dummy_1):
+def test_pipeline_graph_to_db_and_db_to_pipeline_graph_roundtrip(pg_test_db, dag_dummy_1):
     """
     Test that a graph can be written to the database and then read back,
     and that the structure and attributes are preserved.
@@ -156,7 +156,7 @@ def test_graph_to_db_and_db_to_graph_roundtrip(pg_test_db, dag_dummy_1):
     ), "Loaded graph is not isomorphic to the original graph with respect to structure and node attributes."
 
     # Check graph attributes
-    for attr in ['pipeline_id', 'notes', 'tag', 'owner']:
+    for attr in ['pipeline_id', 'notes', 'tag', 'owner', 'editable']:
         assert G_loaded.graph[attr] == dag_dummy_1.graph[attr]
 
 
@@ -202,29 +202,6 @@ def test_project_graph_to_db_and_db_to_project_graph_roundtrip(pg_test_db, dag_d
     for attr in ['project_id', 'notes', 'tag', 'owner']:
         assert G_loaded.graph[attr] == dag_dummy_project.graph[attr]
 
-
-
-def test_graph_dict_to_db_and_db_to_graph_dict_roundtrip(pg_test_db, dict_dummy_1):
-    """
-    Test that a graph dictionary can be written to the database and then read back as a dictionary,
-    and that the structure and attributes are preserved.
-    """
-    from fusionpipe.utils.pip_utils import graph_dict_to_db, db_to_graph_dict_from_pip_id
-    from fusionpipe.utils import db_utils
-
-    # Setup database
-    conn = pg_test_db
-    cur = db_utils.init_db(conn)
-
-    # Write the dummy graph dict to the database
-    graph_dict_to_db(dict_dummy_1, cur)
-    conn.commit()
-
-    # Read the graph dict back from the database
-    loaded_dict = db_to_graph_dict_from_pip_id(cur, dict_dummy_1["pipeline_id"])
-
-    # Check if the loaded dictionary matches the original
-    assert loaded_dict == dict_dummy_1, "Loaded graph dict does not match the original graph dict."
 
 def test_dict_to_graph(dict_dummy_1, dag_dummy_1):
     """
