@@ -279,14 +279,13 @@ def test_branch_pipeline_from_node(pg_test_db, dag_dummy_1, start_node):
     from fusionpipe.utils.pip_utils import branch_pipeline_from_node, db_to_pipeline_graph_from_pip_id
     from fusionpipe.utils import db_utils
     import networkx as nx
+    from fusionpipe.utils.pip_utils import pipeline_graph_to_db    
 
     conn = pg_test_db
     cur = db_utils.init_db(conn)
 
     # Add the original graph to the database
     original_graph = dag_dummy_1
-
-    from fusionpipe.utils.pip_utils import pipeline_graph_to_db
 
     pipeline_graph_to_db(original_graph, cur)
     conn.commit()
@@ -865,3 +864,7 @@ def test_merge_pipelines_with_duplicate_nodes(pg_test_db):
 
     # The merged pipeline should be a new pipeline
     assert merged_pipeline_id not in [pipeline_id1, pipeline_id2]
+
+
+
+

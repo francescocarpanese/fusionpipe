@@ -669,7 +669,7 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
     new_folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"), new_node_id)
     # Update database
     db_utils.update_folder_path_nodes(cur, new_node_id, new_folder_path_nodes)
-    source_node_tag = db_utils.get_node_tag(cur, node_id=source_node_id) + "_copy"
+    source_node_tag = db_utils.get_node_tag(cur, node_id=source_node_id)
     db_utils.update_node_tag(cur, node_id=new_node_id, node_tag=source_node_tag)
 
     old_folder_path_nodes = db_utils.get_node_folder_path(cur, node_id=source_node_id)
@@ -743,6 +743,17 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
 def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_pipeline_id, source_node_ids, withdata=False):
     """
     Duplicate a list of nodes including their relation inside a pipeline.
+    - source_node_ids: list of node ids to duplicate
+    - withdata: if True, also copy the data folder of the nodes
+    - source_pipeline_id: the pipeline id from which to duplicate the nodes
+    - target_pipeline_id: the pipeline id to which to duplicate the nodes
+
+    This function duplicates the specified nodes and their relations in the target pipeline.
+    It creates new node IDs for the duplicated nodes and updates their parent-child relationships accordingly.
+    It also shifts the positions of the duplicated nodes to avoid overlap.
+    If `withdata` is True, it copies the data associated with the nodes.
+
+    id_map: a dictionary mapping old node ids to new node ids
     """
     if isinstance(source_node_ids, str):
         source_node_ids = [source_node_ids]
@@ -964,8 +975,27 @@ def detach_subgraph_from_node(cur, pipeline_id, node_id):
     # Remove from the three all the nodes which are in editable status
     subgraph_nodes = [n for n in subgraph_nodes if not db_utils.is_node_editable(cur, node_id=n)]
 
-    duplicate_nodes_in_pipeline_with_relations(cur, pipeline_id, pipeline_id, subgraph_nodes, withdata=True)
+    # Build a dictionary mapping each node to its editable children in the subtree
+    editable_children_map = {}
+    for node in subgraph_nodes:
+        # Get all children of the node in the subtree
+        childrens = db_utils.get_node_childrens(cur, node_id=node, pipeline_id=pipeline_id)
+        # Filter children that are editable
+        editable_children = [child for child in childrens if db_utils.is_node_editable(cur, node_id=child)]
+        editable_children_map[node] = editable_children
 
-    # Remove the subgraph nodes from the pipeline
-    for sub_node_id in subgraph_nodes:
-        db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=sub_node_id)
+    # Duplicate the nodes with their relations
+    id_map = duplicate_nodes_in_pipeline_with_relations(
+        cur, source_pipeline_id=pipeline_id, target_pipeline_id=pipeline_id,
+        source_node_ids=subgraph_nodes, withdata=True
+    )
+
+    # Remove the original nodes from the pipeline
+    for node in subgraph_nodes:
+        db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node)
+    
+    for node_id, new_node_id in id_map.items():
+        # If the node has editable children, reattach them to the new node
+        if node_id in editable_children_map:
+            for child_id in editable_children_map[node_id]:
+                db_utils.add_node_relation(cur, child_id=child_id, parent_id=new_node_id)

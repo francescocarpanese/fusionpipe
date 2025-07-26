@@ -562,7 +562,7 @@ def update_node_parameters_yaml(node_id: str, payload: dict, db_conn=Depends(get
     return {"message": f"node_parameters.yaml updated for node {node_id}"}
 
 
-@router.post("/detach_subgraph_from_node/{pipeline_id}/{node_id}")
+@router.post("/detach_node_from_pipeline/{pipeline_id}/{node_id}")
 def detach_subgraph_from_node(pipeline_id: str, node_id: str, db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     try:

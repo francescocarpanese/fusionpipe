@@ -172,7 +172,7 @@ def get_node_parents(cur, node_id):
     cur.execute('SELECT parent_id FROM node_relation WHERE child_id = %s', (node_id,))
     return [row[0] for row in cur.fetchall()]
 
-def get_node_children(cur, node_id):
+def get_node_childrens(cur, node_id):
     cur.execute('SELECT child_id FROM node_relation WHERE parent_id = %s', (node_id,))
     return [row[0] for row in cur.fetchall()]
 

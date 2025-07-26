@@ -924,7 +924,7 @@
 
       currentPipelineId = pipelineId;
       currentProjectId = pipeline.project_id || "";
-
+    
       // Set status property to "active" for the projectNode that matches the pipeline id,
       // and set the background color accordingly
       projectNodes = projectNodes.map((node) => {

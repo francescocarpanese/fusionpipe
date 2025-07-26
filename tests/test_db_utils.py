@@ -209,15 +209,15 @@ def test_get_node_children(pg_test_db):
     conn.commit()
 
     # node1 should have node2 and node3 as children
-    children_node1 = db_utils.get_node_children(cur, node1)
+    children_node1 = db_utils.get_node_childrens(cur, node1)
     assert set(children_node1) == set([node2, node3]), f"Expected children of node1 to be [{node2}, {node3}], got {children_node1}"
 
     # node2 should have no children
-    children_node2 = db_utils.get_node_children(cur, node2)
+    children_node2 = db_utils.get_node_childrens(cur, node2)
     assert children_node2 == [], f"Expected no children for node2, got {children_node2}"
 
     # node3 should have no children
-    children_node3 = db_utils.get_node_children(cur, node3)
+    children_node3 = db_utils.get_node_childrens(cur, node3)
     assert children_node3 == [], f"Expected no children for node3, got {children_node3}"
 
 
@@ -634,7 +634,7 @@ def test_dupicate_node_in_pipeline_full_coverage(pg_test_db):
     conn.commit()
 
     # Duplicate the node
-    duplicated_node_id = f"{original_node_id}_copy"
+    duplicated_node_id = generate_node_id()
     db_utils.dupicate_node_in_pipeline(cur, original_node_id, duplicated_node_id, pipeline_id, pipeline_id)
     conn.commit()
 
@@ -707,7 +707,7 @@ def test_copy_node_relations(pg_test_db, parents, childrens):
 
 
 def test_duplicate_node_in_pipeline_with_relations(pg_test_db):
-    from fusionpipe.utils.pip_utils import generate_node_id
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
     conn = pg_test_db
@@ -717,7 +717,7 @@ def test_duplicate_node_in_pipeline_with_relations(pg_test_db):
     source_node_id = generate_node_id()
     parent_id = generate_node_id()
     child_id = generate_node_id()
-    new_node_id = f"{source_node_id}_copy"
+    new_node_id = generate_node_id()
 
     # Add nodes to the database
     for node_id in [source_node_id, parent_id, child_id]:
@@ -729,7 +729,7 @@ def test_duplicate_node_in_pipeline_with_relations(pg_test_db):
     conn.commit()
 
     # Create a pipeline and add an entry connecting the pipeline to the source node
-    pipeline_id = generate_node_id()
+    pipeline_id = generate_pip_id()
     db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Duplicate node with relations
