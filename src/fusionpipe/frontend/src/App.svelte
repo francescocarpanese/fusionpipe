@@ -738,9 +738,8 @@
       );
       if (!response.ok) await handleApiError(response);
       await fetchPipelines();
-      currentPipelineId = "";
-      nodes = [];
-      edges = [];
+      clearPipelineVariables();
+      await loadProject(currentProjectId);
     } catch (error) {
       console.error("Error deleting pipeline:", error);
       alert("Failed to delete pipeline.");

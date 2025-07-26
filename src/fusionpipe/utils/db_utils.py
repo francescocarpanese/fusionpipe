@@ -387,6 +387,7 @@ def remove_pipeline_from_pipeline(cur, pipeline_id):
 def remove_pipeline_from_everywhere(cur, pipeline_id):
     # Remove the pipeline from all tables
     cur.execute('DELETE FROM node_pipeline_relation WHERE pipeline_id = %s', (pipeline_id,))
+    cur.execute('DELETE FROM pipeline_relation WHERE child_id = %s OR parent_id = %s', (pipeline_id, pipeline_id))
     cur.execute('DELETE FROM pipelines WHERE pipeline_id = %s', (pipeline_id,))
     update_editable_status_for_all_nodes(cur)
 
