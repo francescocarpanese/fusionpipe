@@ -337,6 +337,14 @@ def test_branch_pipeline_from_node(pg_test_db, dag_dummy_1, start_node):
     parent_pipelines = db_utils.get_pipeline_parents(cur, new_pip_id)
     assert original_graph.graph['pipeline_id'] in parent_pipelines, "Original pipeline should be a parent of the new pipeline."
 
+    # Assert status of original pipeline has turned to editable=false
+    original_status = db_utils.get_pipeline_editable_status(cur, original_graph.graph['pipeline_id'])
+    assert original_status == False, "Original pipeline should be set to editable=false after branching."
+
+    # Check new pipeline is editable
+    new_status = db_utils.get_pipeline_editable_status(cur, new_pip_id)
+    assert new_status == True, "New pipeline should be set to editable=true after branching."
+
 def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp_base_dir):
     """
     Test that duplicate_node_in_pipeline_w_code_and_data duplicates a node in the pipeline,

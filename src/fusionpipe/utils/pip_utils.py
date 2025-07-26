@@ -253,6 +253,7 @@ def project_graph_to_dict(graph):
             'parents': parents,
             'tag': graph.nodes[node].get('tag', None),  # Optional tag for the node
             'notes': graph.nodes[node].get('notes', None),  # Optional notes for the node
+            'editable': graph.nodes[node].get('editable', True),  # Default editable is True
         }
     return project_data
 
@@ -413,6 +414,7 @@ def db_to_project_graph_from_project_id(cur, project_id):
     for pipeline_id in db_utils.get_all_pipelines_from_project_id(cur, project_id=project_id):
         G.add_node(pipeline_id)  # Add node with attributes
         G.nodes[pipeline_id]['notes'] = db_utils.get_pipeline_notes(cur, pipeline_id=pipeline_id)
+        G.nodes[pipeline_id]['editable'] = db_utils.get_pipeline_editable_status(cur, pipeline_id=pipeline_id)
 
         # Add edges based on parent relationships
         for parent_id in db_utils.get_pipeline_parents(cur, pipeline_id=pipeline_id):
@@ -577,6 +579,9 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
 
     # Add pipeline-to-project relation for the new pipeline
     db_utils.add_pipeline_relation(cur, child_id=new_pip_id, parent_id=pipeline_id)
+
+    # Lock the original pipeline
+    lock_pipeline(cur, pipeline_id=pipeline_id)
 
     return new_pip_id
 
@@ -918,3 +923,9 @@ def merge_pipelines(cur, source_pipeline_ids):
 
 
     return target_pipeline_id
+
+
+def lock_pipeline(cur, pipeline_id):
+    # TODO add the change of the wirting permission when locking a pipeline
+    editable_status = False  # If locking, set editable to False; if unlocking, set it to True
+    db_utils.update_pipeline_editable_status(cur, pipeline_id=pipeline_id, editable=editable_status)

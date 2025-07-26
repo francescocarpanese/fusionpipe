@@ -856,3 +856,18 @@ def get_pipeline_editable_status(cur, pipeline_id):
     cur.execute('SELECT editable FROM pipelines WHERE pipeline_id = %s', (pipeline_id,))
     row = cur.fetchone()
     return bool(row[0]) if row else None  # Return True or False based on the editable status
+
+
+def update_pipeline_editable_status(cur, pipeline_id, editable):
+    """
+    Update the editable status of a specific pipeline.
+    :param cur: Database cursor
+    :param pipeline_id: ID of the pipeline to update
+    :param editable: New editable status (True or False)
+    :return: Number of rows affected
+    """
+    if not isinstance(editable, bool):
+        raise ValueError("Editable status must be a boolean value.")
+    
+    cur.execute('UPDATE pipelines SET editable = %s WHERE pipeline_id = %s', (editable, pipeline_id))
+    return cur.rowcount

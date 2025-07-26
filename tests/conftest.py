@@ -114,6 +114,10 @@ def dag_dummy_project():
     for node in G.nodes:
         G.nodes[node]['tag'] = 'test_tag' + node
         G.nodes[node]['notes'] = 'test notes'
+        G.nodes[node]['editable'] = True
+
+    G.nodes['pip_5']['editable'] = False  # pip_5 is not editable
+
     return G
 
 
@@ -145,11 +149,11 @@ def dict_dummy_project():
         "tag": "test_tag",
         "owner": "test_group",
         "nodes": {
-            "pip_1": {"tag": "test_tagpip_1", "notes": "test notes", "parents": []},
-            "pip_2": {"tag": "test_tagpip_2", "notes": "test notes", "parents": ["pip_1"]},
-            "pip_3": {"tag": "test_tagpip_3", "notes": "test notes", "parents": ["pip_1"]},
-            "pip_4": {"tag": "test_tagpip_4", "notes": "test notes", "parents": ["pip_3"]},
-            "pip_5": {"tag": "test_tagpip_5", "notes": "test notes", "parents": []}
+            "pip_1": {"tag": "test_tagpip_1", "notes": "test notes", "parents": [], "editable": True},
+            "pip_2": {"tag": "test_tagpip_2", "notes": "test notes", "parents": ["pip_1"], "editable": True},
+            "pip_3": {"tag": "test_tagpip_3", "notes": "test notes", "parents": ["pip_1"], "editable": True},
+            "pip_4": {"tag": "test_tagpip_4", "notes": "test notes", "parents": ["pip_3"], "editable": True},
+            "pip_5": {"tag": "test_tagpip_5", "notes": "test notes", "parents": [], "editable": False}
         }
     }
 

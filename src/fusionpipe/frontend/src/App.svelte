@@ -706,6 +706,7 @@
       selectedProjectDropdown = newProjectId;
       await fetchProjects();
       await loadProject(newProjectId);
+      clearPipelineVariables();
     } catch (error) {
       console.error("Error creating project:", error);
     }
@@ -785,6 +786,7 @@
       selectedProjectDropdown = null;
       currentProjectId = "";
       alert("Project deleted successfully.");
+      clearProjectVariables();
     } catch (error) {
       console.error("Error deleting project:", error);
       alert("Failed to delete project.");
@@ -927,7 +929,7 @@
           line2: `ID: ${id}`,
           notes: node.notes || "",
           tag: node.tag || "",
-          editable: node.editable || true,
+          editable: node.editable,
         },
       }));
 
