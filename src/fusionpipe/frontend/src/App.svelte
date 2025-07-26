@@ -705,6 +705,7 @@
       currentProjectId = newProjectId;
       selectedProjectDropdown = newProjectId;
       await fetchProjects();
+      await loadProject(newProjectId);
     } catch (error) {
       console.error("Error creating project:", error);
     }
@@ -926,6 +927,7 @@
           line2: `ID: ${id}`,
           notes: node.notes || "",
           tag: node.tag || "",
+          editable: node.editable || true,
         },
       }));
 
