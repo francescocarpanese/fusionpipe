@@ -703,6 +703,7 @@
       const data = await response.json();
       const newProjectId = data.project_id;
       currentProjectId = newProjectId;
+      selectedProjectDropdown = newProjectId;
       await fetchProjects();
     } catch (error) {
       console.error("Error creating project:", error);
@@ -882,7 +883,6 @@
 
       currentPipelineId = pipelineId;
       currentProjectId = pipeline.project_id || "";
-      selectedPipelineDropdown = null;
 
       // Set status property to "active" for the projectNode that matches the pipeline id,
       // and set the background color accordingly
@@ -942,6 +942,7 @@
       projectEdges = [...layoutedElements.edges];
 
       currentProjectId = project.project_id || "";
+      selectedProjectDropdown = project.project_id;
     } catch (error) {
       console.error("Error loading selected pipeline:", error);
     }
@@ -1570,7 +1571,6 @@
     } else if (radiostate_pipeline === 2) {
       pipelines_dropdown = Object.values(ids_tags_dict_pipelines);
     }
-    selectedPipelineDropdown = null;
   });
 
   // Effect to update projectDrawerForm when a pipeline is selected
