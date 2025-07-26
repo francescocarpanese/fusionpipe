@@ -444,6 +444,45 @@
     }
   }
 
+  async function detachSelectedNodeFromPipeline() {
+    const pipelineId =
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
+
+    if (!pipelineId) {
+      alert("No pipeline selected");
+      return;
+    }
+
+    const selectedNode = nodes.find((node) => node.selected);
+
+    if (!selectedNode) {
+      alert("No node selected");
+      return;
+    }
+
+    const nodeId = selectedNode.id;
+
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/detach_subgraph_from_node/${pipelineId}/${nodeId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+      if (!response.ok) await handleApiError(response);
+      await loadPipeline(pipelineId);
+      alert(
+        `Node ${nodeId} detached from pipeline ${pipelineId} as a new node.`
+      );
+    } catch (error) {
+      console.error("Error detaching node from pipeline:", error);
+      alert("Failed to detach node from pipeline.");
+    }
+  }
+
   async function referenceSelectedNodesIntoPipeline() {
     const pipelineId =
       typeof currentPipelineId === "string"
@@ -1765,9 +1804,6 @@
             >
             <DropdownItem onclick={createPipeline}>Create Pipeline</DropdownItem
             >
-            <DropdownItem onclick={branchPipelineFromNode}
-              >Branch Pipeline from selected node</DropdownItem
-            >
             <DropdownItem class="flex items-center justify-between">
               Move Pipeline to project<ChevronRightOutline
                 class="text-primary-700 ms-2 h-6 w-6 dark:text-white"
@@ -1847,8 +1883,13 @@
               Copy selected node path to clipboard
             </DropdownItem>
             <DropdownItem onclick={addNode}>Create node</DropdownItem>
+            <DropdownItem onclick={branchPipelineFromNode}
+              >Branch Pipeline from selected node</DropdownItem
+            >
+            <DropdownItem onclick={detachSelectedNodeFromPipeline}>Detach selected node</DropdownItem>            
             <DropdownItem class="flex items-center justify-between">
-              Duplicate selected nodes into this pipeline <ChevronRightOutline
+              Duplicate selected nodes into this pipeline 
+              <ChevronRightOutline
                 class="text-primary-700 ms-2 h-6 w-6 dark:text-white"
               />
             </DropdownItem>

@@ -250,9 +250,9 @@ def test_visualize_pip_static_runs_without_error(monkeypatch, dag_dummy_1):
 
 def test_get_all_children_nodes(pg_test_db, dag_dummy_1):
     """
-    Test that get_all_children_nodes returns all descendants of a node in the pipeline.
+    Test that get_all_descendants returns all descendants of a node in the pipeline.
     """
-    from fusionpipe.utils.pip_utils import get_all_children_nodes, pipeline_graph_to_db
+    from fusionpipe.utils.pip_utils import get_all_descendants, pipeline_graph_to_db
     from fusionpipe.utils import db_utils
     import networkx as nx
 
@@ -263,10 +263,10 @@ def test_get_all_children_nodes(pg_test_db, dag_dummy_1):
     pipeline_graph_to_db(dag_dummy_1, cur)
     conn.commit()
 
-    # For each node, compare get_all_children_nodes to nx.descendants
+    # For each node, compare get_all_descendants to nx.descendants
     for node in dag_dummy_1.nodes:
         expected = set(nx.descendants(dag_dummy_1, node))
-        result = set(get_all_children_nodes(cur, dag_dummy_1.graph['pipeline_id'], node))
+        result = set(get_all_descendants(cur, dag_dummy_1.graph['pipeline_id'], node))
         assert result == expected, f"Children nodes for {node} do not match expected descendants."
 
 from conftest import PARENT_NODE_LIST

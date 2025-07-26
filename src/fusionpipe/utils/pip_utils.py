@@ -624,7 +624,7 @@ def can_node_run(cur, node_id):
     # If node has no parents, it can run
     return True
 
-def get_all_children_nodes(cur, pipeline_id, node_id):
+def get_all_descendants(cur, pipeline_id, node_id):
     """
     Get all children of a node in the pipeline.
     """
@@ -826,7 +826,7 @@ def set_children_stale(cur, pipeline_id, node_id):
     """
     Set the status of all children (descendants) of a node to 'staledata'.
     """
-    children = get_all_children_nodes(cur, pipeline_id, node_id)
+    children = get_all_descendants(cur, pipeline_id, node_id)
     for child_id in children:
         db_utils.update_node_status(cur, node_id=child_id, status=NodeState.STALEDATA.value)
 
@@ -929,3 +929,43 @@ def lock_pipeline(cur, pipeline_id):
     # TODO add the change of the wirting permission when locking a pipeline
     editable_status = False  # If locking, set editable to False; if unlocking, set it to True
     db_utils.update_pipeline_editable_status(cur, pipeline_id=pipeline_id, editable=editable_status)
+
+
+def detach_node_from_pipeline(cur, pipeline_id, node_id):
+
+    # Check if the node is editable
+    if db_utils.is_node_editable(cur, node_id=node_id):
+        raise ValueError(f"Node {node_id} is editable. You can detach only nodes which are locked.")
+
+    new_node_id = generate_node_id()
+
+    # Duplicate the node with code and the parents relation
+    duplicate_node_in_pipeline_w_code_and_data(
+        cur, source_pipeline_id=pipeline_id, target_pipeline_id=pipeline_id, 
+        source_node_id=node_id, new_node_id=new_node_id, parents=True, childrens=False, withdata=True
+    )
+
+    # Remove the original node from the pipeline
+    db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node_id)
+
+
+def detach_subgraph_from_node(cur, pipeline_id, node_id):
+    """
+    Detach a subgraph starting from a node in a pipeline.
+    :param cur: Database cursor
+    :param pipeline_id: ID of the pipeline
+    :param node_id: ID of the node to detach the subgraph from
+    """
+
+    # Get all descendants of the node, including the node itself
+    subgraph_nodes = set(get_all_descendants(cur, pipeline_id, node_id))
+    subgraph_nodes.add(node_id)
+
+    # Remove from the three all the nodes which are in editable status
+    subgraph_nodes = [n for n in subgraph_nodes if not db_utils.is_node_editable(cur, node_id=n)]
+
+    duplicate_nodes_in_pipeline_with_relations(cur, pipeline_id, pipeline_id, subgraph_nodes, withdata=True)
+
+    # Remove the subgraph nodes from the pipeline
+    for sub_node_id in subgraph_nodes:
+        db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=sub_node_id)

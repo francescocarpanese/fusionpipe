@@ -55,7 +55,7 @@ class TestPipelineHelperFunctions:
         
         with patch('fusionpipe.utils.db_utils.check_if_pipeline_exists', return_value=True), \
              patch('fusionpipe.utils.db_utils.get_all_nodes_from_pip_id', return_value=['node1', 'node2', 'node3']), \
-             patch('fusionpipe.utils.pip_utils.get_all_children_nodes', return_value=['node3']):
+             patch('fusionpipe.utils.pip_utils.get_all_descendants', return_value=['node3']):
             
             all_nodes, excluded_nodes = runner_utils._initialize_pipeline_state(mock_cur, 'pipeline1', 'node2')
             

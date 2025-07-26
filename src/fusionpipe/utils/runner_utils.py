@@ -909,7 +909,7 @@ def _initialize_pipeline_state(cur, pipeline_id, last_node_id=None):
     if last_node_id is not None:
         if last_node_id not in all_nodes:
             raise ValueError(f"last_node_id {last_node_id} is not in pipeline {pipeline_id}")
-        children_nodes = set(pip_utils.get_all_children_nodes(cur, pipeline_id=pipeline_id, node_id=last_node_id))
+        children_nodes = set(pip_utils.get_all_descendants(cur, pipeline_id=pipeline_id, node_id=last_node_id))
         excluded_nodes = children_nodes
         all_nodes = all_nodes - excluded_nodes
     
