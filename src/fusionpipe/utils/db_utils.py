@@ -172,10 +172,6 @@ def get_node_parents(cur, node_id):
     cur.execute('SELECT parent_id FROM node_relation WHERE child_id = %s', (node_id,))
     return [row[0] for row in cur.fetchall()]
 
-def get_node_childrens(cur, node_id):
-    cur.execute('SELECT child_id FROM node_relation WHERE parent_id = %s', (node_id,))
-    return [row[0] for row in cur.fetchall()]
-
 def update_node_status(cur, node_id, status):
     cur.execute('UPDATE nodes SET status = %s WHERE node_id = %s', (status, node_id))
     return cur.rowcount
@@ -872,3 +868,14 @@ def update_pipeline_editable_status(cur, pipeline_id, editable):
     
     cur.execute('UPDATE pipelines SET editable = %s WHERE pipeline_id = %s', (editable, pipeline_id))
     return cur.rowcount
+
+def check_node_relation_exists(cur, child_id, parent_id):
+    """
+    Check if a relation between nodes already exists in the node_relation table.
+    :param cur: Database cursor
+    :param child_id: ID of the child node
+    :param parent_id: ID of the parent node
+    :return: True if the relation exists, False otherwise
+    """
+    cur.execute('SELECT 1 FROM node_relation WHERE child_id = %s AND parent_id = %s', (child_id, parent_id))
+    return cur.fetchone() is not None

@@ -187,38 +187,6 @@ def test_get_node_parents(pg_test_db):
     assert parents_node3 == [], f"Expected no parents for node3, got {parents_node3}"
 
 
-def test_get_node_children(pg_test_db):
-    from fusionpipe.utils.pip_utils import generate_node_id
-    from fusionpipe.utils import db_utils
-
-    conn = pg_test_db
-    cur = db_utils.init_db(conn)
-
-    # Create 3 nodes
-    node1 = generate_node_id()
-    node2 = generate_node_id()
-    node3 = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=node1)
-    db_utils.add_node_to_nodes(cur, node_id=node2)
-    db_utils.add_node_to_nodes(cur, node_id=node3)
-
-    # Add relation: node1 is parent of node2
-    db_utils.add_node_relation(cur, child_id=node2, parent_id=node1)
-    # Add relation: node1 is parent of node3
-    db_utils.add_node_relation(cur, child_id=node3, parent_id=node1)
-    conn.commit()
-
-    # node1 should have node2 and node3 as children
-    children_node1 = db_utils.get_node_childrens(cur, node1)
-    assert set(children_node1) == set([node2, node3]), f"Expected children of node1 to be [{node2}, {node3}], got {children_node1}"
-
-    # node2 should have no children
-    children_node2 = db_utils.get_node_childrens(cur, node2)
-    assert children_node2 == [], f"Expected no children for node2, got {children_node2}"
-
-    # node3 should have no children
-    children_node3 = db_utils.get_node_childrens(cur, node3)
-    assert children_node3 == [], f"Expected no children for node3, got {children_node3}"
 
 
 def test_update_node_status(pg_test_db):

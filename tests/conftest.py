@@ -159,3 +159,52 @@ def dict_dummy_project():
 
 
 PARENT_NODE_LIST =  ["A", "B", "C", "D", "E"]
+
+
+def dag_detach_1():
+    import networkx as nx
+    from fusionpipe.utils.pip_utils import NodeState 
+    # Create a simple directed acyclic graph (DAG) for testing
+    G = nx.DiGraph()
+    G.add_edges_from([
+        ("A", "B"),
+        ("B", "C"),
+        ("B", "D"),
+    ])
+    G.name = "12345"
+    G.graph['pipeline_id'] = G.name
+
+    G.nodes['A']['editable'] = False
+    G.nodes['B']['editable'] = False
+    G.nodes['C']['editable'] = False
+    G.nodes['D']['editable'] = True
+
+    # Add a 'status' attribute to each node using NodeState
+    for node in G.nodes:
+        G.nodes[node]['position'] = [0, 0]  # Default position
+    return G
+
+def dag_detach_2():
+    import networkx as nx
+    from fusionpipe.utils.pip_utils import NodeState 
+    # Create a simple directed acyclic graph (DAG) for testing
+    G = nx.DiGraph()
+    G.add_edges_from([
+        ("A", "B"),
+        ("B", "C"),
+        ("B", "D"),
+        ("E", "D"),
+    ])
+    G.name = "12345"
+    G.graph['pipeline_id'] = G.name
+
+    G.nodes['A']['editable'] = False
+    G.nodes['B']['editable'] = False
+    G.nodes['C']['editable'] = False
+    G.nodes['D']['editable'] = True
+    G.nodes['E']['editable'] = True
+
+    # Add a 'status' attribute to each node using NodeState
+    for node in G.nodes:
+        G.nodes[node]['position'] = [0, 0]  # Default position
+    return G

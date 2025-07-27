@@ -273,6 +273,11 @@ def pipeline_graph_to_db(Gnx, cur):
     """
     - This function can be used to add a pipeline graph to the pipelines table
     - This will also work to add a subgraph to an existing pipeline.
+
+    Special consideration:
+    - Nodes which are not editable, hence that are present in multiple pipelines, must have the same parents in all pipelines,
+    but can have different childrens in different pipelines. This guarantees that a subgraph of referenced nodes preserve the same inputs across pipelines.
+    To enforce that, the database has to be traversing the graph, and add the parents of each nodes.
     """
     # Add the pipeline to the database
     pip_id = Gnx.graph['pipeline_id']
@@ -311,11 +316,13 @@ def pipeline_graph_to_db(Gnx, cur):
                 folder_path=folder_path,
                 node_tag=node_tag
             )
-            # If node already existed, parants cannot have change. Children can and will be added later
-            for parent in Gnx.predecessors(node):
-                db_utils.add_node_relation(cur, child_id=node_id, parent_id=parent)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pip_id, 
-                                     position_x=position[0], position_y=position[1])
+                                position_x=position[0], position_y=position[1])
+    # Add relation between nodes
+    for node in Gnx.nodes:
+        for parent in Gnx.predecessors(node):
+            if not db_utils.check_node_relation_exists(cur, child_id=node, parent_id=parent):
+                db_utils.add_node_relation(cur, child_id=node, parent_id=parent)
 
 
 def project_graph_to_db(Gnx, cur):
@@ -353,6 +360,12 @@ def project_graph_to_db(Gnx, cur):
 
 
 def db_to_pipeline_graph_from_pip_id(cur, pip_id):
+    '''
+    Special consideration:
+    - Nodes which are not editable, hence that are present in multiple pipelines, must have the same parents in all pipelines,
+    but can have different childrens in different pipelines. This guarantees that a subgraph of referenced nodes preserve the same inputs across pipelines.
+    To enforce that, the database has to be traversing the graph, and add the parents of each nodes.
+    '''
     # Load the pipeline from the database
     if not db_utils.check_if_pipeline_exists(cur, pip_id):
         raise ValueError(f"Pipeline with ID {pip_id} does not exist in the database.")
@@ -966,23 +979,30 @@ def detach_subgraph_from_node(cur, pipeline_id, node_id):
     :param cur: Database cursor
     :param pipeline_id: ID of the pipeline
     :param node_id: ID of the node to detach the subgraph from
+
+    Return map of detached nodes
     """
 
+    # Get the pipeline graph
+    graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
+
+
     # Get all descendants of the node, including the node itself
-    subgraph_nodes = set(get_all_descendants(cur, pipeline_id, node_id))
+    subgraph_nodes = set(nx.descendants(graph, node_id))
     subgraph_nodes.add(node_id)
 
-    # Remove from the three all the nodes which are in editable status
-    subgraph_nodes = [n for n in subgraph_nodes if not db_utils.is_node_editable(cur, node_id=n)]
+    editable_nodes_in_subgraph = [n for n in subgraph_nodes if db_utils.is_node_editable(cur, node_id=n)]
+    non_editable_parents_dict_of_editable_node = {}
 
-    # Build a dictionary mapping each node to its editable children in the subtree
-    editable_children_map = {}
-    for node in subgraph_nodes:
-        # Get all children of the node in the subtree
-        childrens = db_utils.get_node_childrens(cur, node_id=node, pipeline_id=pipeline_id)
-        # Filter children that are editable
-        editable_children = [child for child in childrens if db_utils.is_node_editable(cur, node_id=child)]
-        editable_children_map[node] = editable_children
+    for node in editable_nodes_in_subgraph:
+        # Find direct parents
+        parents = list(graph.predecessors(node))
+        non_editable_parents = [parent for parent in parents if not db_utils.is_node_editable(cur, node_id=parent)]
+        if non_editable_parents:
+            non_editable_parents_dict_of_editable_node[node] = non_editable_parents
+
+    # Remove from the subthree all the nodes which are in editable status
+    subgraph_nodes = [n for n in subgraph_nodes if n not in editable_nodes_in_subgraph]
 
     # Duplicate the nodes with their relations
     id_map = duplicate_nodes_in_pipeline_with_relations(
@@ -994,8 +1014,11 @@ def detach_subgraph_from_node(cur, pipeline_id, node_id):
     for node in subgraph_nodes:
         db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node)
     
-    for node_id, new_node_id in id_map.items():
-        # If the node has editable children, reattach them to the new node
-        if node_id in editable_children_map:
-            for child_id in editable_children_map[node_id]:
-                db_utils.add_node_relation(cur, child_id=child_id, parent_id=new_node_id)
+    # Attach editable nodes with non-editable parents to the new nodes
+    for node, parents in non_editable_parents_dict_of_editable_node.items():
+        new_parents = [id_map[parent] for parent in parents]
+        for new_parent in new_parents:
+            # Add the relation to the new node
+            db_utils.add_node_relation(cur, child_id=node, parent_id=new_parent)
+    
+    return id_map

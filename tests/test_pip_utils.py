@@ -868,3 +868,70 @@ def test_merge_pipelines_with_duplicate_nodes(pg_test_db):
 
 
 
+
+
+from conftest import dag_detach_1, dag_detach_2
+@pytest.mark.parametrize("dag, start_node, expected_detached_nodes, not_detached_nodes", [
+    (dag_detach_1,"A",["A","B","C"],["D"]),
+    (dag_detach_1,"B",["B","C"],["D"]),
+    (dag_detach_2,"A",["A","B","C"],["D"]),      
+    ])
+def test_detach_pipeline_from_node(
+    monkeypatch,
+    pg_test_db,
+    tmp_base_dir,
+    dag,
+    start_node,
+    expected_detached_nodes,
+    not_detached_nodes
+    ):
+    from fusionpipe.utils.pip_utils import detach_subgraph_from_node, db_to_pipeline_graph_from_pip_id
+    from fusionpipe.utils import db_utils
+    import networkx as nx
+    from fusionpipe.utils.pip_utils import pipeline_graph_to_db
+    from fusionpipe.utils.pip_utils import init_node_folder
+
+
+    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add the original graph to the database
+    original_graph = dag()
+
+    pipeline_graph_to_db(original_graph, cur)
+    conn.commit()
+
+    # Setup folders for all nodes to be duplicated
+    for node_id in original_graph:
+        folder_path = os.path.join(tmp_base_dir, node_id)
+        init_node_folder(folder_path)
+        db_utils.update_folder_path_nodes(cur, node_id, folder_path)
+    conn.commit()
+
+    id_map = detach_subgraph_from_node(cur, original_graph.graph['pipeline_id'], start_node)
+
+    # Check that the keys in id_map correspond to the expected detached nodes
+    assert set(id_map.keys()) == set(expected_detached_nodes), f"Detached nodes do not match expected nodes. Expected: {expected_detached_nodes}, Found: {list(id_map.keys())}"
+
+    # Get the parents of the nodes that are not deteached in the original graph
+    original_parents_dict_not_detached_nodes = { node: list(original_graph.predecessors(node)) for node in not_detached_nodes}
+    
+    # Get the modified graph from the database
+    modified_graph = db_to_pipeline_graph_from_pip_id(cur, original_graph.graph['pipeline_id'])
+
+    # Get the parents of the nodes that are not detached in the modified graph
+    new_parents_dict_not_detached_nodes = { node: list(modified_graph.predecessors(node)) for node in not_detached_nodes}
+
+    # The expected new parentes of the nodes which are not detached should be the original ones, where the nodes that have been detached
+    # are replaced with the new detached ones
+    for node in not_detached_nodes:
+        expected_parents = original_parents_dict_not_detached_nodes[node].copy()
+        for i, parent in enumerate(expected_parents):
+            if parent in id_map:
+                expected_parents[i] = id_map[parent]
+        assert set(new_parents_dict_not_detached_nodes[node]) == set(expected_parents), f"Parents of node {node} do not match expected parents. Expected: {expected_parents}, Found: {new_parents_dict_not_detached_nodes[node]}"
+
+        
