@@ -63,7 +63,7 @@ def init_db(conn):
             owner TEXT DEFAULT NULL,
             notes TEXT DEFAULT NULL,
             project_id TEXT DEFAULT NULL,
-            editable BOOLEAN DEFAULT TRUE,
+            blocked BOOLEAN DEFAULT FALSE,
             FOREIGN KEY (project_id) REFERENCES projects(project_id)
         )
     ''')
@@ -72,7 +72,7 @@ def init_db(conn):
         CREATE TABLE IF NOT EXISTS nodes (
             node_id TEXT PRIMARY KEY,
             status TEXT CHECK(status IN ('ready', 'running', 'completed', 'failed', 'staledata')) DEFAULT 'ready',
-            editable BOOLEAN DEFAULT TRUE,
+            referenced BOOLEAN DEFAULT FALSE,
             notes TEXT DEFAULT NULL,
             folder_path TEXT DEFAULT NULL,
             node_tag TEXT
@@ -128,17 +128,17 @@ def init_db(conn):
     return cur
 
 
-def add_pipeline_to_pipelines(cur, pipeline_id, tag=None, owner=None, notes=None, project_id=None, editable=True):
+def add_pipeline_to_pipelines(cur, pipeline_id, tag=None, owner=None, notes=None, project_id=None, blocked=False):
     if tag is None:
         tag = pipeline_id
-    cur.execute('INSERT INTO pipelines (pipeline_id, tag, owner, notes, project_id, editable) VALUES (%s, %s, %s, %s, %s, %s)', (pipeline_id, tag, owner, notes, project_id, editable))
+    cur.execute('INSERT INTO pipelines (pipeline_id, tag, owner, notes, project_id, blocked) VALUES (%s, %s, %s, %s, %s, %s)', (pipeline_id, tag, owner, notes, project_id, blocked))
     return pipeline_id
 
-def add_node_to_nodes(cur, node_id, status='ready', editable=True, notes=None, folder_path=None, node_tag=None):
+def add_node_to_nodes(cur, node_id, status='ready', referenced=False, notes=None, folder_path=None, node_tag=None):
     if node_tag is None:
         node_tag = node_id
-    cur.execute('INSERT INTO nodes (node_id, status, editable, notes, folder_path, node_tag) VALUES (%s, %s, %s, %s, %s, %s)', 
-                (node_id, status, bool(editable), notes, folder_path, node_tag))
+    cur.execute('INSERT INTO nodes (node_id, status, referenced, notes, folder_path, node_tag) VALUES (%s, %s, %s, %s, %s, %s)', 
+                (node_id, status, bool(referenced), notes, folder_path, node_tag))
     return node_id
 
 def remove_node_from_nodes(cur, node_id):
@@ -158,9 +158,9 @@ def add_node_to_pipeline(cur, node_id, pipeline_id, position_x=0., position_y=0.
     cur.execute('SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id = %s', (node_id,))
     count = cur.fetchone()[0]
 
-    # If the node is present in more than one pipeline, set editable to false
+    # If the node is present in more than one pipeline, set referenced to false
     if count > 1:
-        cur.execute('UPDATE nodes SET editable = FALSE WHERE node_id = %s', (node_id,))
+        cur.execute('UPDATE nodes SET referenced = TRUE WHERE node_id = %s', (node_id,))
     
     return node_id
 
@@ -265,11 +265,11 @@ def get_rows_with_pipeline_id_in_pipelines(cur, pipeline_id):
 
 def remove_node_from_pipeline(cur, node_id, pipeline_id):
     cur.execute('DELETE FROM node_pipeline_relation WHERE node_id = %s AND pipeline_id = %s', (node_id,pipeline_id))
-    # Make node editable if present in only 1 pipeline.
+    # Make node not referenced if present in only 1 pipeline.
     cur.execute('SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id = %s', (node_id,))
     count = cur.fetchone()[0]
     if count <= 1:
-        cur.execute('UPDATE nodes SET editable = TRUE WHERE node_id = %s', (node_id,))
+        cur.execute('UPDATE nodes SET referenced = FALSE WHERE node_id = %s', (node_id,))
     sanitize_node_relation(cur, pipeline_id)
     return cur.rowcount    
 
@@ -301,7 +301,7 @@ def duplicate_node_pipeline_relation(cur, source_pipeline_id, node_ids, new_pipe
 
     # As node are now duplicated they cannot be edited anymore.
     for node_id in node_ids:
-        update_editable_status(cur, node_id, False)
+        update_referenced_status(cur, node_id, False)
 
     return new_pipeline_id
 
@@ -385,7 +385,7 @@ def remove_pipeline_from_everywhere(cur, pipeline_id):
     cur.execute('DELETE FROM node_pipeline_relation WHERE pipeline_id = %s', (pipeline_id,))
     cur.execute('DELETE FROM pipeline_relation WHERE child_id = %s OR parent_id = %s', (pipeline_id, pipeline_id))
     cur.execute('DELETE FROM pipelines WHERE pipeline_id = %s', (pipeline_id,))
-    update_editable_status_for_all_nodes(cur)
+    update_referenced_status_for_all_nodes(cur)
 
 def duplicate_node_in_pipeline_with_relations(cur, source_node_id, new_node_id, source_pipeline_id, target_pipeline_id, parents=False, childrens=False):
     # Duplicate the node in a pipeline with copying relations
@@ -403,12 +403,12 @@ def count_pipeline_with_node(cur, node_id):
     row = cur.fetchone()
     return row[0] if row else 0
 
-def is_node_editable(cur, node_id):
-    cur.execute('SELECT editable FROM nodes WHERE node_id = %s', (node_id,))
+def is_node_referenced(cur, node_id):
+    cur.execute('SELECT referenced FROM nodes WHERE node_id = %s', (node_id,))
     row = cur.fetchone()
     return bool(row[0])
 
-def update_editable_status_for_all_nodes(cur):
+def update_referenced_status_for_all_nodes(cur):
     # Get the list of all nodes
     cur.execute('SELECT node_id FROM nodes')
     nodes = [row[0] for row in cur.fetchall()]
@@ -420,20 +420,18 @@ def update_editable_status_for_all_nodes(cur):
         cur.execute('SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id = %s', (node_id,))
         pipeline_count = cur.fetchone()[0]
 
-        # Update editable status based on the pipeline count
+        # Update referenced status based on the pipeline count
         if pipeline_count <= 1:
-            cur.execute('UPDATE nodes SET editable = TRUE WHERE node_id = %s', (node_id,))
+            cur.execute('UPDATE nodes SET referenced = FALSE WHERE node_id = %s', (node_id,))
         else:
-            cur.execute('UPDATE nodes SET editable = FALSE WHERE node_id = %s', (node_id,))
+            cur.execute('UPDATE nodes SET referenced = TRUE WHERE node_id = %s', (node_id,))
             report.append(node_id)
 
     # Print a report of nodes that did not match the logic
     if report:
-        print("Nodes with editable set to FALSE due to being in multiple pipelines:")
+        print("Nodes with referenced set to TRUE due to being in multiple pipelines:")
         for node_id in report:
             print(f" - Node ID: {node_id}")
-    else:
-        print("All nodes are editable.")
 
 def get_pipeline_notes(cur, pipeline_id):
     cur.execute('SELECT notes FROM pipelines WHERE pipeline_id = %s', (pipeline_id,))
@@ -481,7 +479,7 @@ def sanitize_node_relation(cur, pipeline_id):
     relations = cur.fetchall()
 
     for node_id in pipeline_nodes:
-        if is_node_editable(cur, node_id):
+        if not is_node_referenced(cur, node_id):
             # Get all relations where the node is a child
             cur.execute('SELECT id, parent_id FROM node_relation WHERE child_id = %s', (node_id,))
             child_relations = cur.fetchall()
@@ -492,16 +490,16 @@ def sanitize_node_relation(cur, pipeline_id):
                     cur.execute('DELETE FROM node_relation WHERE id = %s', (relation_id,))
 
 
-def remove_node_relation_with_editable_logic(cur, parent_id, child_id):
+def remove_node_relation_with_referenced_logic(cur, parent_id, child_id):
     """
-    Can only remove relation between nodes if childen is editable
+    Can only remove relation between nodes if child is not referenced
     """
-    if is_node_editable(cur,child_id):
+    if not is_node_referenced(cur,child_id):
         # Remove the relation
         cur.execute('DELETE FROM node_relation WHERE parent_id = %s AND child_id = %s', (parent_id, child_id))
         return cur.rowcount
     else:
-        raise ValueError(f"Cannot remove relation: Node {child_id} is not editable.")
+        raise ValueError(f"Cannot remove relation: Node {child_id} is referenced, and present in multiple pipeline.")
 
 def update_node_notes(cur, node_id, notes):
     cur.execute('UPDATE nodes SET notes = %s WHERE node_id = %s', (notes, node_id))
@@ -536,18 +534,18 @@ def update_folder_path_nodes(cur, node_id, folder_path):
     cur.execute('UPDATE nodes SET folder_path = %s WHERE node_id = %s', (folder_path, node_id))
     return cur.rowcount
 
-def update_editable_status(cur, node_id, editable):
+def update_referenced_status(cur, node_id, referenced):
     """
-    Update the editable status of a node.
+    Update the referenced status of a node.
     :param cur: Database cursor
     :param node_id: ID of the node to update
-    :param editable: New editable status (True or False)
+    :param referenced: New referenced status (True or False)
     :return: Number of rows affected
     """
-    if not isinstance(editable, bool):
-        raise ValueError("Editable status must be a boolean value.")
+    if not isinstance(referenced, bool):
+        raise ValueError("referenced status must be a boolean value.")
     
-    cur.execute('UPDATE nodes SET editable = %s WHERE node_id = %s', (editable, node_id))
+    cur.execute('UPDATE nodes SET referenced = %s WHERE node_id = %s', (referenced, node_id))
     return cur.rowcount
 
 def add_process(cur, process_id, node_id, status='pending', start_time=None, end_time=None):
@@ -819,54 +817,60 @@ def get_project_tag(cur, project_id):
     row = cur.fetchone()
     return row[0] if row else None
 
-def is_pipeline_editable(cur, pipeline_id):
+def is_pipeline_blocked(cur, pipeline_id):
     """
-    Set the editable status of a pipeline based on the editable status of its nodes.
-    If at least one node in the pipeline is editable, the pipeline is set to editable.
+    Set the blocked status of a pipeline based on the blocked status of its nodes.
+    A pipeline is blocked if all nodes in the pipeline are blocked.
     :param cur: Database cursor
     :param pipeline_id: ID of the pipeline to check
-    :return: True if the pipeline is editable, False otherwise
+    :return: True if the pipeline is blocked, False otherwise
     """
-    # Check if at least one node in the pipeline is editable
-    cur.execute('''
-        SELECT EXISTS (
-            SELECT 1
+    # Count total nodes in the pipeline
+    cur.execute('SELECT COUNT(*) FROM node_pipeline_relation WHERE pipeline_id = %s', (pipeline_id,))
+    total_nodes = cur.fetchone()[0]
+
+    if total_nodes == 0:
+        blocked = False
+    else:
+        # Count blocked nodes in the pipeline
+        cur.execute('''
+            SELECT COUNT(*)
             FROM node_pipeline_relation npr
             JOIN nodes n ON npr.node_id = n.node_id
-            WHERE npr.pipeline_id = %s AND n.editable = TRUE
-        )
-    ''', (pipeline_id,))
-    is_editable = cur.fetchone()[0]
+            WHERE npr.pipeline_id = %s AND n.status = 'blocked'
+        ''', (pipeline_id,))
+        blocked_nodes = cur.fetchone()[0]
+        blocked = (blocked_nodes == total_nodes)
 
-    # Update the pipeline's editable status
-    cur.execute('UPDATE pipelines SET editable = %s WHERE pipeline_id = %s', (is_editable, pipeline_id))
-    return bool(is_editable)
+    # Update the pipeline's blocked status
+    cur.execute('UPDATE pipelines SET blocked = %s WHERE pipeline_id = %s', (blocked, pipeline_id))
+    return blocked
 
 
-def get_pipeline_editable_status(cur, pipeline_id):
+def get_pipeline_blocked_status(cur, pipeline_id):
     """
-    Get the editable status of a specific pipeline.
+    Get the blocked status of a specific pipeline.
     :param cur: Database cursor
     :param pipeline_id: ID of the pipeline to query
-    :return: Editable status of the pipeline (True or False)
+    :return: blocked status of the pipeline (True or False)
     """
-    cur.execute('SELECT editable FROM pipelines WHERE pipeline_id = %s', (pipeline_id,))
+    cur.execute('SELECT blocked FROM pipelines WHERE pipeline_id = %s', (pipeline_id,))
     row = cur.fetchone()
-    return bool(row[0]) if row else None  # Return True or False based on the editable status
+    return bool(row[0]) if row else None  # Return True or False based on the referenced status
 
 
-def update_pipeline_editable_status(cur, pipeline_id, editable):
+def update_pipeline_blocked_status(cur, pipeline_id, blocked):
     """
-    Update the editable status of a specific pipeline.
+    Update the blocked status of a specific pipeline.
     :param cur: Database cursor
     :param pipeline_id: ID of the pipeline to update
-    :param editable: New editable status (True or False)
+    :param blocked: New blocked status (True or False)
     :return: Number of rows affected
     """
-    if not isinstance(editable, bool):
-        raise ValueError("Editable status must be a boolean value.")
+    if not isinstance(blocked, bool):
+        raise ValueError("referenced status must be a boolean value.")
     
-    cur.execute('UPDATE pipelines SET editable = %s WHERE pipeline_id = %s', (editable, pipeline_id))
+    cur.execute('UPDATE pipelines SET blocked = %s WHERE pipeline_id = %s', (blocked, pipeline_id))
     return cur.rowcount
 
 def check_node_relation_exists(cur, child_id, parent_id):

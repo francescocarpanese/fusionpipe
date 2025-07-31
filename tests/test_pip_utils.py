@@ -589,14 +589,14 @@ def test_delete_node_data_removes_data_contents(monkeypatch, pg_test_db, tmp_bas
     assert os.path.exists(data_folder)
     assert not any(os.scandir(data_folder)), "Data folder is not empty after deletion"
 
-def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, pg_test_db, tmp_base_dir):
+def test_delete_node_from_pipeline_with_referenced_logic(monkeypatch, pg_test_db, tmp_base_dir):
     """
-    Test delete_node_from_pipeline_with_editable_logic for referenced and non-referenced nodes.
+    Test delete_node_from_pipeline_with_referenced_logic for referenced and non-referenced nodes.
     """
     import os
     import shutil
     from fusionpipe.utils.pip_utils import (
-        generate_node_id, generate_pip_id, init_node_folder, delete_node_from_pipeline_with_editable_logic
+        generate_node_id, generate_pip_id, init_node_folder, delete_node_from_pipeline_with_referenced_logic
     )
     from fusionpipe.utils import db_utils
     import networkx as nx
@@ -610,29 +610,29 @@ def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, pg_test_db, 
     db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
 
     # Case 1: Not Referenced node
-    node_id_editable = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=node_id_editable, status="ready", referenced=False, notes="not referenced node", folder_path=None)
-    db_utils.add_node_to_pipeline(cur, node_id=node_id_editable, pipeline_id=pipeline_id, position_x=0, position_y=0)
-    db_utils.update_folder_path_nodes(cur, node_id_editable, os.path.join(tmp_base_dir, node_id_editable))
+    node_id_not_referenced = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id_not_referenced, status="ready", referenced=False, notes="not referenced node", folder_path=None)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id_not_referenced, pipeline_id=pipeline_id, position_x=0, position_y=0)
+    db_utils.update_folder_path_nodes(cur, node_id_not_referenced, os.path.join(tmp_base_dir, node_id_not_referenced))
     conn.commit()
-    folder_path_nodes = os.path.join(tmp_base_dir, node_id_editable)
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id_not_referenced)
     init_node_folder(folder_path_nodes, verbose=True)
     assert os.path.exists(folder_path_nodes)
     # Should delete node and folder
-    delete_node_from_pipeline_with_editable_logic(cur, pipeline_id, node_id_editable)
+    delete_node_from_pipeline_with_referenced_logic(cur, pipeline_id, node_id_not_referenced)
     conn.commit()
     assert not os.path.exists(folder_path_nodes)
-    assert node_id_editable not in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
+    assert node_id_not_referenced not in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
 
     # Case 2: Referenced leaf node in referenced subgraph
-    node_id_noneditable = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=node_id_noneditable, status="ready", referenced=True, notes="referenced node", folder_path=None)
-    db_utils.add_node_to_pipeline(cur, node_id=node_id_noneditable, pipeline_id=pipeline_id, position_x=1, position_y=1)
+    node_id_referenced = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id_referenced, status="ready", referenced=True, notes="referenced node", folder_path=None)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id_referenced, pipeline_id=pipeline_id, position_x=1, position_y=1)
     conn.commit()
     # Should delete node from pipeline (no error)
-    delete_node_from_pipeline_with_editable_logic(cur, pipeline_id, node_id_noneditable)
+    delete_node_from_pipeline_with_referenced_logic(cur, pipeline_id, node_id_referenced)
     conn.commit()
-    assert node_id_noneditable not in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
+    assert node_id_referenced not in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
 
     # Case 3: Referenced node that is not a leaf in Referenced subgraph
     parent_id = generate_node_id()
@@ -646,7 +646,7 @@ def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, pg_test_db, 
     # Should raise ValueError because parent_id is not a leaf
     import pytest
     with pytest.raises(ValueError):
-        delete_node_from_pipeline_with_editable_logic(cur, pipeline_id, parent_id)
+        delete_node_from_pipeline_with_referenced_logic(cur, pipeline_id, parent_id)
 
 def test_set_children_stale_sets_descendants_to_staledata(pg_test_db, dag_dummy_1):
     """

@@ -70,11 +70,11 @@ def dag_dummy_1():
     G.graph['notes'] = "A simple test DAG"
     G.graph['tag'] = "test_tag"
     G.graph['owner'] = "test_group"
-    G.graph['editable'] = True
+    G.graph['blocked'] = False
 
     # Add a 'status' attribute to each node using NodeState
     for node in G.nodes:
-        G.nodes[node]['editable'] = True
+        G.nodes[node]['referenced'] = False
         G.nodes[node]['tag'] = 'test_tag'
         G.nodes[node]['folder_path'] = f'dummy_folder_path_{node}'
         G.nodes[node]['notes'] = 'test notes'
@@ -114,9 +114,9 @@ def dag_dummy_project():
     for node in G.nodes:
         G.nodes[node]['tag'] = 'test_tag' + node
         G.nodes[node]['notes'] = 'test notes'
-        G.nodes[node]['editable'] = True
+        G.nodes[node]['blocked'] = False
 
-    G.nodes['pip_5']['editable'] = False  # pip_5 is not editable
+    G.nodes['pip_5']['blocked'] = True  # pip_5 is blocked
 
     return G
 
@@ -130,13 +130,13 @@ def dict_dummy_1():
         "tag": "test_tag",
         "owner": "test_group",
         "project_id": "test_project",
-        "editable": True,
+        "blocked": False,
         "nodes": {
-            "A": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0], 'folder_path': 'dummy_folder_path_A'},
-            "B": {"status": "running", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_B'},
-            "C": {"status": "completed", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_C'},
-            "D": {"status": "staledata", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_D'},
-            "E": {"status": "ready", "editable": True, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0,], 'folder_path': 'dummy_folder_path_E'}
+            "A": {"status": "ready", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0], 'folder_path': 'dummy_folder_path_A'},
+            "B": {"status": "running", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_B'},
+            "C": {"status": "completed", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_C'},
+            "D": {"status": "staledata", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_D'},
+            "E": {"status": "ready", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0,], 'folder_path': 'dummy_folder_path_E'}
         }
     }
 
@@ -149,11 +149,11 @@ def dict_dummy_project():
         "tag": "test_tag",
         "owner": "test_group",
         "nodes": {
-            "pip_1": {"tag": "test_tagpip_1", "notes": "test notes", "parents": [], "editable": True},
-            "pip_2": {"tag": "test_tagpip_2", "notes": "test notes", "parents": ["pip_1"], "editable": True},
-            "pip_3": {"tag": "test_tagpip_3", "notes": "test notes", "parents": ["pip_1"], "editable": True},
-            "pip_4": {"tag": "test_tagpip_4", "notes": "test notes", "parents": ["pip_3"], "editable": True},
-            "pip_5": {"tag": "test_tagpip_5", "notes": "test notes", "parents": [], "editable": False}
+            "pip_1": {"tag": "test_tagpip_1", "notes": "test notes", "parents": [], "blocked": False},
+            "pip_2": {"tag": "test_tagpip_2", "notes": "test notes", "parents": ["pip_1"], "blocked": False},
+            "pip_3": {"tag": "test_tagpip_3", "notes": "test notes", "parents": ["pip_1"], "blocked": False},
+            "pip_4": {"tag": "test_tagpip_4", "notes": "test notes", "parents": ["pip_3"], "blocked": False},
+            "pip_5": {"tag": "test_tagpip_5", "notes": "test notes", "parents": [], "blocked": True}
         }
     }
 
@@ -174,10 +174,10 @@ def dag_detach_1():
     G.name = "12345"
     G.graph['pipeline_id'] = G.name
 
-    G.nodes['A']['editable'] = False
-    G.nodes['B']['editable'] = False
-    G.nodes['C']['editable'] = False
-    G.nodes['D']['editable'] = True
+    G.nodes['A']['referenced'] = True
+    G.nodes['B']['referenced'] = True
+    G.nodes['C']['referenced'] = True
+    G.nodes['D']['referenced'] = False
 
     # Add a 'status' attribute to each node using NodeState
     for node in G.nodes:
@@ -198,11 +198,11 @@ def dag_detach_2():
     G.name = "12345"
     G.graph['pipeline_id'] = G.name
 
-    G.nodes['A']['editable'] = False
-    G.nodes['B']['editable'] = False
-    G.nodes['C']['editable'] = False
-    G.nodes['D']['editable'] = True
-    G.nodes['E']['editable'] = True
+    G.nodes['A']['referenced'] = True
+    G.nodes['B']['referenced'] = True
+    G.nodes['C']['referenced'] = True
+    G.nodes['D']['referenced'] = False
+    G.nodes['E']['referenced'] = False
 
     # Add a 'status' attribute to each node using NodeState
     for node in G.nodes:

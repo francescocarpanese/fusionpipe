@@ -847,14 +847,14 @@ def test_update_referenced_status_for_all_nodes(pg_test_db):
     conn.commit()
 
     # Verify referenced status for each node
-    editable_node1 = db_utils.is_node_referenced(cur, node1)
-    assert editable_node1 is False, f"Expected node1 to not be referenced, got {editable_node1}"
+    referenced_node1 = db_utils.is_node_referenced(cur, node1)
+    assert referenced_node1 is False, f"Expected node1 to not be referenced, got {referenced_node1}"
 
-    editable_node2 =  db_utils.is_node_referenced(cur, node2)
-    assert editable_node2 is True, f"Expected node2 to be referenced, got {editable_node2}"
+    referenced_node2 =  db_utils.is_node_referenced(cur, node2)
+    assert referenced_node2 is True, f"Expected node2 to be referenced, got {referenced_node2}"
 
-    editable_node3 = db_utils.is_node_referenced(cur, node3)
-    assert editable_node3 is False, f"Expected node3 to not be referenced, got {editable_node3}"
+    referenced_node3 = db_utils.is_node_referenced(cur, node3)
+    assert referenced_node3 is False, f"Expected node3 to not be referenced, got {referenced_node3}"
 
 
 def test_get_pipeline_notes_existing_and_nonexistent(pg_test_db):
@@ -1117,7 +1117,7 @@ def test_update_referenced_status(pg_test_db):
     conn.commit()
 
     # Verify the referenced status was updated
-    assert rows_updated == 1, "Editable status was not updated in the database."
+    assert rows_updated == 1, "Referenced status was not updated in the database."
     cur.execute("SELECT referenced FROM nodes WHERE node_id=%s", (node_id,))
     result = cur.fetchone()
     assert result is not None, "Node not found in database."
@@ -1660,8 +1660,8 @@ def test_is_pipeline_blocked(pg_test_db):
     conn.commit()
 
     # Test case: Pipeline with no nodes
-    is_editable = db_utils.is_pipeline_blocked(cur, pipeline_id)
-    assert is_editable is False, f"Expected pipeline {pipeline_id} to be non-referenced when it has no nodes."
+    is_blocked = db_utils.is_pipeline_blocked(cur, pipeline_id)
+    assert is_blocked is False, f"Expected pipeline {pipeline_id} to be non-blocked when it has no nodes."
 
     # Add a node to the pipeline
     node_id = generate_node_id()
@@ -1670,23 +1670,7 @@ def test_is_pipeline_blocked(pg_test_db):
     conn.commit()
 
     # Test case: Pipeline with one referenced node
-    is_editable = db_utils.is_pipeline_blocked(cur, pipeline_id)
-    assert is_editable is True, f"Expected pipeline {pipeline_id} to be referenced when it has at least one referenced node."
+    is_blocked = db_utils.is_pipeline_blocked(cur, pipeline_id)
+    assert is_blocked is False, f"Expected pipeline {pipeline_id} to be non-blocked when it has at least one referenced node."
 
-    # Add another node to the pipeline and set it to non-referenced
-    another_node_id = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=another_node_id, referenced=False)
-    db_utils.add_node_to_pipeline(cur, node_id=another_node_id, pipeline_id=pipeline_id)
-    conn.commit()
-
-    # Test case: Pipeline with one referenced and one non-referenced node
-    is_editable = db_utils.is_pipeline_blocked(cur, pipeline_id)
-    assert is_editable is True, f"Expected pipeline {pipeline_id} to remain referenced when it has at least one referenced node."
-
-    # Update the first node to be non-referenced
-    db_utils.update_referenced_status(cur, node_id=node_id, referenced=False)
-    conn.commit()
-
-    # Test case: Pipeline with no referenced nodes
-    is_editable = db_utils.is_pipeline_blocked(cur, pipeline_id)
-    assert is_editable is False, f"Expected pipeline {pipeline_id} to be non-referenced when all its nodes are non-referenced."
+    raise RuntimeError("This is a remainder error to make the test fail intentionally. The logic for the blocking needs to be updated")

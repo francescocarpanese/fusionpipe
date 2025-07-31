@@ -211,6 +211,7 @@ def pipeline_graph_to_dict(graph):
     """
     Convert a NetworkX directed graph to a dictionary format suitable for serialization.
     """
+    
 
     pipeline_data = {
         'pipeline_id': graph.graph.get('pipeline_id'), # This is the tag that can be given to the pipeline
@@ -219,14 +220,14 @@ def pipeline_graph_to_dict(graph):
         'tag': graph.graph.get('tag', None),  # Optional tag for the pipeline
         'owner': graph.graph.get('owner', None),  # Optional owner for the pipeline
         'project_id': graph.graph.get('project_id', ""),  # Optional list of project IDs associated with the pipeline
-        'editable': graph.graph.get('editable', True),  # Optional editable status for the pipeline
+        'blocked': graph.graph.get('blocked', False),  # Optional blocked status for the pipeline
     }
     for node in graph.nodes:
         parents = list(graph.predecessors(node))
         pipeline_data['nodes'][node] = {
             'parents': parents,
             'status': graph.nodes[node].get('status', 'null'),  # Default status is 'null'
-            'editable': graph.nodes[node].get('editable', True),  # Default editable is True
+            'referenced': graph.nodes[node].get('referenced', False),  # Default referenced is True
             'tag': graph.nodes[node].get('tag', None),  # Optional tag for the node
             'notes': graph.nodes[node].get('notes', None),  # Optional notes for the node
             'position': graph.nodes[node].get('position', None),  # Node position
@@ -253,7 +254,7 @@ def project_graph_to_dict(graph):
             'parents': parents,
             'tag': graph.nodes[node].get('tag', None),  # Optional tag for the node
             'notes': graph.nodes[node].get('notes', None),  # Optional notes for the node
-            'editable': graph.nodes[node].get('editable', True),  # Default editable is True
+            'blocked': graph.nodes[node].get('blocked', False),  # Default referenced is True
         }
     return project_data
 
@@ -275,7 +276,7 @@ def pipeline_graph_to_db(Gnx, cur):
     - This will also work to add a subgraph to an existing pipeline.
 
     Special consideration:
-    - Nodes which are not editable, hence that are present in multiple pipelines, must have the same parents in all pipelines,
+    - Nodes which are referenced, hence that are present in multiple pipelines, must have the same parents in all pipelines,
     but can have different childrens in different pipelines. This guarantees that a subgraph of referenced nodes preserve the same inputs across pipelines.
     To enforce that, the database has to be traversing the graph, and add the parents of each nodes.
     """
@@ -285,7 +286,7 @@ def pipeline_graph_to_db(Gnx, cur):
     owner = Gnx.graph.get('owner', None)
     notes = Gnx.graph.get('notes', None)
     project_id = Gnx.graph.get('project_id', generate_project_id())
-    editable = Gnx.graph.get('editable', True)
+    blocked = Gnx.graph.get('blocked', False)
 
     # Check if the project associated with the pipeline exists, if not, add it
     if project_id and not db_utils.check_if_project_exists(cur, project_id):
@@ -293,13 +294,13 @@ def pipeline_graph_to_db(Gnx, cur):
     
     # Check if the pipeline already exists, if not, add it
     if not db_utils.check_if_pipeline_exists(cur, pip_id):
-        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pip_id, tag=graph_tag, owner=owner, notes=notes, project_id=project_id, editable=editable)
+        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pip_id, tag=graph_tag, owner=owner, notes=notes, project_id=project_id, blocked=blocked)
 
     # Add nodes and their dependencies directly from the graph
     for node in Gnx.nodes:
         node_id = node
         status = Gnx.nodes[node].get('status', 'ready')  # Default status is 'ready'
-        editable = Gnx.nodes[node].get('editable', True)  # Default editable is True
+        referenced = Gnx.nodes[node].get('referenced', False)  # Default referenced is False
         node_notes = Gnx.nodes[node].get('notes', "")  # Optional notes for the node
         node_tag = Gnx.nodes[node].get('tag', None)  # Optional tag for the node
         position = Gnx.nodes[node].get('position', None)  # Node position
@@ -311,7 +312,7 @@ def pipeline_graph_to_db(Gnx, cur):
                 cur,
                 node_id=node_id,
                 status=status,
-                editable=editable,
+                referenced=referenced,
                 notes=node_notes,
                 folder_path=folder_path,
                 node_tag=node_tag
@@ -362,7 +363,7 @@ def project_graph_to_db(Gnx, cur):
 def db_to_pipeline_graph_from_pip_id(cur, pip_id):
     '''
     Special consideration:
-    - Nodes which are not editable, hence that are present in multiple pipelines, must have the same parents in all pipelines,
+    - Nodes which are referenced, hence that are present in multiple pipelines, must have the same parents in all pipelines,
     but can have different childrens in different pipelines. This guarantees that a subgraph of referenced nodes preserve the same inputs across pipelines.
     To enforce that, the database has to be traversing the graph, and add the parents of each nodes.
     '''
@@ -377,7 +378,7 @@ def db_to_pipeline_graph_from_pip_id(cur, pip_id):
     G.graph['tag'] = db_utils.get_pipeline_tag(cur, pipeline_id=pip_id)  # Set the graph tag from the pipeline data
     G.graph['owner'] = db_utils.get_pipeline_owner(cur, pipeline_id=pip_id)  # Optional owner for the pipeline
     G.graph['project_id'] = db_utils.get_project_id_by_pipeline(cur, pipeline_id=pip_id)  # Optional list of project IDs associated with the pipeline
-    G.graph['editable'] = db_utils.get_pipeline_editable_status(cur, pipeline_id=pip_id)  # Optional editable status for the pipeline
+    G.graph['blocked'] = db_utils.get_pipeline_blocked_status(cur, pipeline_id=pip_id)  # Optional blocked status for the pipeline
 
     # Add nodes and their dependencies
     for node_id in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id=pip_id):
@@ -386,9 +387,9 @@ def db_to_pipeline_graph_from_pip_id(cur, pip_id):
         status = db_utils.get_node_status(cur, node_id=node_id)
         if status not in NodeState._value2member_map_:
             raise ValueError(f"Invalid status '{status}' for node {node_id}. Must be one of {list(NodeState._value2member_map_.keys())}.")
-        editable = db_utils.is_node_editable(cur, node_id=node_id)
+        referenced = db_utils.is_node_referenced(cur, node_id=node_id)
         G.nodes[node_id]['status'] = status
-        G.nodes[node_id]['editable'] = editable
+        G.nodes[node_id]['referenced'] = referenced
         G.nodes[node_id]['notes'] = db_utils.get_node_notes(cur, node_id=node_id)
         G.nodes[node_id]['folder_path'] = db_utils.get_node_folder_path(cur, node_id=node_id)
 
@@ -427,7 +428,7 @@ def db_to_project_graph_from_project_id(cur, project_id):
     for pipeline_id in db_utils.get_all_pipelines_from_project_id(cur, project_id=project_id):
         G.add_node(pipeline_id)  # Add node with attributes
         G.nodes[pipeline_id]['notes'] = db_utils.get_pipeline_notes(cur, pipeline_id=pipeline_id)
-        G.nodes[pipeline_id]['editable'] = db_utils.get_pipeline_editable_status(cur, pipeline_id=pipeline_id)
+        G.nodes[pipeline_id]['referenced'] = db_utils.get_pipeline_blocked_status(cur, pipeline_id=pipeline_id)
 
         # Add edges based on parent relationships
         for parent_id in db_utils.get_pipeline_parents(cur, pipeline_id=pipeline_id):
@@ -463,10 +464,11 @@ def dict_to_graph(graph_dict):
     G.graph['notes'] = graph_dict.get('notes', None)
     G.graph['tag'] = graph_dict.get('tag', None)
     G.graph['owner'] = graph_dict.get('owner', None)
+    G.graph['blocked'] = graph_dict.get('blocked', False)
 
     # Add nodes and their attributes
     for node_id, node_data in graph_dict['nodes'].items():
-        G.add_node(node_id, status=node_data.get('status', 'ready'), editable=node_data.get('editable', True),
+        G.add_node(node_id, status=node_data.get('status', 'ready'), referenced=node_data['referenced'],
                    tag=node_data.get('tag', None), notes=node_data.get('notes', None), folder_path=node_data.get('folder_path', None))
         for parent in node_data.get('parents', []):
             G.add_edge(parent, node_id)
@@ -598,10 +600,10 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
 
     return new_pip_id
 
-def delete_node_from_pipeline_with_editable_logic(cur,pipeline_id, node_id):
-    # Check if the node is editable
-    if db_utils.is_node_editable(cur, node_id=node_id):
-        # If editable, delete the node directly from the pipeline database
+def delete_node_from_pipeline_with_referenced_logic(cur,pipeline_id, node_id):
+    # Check if the node is referenced
+    if not db_utils.is_node_referenced(cur, node_id=node_id):
+        # If not referenced, delete the node directly from the pipeline database
         set_children_stale(cur, pipeline_id, node_id)
         db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node_id)
         delete_node_folder(db_utils.get_node_folder_path(cur, node_id=node_id))
@@ -610,13 +612,13 @@ def delete_node_from_pipeline_with_editable_logic(cur,pipeline_id, node_id):
     # Get the pipeline graph from the database
     graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
 
-    # Get subgraph of non-editable nodes
-    non_editable_nodes = [n for n in graph.nodes if not graph.nodes[n].get('editable', True)]
-    subgraph = graph.subgraph(non_editable_nodes)
+    # Get subgraph of referenced nodes
+    referenced_nodes = [n for n in graph.nodes if graph.nodes[n]['referenced']]
+    subgraph = graph.subgraph(referenced_nodes)
 
     # Check if the node is a leaf (no children)
     if list(subgraph.successors(node_id)):
-        raise ValueError(f"Node {node_id} is not a leaf of non editable subgraph.")
+        raise ValueError(f"Node {node_id} is not a leaf of referenced subgraph.")
 
     # Delete the node from the pipeline
     db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node_id)
@@ -676,7 +678,7 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
         )
 
     # New node is 
-    db_utils.update_editable_status(cur, node_id=new_node_id, editable=True)
+    db_utils.update_referenced_status(cur, node_id=new_node_id, referenced=False)
 
     # Copy the folder into the new node folder
     new_folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"), new_node_id)
@@ -874,20 +876,20 @@ def update_stale_status_for_pipeline_nodes(cur, pipeline_id):
                     G.nodes[node_id]["status"] = NodeState.STALEDATA.value
 
 def delete_edge_and_update_status(cur, pipeline_id, parent_id, child_id):
-    # Check if the child node is editable
-    if not db_utils.is_node_editable(cur, node_id=child_id):
-        raise ValueError(f"Child node {child_id} is not editable. You cannot delete edges from it. Consider duplicating the node if you want to branch the pipeline")
+    # Check if the child node is referenced
+    if db_utils.is_node_referenced(cur, node_id=child_id):
+        raise ValueError(f"Child node {child_id} is referenced. You cannot delete edges from it. Consider duplicating the node if you want to branch the pipeline")
 
     # Set all descendants of the child node to 'staledata'
     set_children_stale(cur, pipeline_id, parent_id)
 
-    # Remove the edge and update the pipeline using editable logic
-    db_utils.remove_node_relation_with_editable_logic(cur, parent_id=parent_id, child_id=child_id)
+    # Remove the edge and update the pipeline using referenced logic
+    db_utils.remove_node_relation_with_referenced_logic(cur, parent_id=parent_id, child_id=child_id)
 
 def add_node_relation_safe(cur, pipeline_id, parent_id, child_id):
     """
     Safely add a node relation (edge) to the pipeline graph.
-    - Checks that the child node is editable.
+    - Checks that the child node is referenced.
     - Checks that adding the edge does not create a cycle.
     - Adds the relation if all checks pass.
     """
@@ -897,9 +899,9 @@ def add_node_relation_safe(cur, pipeline_id, parent_id, child_id):
     # Get the current pipeline graph
     graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
 
-    # Check if the child node is editable
-    if not db_utils.is_node_editable(cur, node_id=child_id):
-        raise ValueError(f"Child node {child_id} is not editable. Cannot add relation.")
+    # Check if the child node is referenced
+    if db_utils.is_node_referenced(cur, node_id=child_id):
+        raise ValueError(f"Child node {child_id} is referenced. Cannot add relation.")
 
     # Check if adding the edge would create a cycle
     temp_graph = graph.copy()
@@ -951,15 +953,15 @@ def merge_pipelines(cur, source_pipeline_ids):
 
 def lock_pipeline(cur, pipeline_id):
     # TODO add the change of the wirting permission when locking a pipeline
-    editable_status = False  # If locking, set editable to False; if unlocking, set it to True
-    db_utils.update_pipeline_editable_status(cur, pipeline_id=pipeline_id, editable=editable_status)
+    blocked = True  # If locking, set blocked to True; if unlocking, set it to True
+    db_utils.update_pipeline_blocked_status(cur, pipeline_id=pipeline_id, blocked=blocked)
 
 
 def detach_node_from_pipeline(cur, pipeline_id, node_id):
 
-    # Check if the node is editable
-    if db_utils.is_node_editable(cur, node_id=node_id):
-        raise ValueError(f"Node {node_id} is editable. You can detach only nodes which are locked.")
+    # Check if the node is referenced
+    if not db_utils.is_node_referenced(cur, node_id=node_id):
+        raise ValueError(f"Node {node_id} is not referenced. You can detach only nodes which are referenced.")
 
     new_node_id = generate_node_id()
 
@@ -991,18 +993,18 @@ def detach_subgraph_from_node(cur, pipeline_id, node_id):
     subgraph_nodes = set(nx.descendants(graph, node_id))
     subgraph_nodes.add(node_id)
 
-    editable_nodes_in_subgraph = [n for n in subgraph_nodes if db_utils.is_node_editable(cur, node_id=n)]
-    non_editable_parents_dict_of_editable_node = {}
+    not_referenced_nodes_in_subgraph = [n for n in subgraph_nodes if not db_utils.is_node_referenced(cur, node_id=n)]
+    referenced_parents_dict_of_referenced_node = {}
 
-    for node in editable_nodes_in_subgraph:
+    for node in not_referenced_nodes_in_subgraph:
         # Find direct parents
         parents = list(graph.predecessors(node))
-        non_editable_parents = [parent for parent in parents if not db_utils.is_node_editable(cur, node_id=parent)]
-        if non_editable_parents:
-            non_editable_parents_dict_of_editable_node[node] = non_editable_parents
+        referenced_parents = [parent for parent in parents if db_utils.is_node_referenced(cur, node_id=parent)]
+        if referenced_parents:
+            referenced_parents_dict_of_referenced_node[node] = referenced_parents
 
-    # Remove from the subthree all the nodes which are in editable status
-    subgraph_nodes = [n for n in subgraph_nodes if n not in editable_nodes_in_subgraph]
+    # Remove from the subthree all the nodes which are in referenced status
+    subgraph_nodes = [n for n in subgraph_nodes if n not in not_referenced_nodes_in_subgraph]
 
     # Duplicate the nodes with their relations
     id_map = duplicate_nodes_in_pipeline_with_relations(
@@ -1014,8 +1016,8 @@ def detach_subgraph_from_node(cur, pipeline_id, node_id):
     for node in subgraph_nodes:
         db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node)
     
-    # Attach editable nodes with non-editable parents to the new nodes
-    for node, parents in non_editable_parents_dict_of_editable_node.items():
+    # Attach not referenced nodes with referenced parents to the new nodes
+    for node, parents in referenced_parents_dict_of_referenced_node.items():
         new_parents = [id_map[parent] for parent in parents]
         for new_parent in new_parents:
             # Add the relation to the new node
