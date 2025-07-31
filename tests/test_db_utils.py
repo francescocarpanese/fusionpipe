@@ -76,7 +76,7 @@ def test_add_node_to_pipline(pg_test_db):
     assert result[1] == pipeline_id, "Pipeline ID in entry does not match."
 
 def test_remove_node_from_pipeline(pg_test_db):
-    from fusionpipe.utils.db_utils import remove_node_from_pipeline, get_rows_with_node_id_in_entries, get_rows_node_id_in_nodes, is_node_editable
+    from fusionpipe.utils.db_utils import remove_node_from_pipeline, get_rows_with_node_id_in_entries, get_rows_node_id_in_nodes, is_node_referenced
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
@@ -110,14 +110,14 @@ def test_remove_node_from_pipeline(pg_test_db):
     cur.execute("SELECT * FROM node_pipeline_relation WHERE node_id=%s AND pipeline_id=%s", (node_id, pipeline_id2))
     assert cur.fetchone() is not None, "Node entry for second pipeline was removed unexpectedly."
 
-    # The node should be editable only if it is present in one or zero pipelines
-    editable = is_node_editable(cur, node_id)
+    # The node should be referenced only if it is present > 1 pipelines
+    referenced = is_node_referenced(cur, node_id)
     cur.execute("SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id=%s", (node_id,))
     count = cur.fetchone()[0]
     if count <= 1:
-        assert editable is True, "Node should be editable when present in one or zero pipelines."
+        assert referenced is False, "Node should not be referenced when present in one or zero pipelines."
     else:
-        assert editable is False, "Node should not be editable when present in more than one pipeline."
+        assert referenced is True, "Node should be referenced when present in more than one pipeline."
 
     # Now remove from the second pipeline as well
     rows_deleted2 = remove_node_from_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id2)
@@ -126,9 +126,9 @@ def test_remove_node_from_pipeline(pg_test_db):
     # Node should still exist in nodes table
     assert db_utils.get_rows_node_id_in_nodes(cur, node_id), "Node was unexpectedly removed from nodes table after removing from all pipelines."
 
-    # Node should now be editable (since it's not in any pipeline)
-    editable = is_node_editable(cur, node_id)
-    assert editable is True, "Node should be editable when not present in any pipeline."
+    # Node should now not be referenced (since it's not in any pipeline)
+    referenced = is_node_referenced(cur, node_id)
+    assert referenced is False, "Node should not be referenced when not present in any pipeline."
 
 
 
@@ -781,7 +781,7 @@ def test_count_pipeline_with_node(pg_test_db):
     new_node_pipeline_count = db_utils.count_pipeline_with_node(cur, new_node_id)
     assert new_node_pipeline_count == 0, f"Expected 0 pipelines for node {new_node_id}, got {new_node_pipeline_count}"
 
-def test_is_node_editable(pg_test_db):
+def test_is_node_referenced(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
@@ -793,8 +793,8 @@ def test_is_node_editable(pg_test_db):
     db_utils.add_node_to_nodes(cur, node_id=node_id)
 
     # Test case: Node does not belong to any pipeline
-    editable = db_utils.is_node_editable(cur, node_id)
-    assert editable is True, f"Expected node {node_id} to be editable when not associated with any pipeline."
+    referenced = db_utils.is_node_referenced(cur, node_id)
+    assert referenced is False, f"Expected node {node_id} to not be referenced when not associated with any pipeline."
 
     # Test case: Node belongs to one pipeline
     pipeline_id = generate_pip_id()
@@ -802,8 +802,8 @@ def test_is_node_editable(pg_test_db):
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
-    editable = db_utils.is_node_editable(cur, node_id)
-    assert editable is True, f"Expected node {node_id} to be editable when associated with one pipeline."
+    referenced = db_utils.is_node_referenced(cur, node_id)
+    assert referenced is False, f"Expected node {node_id} to not be referenced when associated with only one pipeline."
 
     # Test case: Node belongs to more than one pipeline
     another_pipeline_id = generate_pip_id()
@@ -811,11 +811,11 @@ def test_is_node_editable(pg_test_db):
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=another_pipeline_id)
     conn.commit()
 
-    editable = db_utils.is_node_editable(cur, node_id)
-    assert editable is False, f"Expected node {node_id} to be non-editable when associated with more than one pipeline."
+    referenced = db_utils.is_node_referenced(cur, node_id)
+    assert referenced is True, f"Expected node {node_id} to be referenced when associated with more than one pipeline."
 
 
-def test_update_editable_status_for_all_nodes(pg_test_db):
+def test_update_referenced_status_for_all_nodes(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
@@ -842,19 +842,19 @@ def test_update_editable_status_for_all_nodes(pg_test_db):
     db_utils.add_node_to_pipeline(cur, node_id=node2, pipeline_id=pipeline2)
     conn.commit()
 
-    # Call the function to update editable status
-    db_utils.update_editable_status_for_all_nodes(cur)
+    # Call the function to update referenced status
+    db_utils.update_referenced_status_for_all_nodes(cur)
     conn.commit()
 
-    # Verify editable status for each node
-    editable_node1 = db_utils.is_node_editable(cur, node1)
-    assert editable_node1 is True, f"Expected node1 to be editable, got {editable_node1}"
+    # Verify referenced status for each node
+    editable_node1 = db_utils.is_node_referenced(cur, node1)
+    assert editable_node1 is False, f"Expected node1 to not be referenced, got {editable_node1}"
 
-    editable_node2 =  db_utils.is_node_editable(cur, node2)
-    assert editable_node2 is False, f"Expected node2 to be non-editable, got {editable_node2}"
+    editable_node2 =  db_utils.is_node_referenced(cur, node2)
+    assert editable_node2 is True, f"Expected node2 to be referenced, got {editable_node2}"
 
-    editable_node3 = db_utils.is_node_editable(cur, node3)
-    assert editable_node3 is True, f"Expected node3 to be editable, got {editable_node3}"
+    editable_node3 = db_utils.is_node_referenced(cur, node3)
+    assert editable_node3 is False, f"Expected node3 to not be referenced, got {editable_node3}"
 
 
 def test_get_pipeline_notes_existing_and_nonexistent(pg_test_db):
@@ -985,16 +985,16 @@ def test_sanitize_node_relation(pg_test_db):
     node2 = 'n2'
     node3 = 'n3'
     node4 = 'n4'
-    node5 = 'n5'  # This node will not be editable
-    node6 = 'n6'  # This node will not be editable
+    node5 = 'n5'  # This node will be referenced
+    node6 = 'n6'  # This node will be referenced
     node7 = 'n7'  # This node will be a child of node6
     pipeline_id = generate_pip_id()
     db_utils.add_node_to_nodes(cur, node_id=node1)
     db_utils.add_node_to_nodes(cur, node_id=node2)
     db_utils.add_node_to_nodes(cur, node_id=node3)
     db_utils.add_node_to_nodes(cur, node_id=node4)
-    db_utils.add_node_to_nodes(cur, node_id=node5, editable=False)  # Not editable
-    db_utils.add_node_to_nodes(cur, node_id=node6, editable=False)  # Not editable
+    db_utils.add_node_to_nodes(cur, node_id=node5, referenced=True)  # referenced
+    db_utils.add_node_to_nodes(cur, node_id=node6, referenced=True)  # referenced
     db_utils.add_node_to_nodes(cur, node_id=node7)
     db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     db_utils.add_node_to_pipeline(cur, node_id=node1, pipeline_id=pipeline_id)
@@ -1002,7 +1002,7 @@ def test_sanitize_node_relation(pg_test_db):
     db_utils.add_node_to_pipeline(cur, node_id=node7, pipeline_id=pipeline_id)
     # node 1,2,3,7 are in the pipeline
     # node3, node4, node5, node6 are not in the pipeline
-    # node5 and node6 are not editable
+    # node5 and node6 are referenced
     # node6 is parent of node 7
 
     # Add relations:
@@ -1010,9 +1010,9 @@ def test_sanitize_node_relation(pg_test_db):
     db_utils.add_node_relation(cur, child_id=node2, parent_id=node1)
     # node3 -> node4 (neither in pipeline, should remain untouched)
     db_utils.add_node_relation(cur, child_id=node4, parent_id=node3)
-    # node5 -> node6 (not in pipeline, not editable, should be remain)
+    # node5 -> node6 (not in pipeline,  referenced, should be remain)
     db_utils.add_node_relation(cur, child_id=node6, parent_id=node5)
-    # node5 -> node7 (parents are not editable and not in pipeline)
+    # node5 -> node7 (parents are  referenced and not in pipeline)
     db_utils.add_node_relation(cur, child_id=node7, parent_id=node5)
 
     conn.commit()
@@ -1071,13 +1071,13 @@ def test_can_node_run_logic(pg_test_db):
     conn = pg_test_db
     cur = db_utils.init_db(conn)
 
-    # Create a node with default status ('ready') and editable True
+    # Create a node with default status ('ready') and referenced False
     node_id = pip_utils.generate_node_id()
     db_utils.add_node_to_nodes(cur, node_id=node_id)
     conn.commit()
 
     canrun = pip_utils.can_node_run(cur, node_id)
-    assert canrun is True, "Node should be able to run when status is 'ready' and editable is True."
+    assert canrun is True, "Node should be able to run when status is 'ready' and referenced is False."
     # Update node status to 'running' and check again
     cur.execute("UPDATE nodes SET status='running' WHERE node_id=%s", (node_id,))
     conn.commit()
@@ -1089,7 +1089,7 @@ def test_can_node_run_logic(pg_test_db):
     canrun = pip_utils.can_node_run(cur, node_id)
     assert canrun is False, "Node should not be able to run when status is 'failed'."
 
-def test_update_editable_status(pg_test_db):
+def test_update_referenced_status(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id
     from fusionpipe.utils import db_utils
 
@@ -1101,27 +1101,27 @@ def test_update_editable_status(pg_test_db):
     db_utils.add_node_to_nodes(cur, node_id=node_id)
     conn.commit()
 
-    # Update editable status to False
-    rows_updated = db_utils.update_editable_status(cur, node_id=node_id, editable=False)
+    # Update referenced status to True
+    rows_updated = db_utils.update_referenced_status(cur, node_id=node_id, referenced=True)
     conn.commit()
 
-    # Verify the editable status was updated
-    assert rows_updated == 1, "Editable status was not updated in the database."
-    cur.execute("SELECT editable FROM nodes WHERE node_id=%s", (node_id,))
+    # Verify the referenced status was updated
+    assert rows_updated == 1, "Referenced status was not updated in the database."
+    cur.execute("SELECT referenced FROM nodes WHERE node_id=%s", (node_id,))
     result = cur.fetchone()
     assert result is not None, "Node not found in database."
-    assert result[0] == 0, f"Expected editable status to be False, got {result[0]}"
+    assert result[0] == 1, f"Expected referenced status to be True, got {result[0]}"
 
-    # Update editable status back to True
-    rows_updated = db_utils.update_editable_status(cur, node_id=node_id, editable=True)
+    # Update referenced status back to False
+    rows_updated = db_utils.update_referenced_status(cur, node_id=node_id, referenced=False)
     conn.commit()
 
-    # Verify the editable status was updated
+    # Verify the referenced status was updated
     assert rows_updated == 1, "Editable status was not updated in the database."
-    cur.execute("SELECT editable FROM nodes WHERE node_id=%s", (node_id,))
+    cur.execute("SELECT referenced FROM nodes WHERE node_id=%s", (node_id,))
     result = cur.fetchone()
     assert result is not None, "Node not found in database."
-    assert result[0] == 1, f"Expected editable status to be True, got {result[0]}"
+    assert result[0] == 0, f"Expected referenced status to be False, got {result[0]}"
 
 
 def test_duplicate_node_pipeline_relation(pg_test_db):
@@ -1647,7 +1647,7 @@ def test_get_all_pipelines_from_project_id(pg_test_db):
     assert result_none == [], f"Expected empty list for missing project, got {result_none}"
 
 
-def test_is_pipeline_editable(pg_test_db):
+def test_is_pipeline_blocked(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
@@ -1660,33 +1660,33 @@ def test_is_pipeline_editable(pg_test_db):
     conn.commit()
 
     # Test case: Pipeline with no nodes
-    is_editable = db_utils.is_pipeline_editable(cur, pipeline_id)
-    assert is_editable is False, f"Expected pipeline {pipeline_id} to be non-editable when it has no nodes."
+    is_editable = db_utils.is_pipeline_blocked(cur, pipeline_id)
+    assert is_editable is False, f"Expected pipeline {pipeline_id} to be non-referenced when it has no nodes."
 
     # Add a node to the pipeline
     node_id = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, referenced=False)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
-    # Test case: Pipeline with one editable node
-    is_editable = db_utils.is_pipeline_editable(cur, pipeline_id)
-    assert is_editable is True, f"Expected pipeline {pipeline_id} to be editable when it has at least one editable node."
+    # Test case: Pipeline with one referenced node
+    is_editable = db_utils.is_pipeline_blocked(cur, pipeline_id)
+    assert is_editable is True, f"Expected pipeline {pipeline_id} to be referenced when it has at least one referenced node."
 
-    # Add another node to the pipeline and set it to non-editable
+    # Add another node to the pipeline and set it to non-referenced
     another_node_id = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=another_node_id, editable=False)
+    db_utils.add_node_to_nodes(cur, node_id=another_node_id, referenced=False)
     db_utils.add_node_to_pipeline(cur, node_id=another_node_id, pipeline_id=pipeline_id)
     conn.commit()
 
-    # Test case: Pipeline with one editable and one non-editable node
-    is_editable = db_utils.is_pipeline_editable(cur, pipeline_id)
-    assert is_editable is True, f"Expected pipeline {pipeline_id} to remain editable when it has at least one editable node."
+    # Test case: Pipeline with one referenced and one non-referenced node
+    is_editable = db_utils.is_pipeline_blocked(cur, pipeline_id)
+    assert is_editable is True, f"Expected pipeline {pipeline_id} to remain referenced when it has at least one referenced node."
 
-    # Update the first node to be non-editable
-    db_utils.update_editable_status(cur, node_id=node_id, editable=False)
+    # Update the first node to be non-referenced
+    db_utils.update_referenced_status(cur, node_id=node_id, referenced=False)
     conn.commit()
 
-    # Test case: Pipeline with no editable nodes
-    is_editable = db_utils.is_pipeline_editable(cur, pipeline_id)
-    assert is_editable is False, f"Expected pipeline {pipeline_id} to be non-editable when all its nodes are non-editable."
+    # Test case: Pipeline with no referenced nodes
+    is_editable = db_utils.is_pipeline_blocked(cur, pipeline_id)
+    assert is_editable is False, f"Expected pipeline {pipeline_id} to be non-referenced when all its nodes are non-referenced."
