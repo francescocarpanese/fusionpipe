@@ -140,7 +140,7 @@ def test_pipeline_graph_to_db_and_db_to_pipeline_graph_roundtrip(pg_test_db, dag
     # Use networkx's is_isomorphic to compare structure and attributes
     def node_match(n1, n2):
         # Compare relevant node attributes
-        for attr in ['status', 'editable', 'tag', 'notes', 'folder_path']:
+        for attr in ['status', 'referenced', 'tag', 'notes', 'folder_path']:
             if n1.get(attr) != n2.get(attr):
                 return False
         return True
@@ -156,7 +156,7 @@ def test_pipeline_graph_to_db_and_db_to_pipeline_graph_roundtrip(pg_test_db, dag
     ), "Loaded graph is not isomorphic to the original graph with respect to structure and node attributes."
 
     # Check graph attributes
-    for attr in ['pipeline_id', 'notes', 'tag', 'owner', 'editable']:
+    for attr in ['pipeline_id', 'notes', 'tag', 'owner', 'blocked']:
         assert G_loaded.graph[attr] == dag_dummy_1.graph[attr]
 
 
@@ -216,7 +216,7 @@ def test_dict_to_graph(dict_dummy_1, dag_dummy_1):
 
     # Use networkx's is_isomorphic to compare structure and attributes
     def node_match(n1, n2):
-        for attr in ['status', 'editable', 'tag', 'notes']:
+        for attr in ['status', 'referenced', 'tag', 'notes']:
             if n1.get(attr) != n2.get(attr):
                 return False
         return True
@@ -231,7 +231,7 @@ def test_dict_to_graph(dict_dummy_1, dag_dummy_1):
     ), "Graph reconstructed from dict is not isomorphic to the original graph."
 
     # Check graph attributes
-    for attr in ['pipeline_id', 'notes', 'tag', 'owner']:
+    for attr in ['pipeline_id', 'notes', 'tag', 'owner','blocked']:
         assert G.graph[attr] == dag_dummy_1.graph[attr]
 
 def test_visualize_pip_static_runs_without_error(monkeypatch, dag_dummy_1):
@@ -336,13 +336,13 @@ def test_branch_pipeline_from_node(pg_test_db, dag_dummy_1, start_node):
     parent_pipelines = db_utils.get_pipeline_parents(cur, new_pip_id)
     assert original_graph.graph['pipeline_id'] in parent_pipelines, "Original pipeline should be a parent of the new pipeline."
 
-    # Assert status of original pipeline has turned to editable=false
-    original_status = db_utils.get_pipeline_editable_status(cur, original_graph.graph['pipeline_id'])
-    assert original_status == False, "Original pipeline should be set to editable=false after branching."
+    # Assert status of original pipeline has turned to blocked=true
+    original_status = db_utils.get_pipeline_blocked_status(cur, original_graph.graph['pipeline_id'])
+    assert original_status == True, "Original pipeline should be set to blocked=true after branching."
 
-    # Check new pipeline is editable
-    new_status = db_utils.get_pipeline_editable_status(cur, new_pip_id)
-    assert new_status == True, "New pipeline should be set to editable=true after branching."
+    # Check new pipeline is referenced
+    new_status = db_utils.get_pipeline_blocked_status(cur, new_pip_id)
+    assert new_status == False, "New pipeline should be set to referenced= false after branching."
 
 def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp_base_dir):
     """
@@ -364,7 +364,7 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp
     pipeline_id = generate_pip_id()
     node_id = generate_node_id()
     db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None, node_tag="test")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, notes="test node", folder_path=None, node_tag="test")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, position_x=0, position_y=0)
     db_utils.update_folder_path_nodes(cur, node_id, os.path.join(tmp_base_dir, node_id))
     conn.commit()
@@ -436,7 +436,7 @@ def test_duplicate_node_in_different_pipeline_w_code_and_data(monkeypatch, pg_te
     node_id = generate_node_id()
     db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id_src, tag="src", owner="tester", notes="src pipeline")
     db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id_dst, tag="dst", owner="tester", notes="dst pipeline")
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None, node_tag="test")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, notes="test node", folder_path=None, node_tag="test")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id_src, position_x=0, position_y=0)
     db_utils.update_folder_path_nodes(cur, node_id, os.path.join(tmp_base_dir, node_id))
     conn.commit()
@@ -556,7 +556,7 @@ def test_delete_node_data_removes_data_contents(monkeypatch, pg_test_db, tmp_bas
     conn = pg_test_db
     cur = db_utils.init_db(conn)
     node_id = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, notes="test node", folder_path=None)
     db_utils.update_folder_path_nodes(cur, node_id, os.path.join(tmp_base_dir, node_id))
     conn.commit()
 
@@ -591,7 +591,7 @@ def test_delete_node_data_removes_data_contents(monkeypatch, pg_test_db, tmp_bas
 
 def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, pg_test_db, tmp_base_dir):
     """
-    Test delete_node_from_pipeline_with_editable_logic for editable and non-editable nodes.
+    Test delete_node_from_pipeline_with_editable_logic for referenced and non-referenced nodes.
     """
     import os
     import shutil
@@ -609,9 +609,9 @@ def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, pg_test_db, 
     pipeline_id = generate_pip_id()
     db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
 
-    # Case 1: Editable node
+    # Case 1: Not Referenced node
     node_id_editable = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=node_id_editable, status="ready", editable=1, notes="editable node", folder_path=None)
+    db_utils.add_node_to_nodes(cur, node_id=node_id_editable, status="ready", referenced=False, notes="not referenced node", folder_path=None)
     db_utils.add_node_to_pipeline(cur, node_id=node_id_editable, pipeline_id=pipeline_id, position_x=0, position_y=0)
     db_utils.update_folder_path_nodes(cur, node_id_editable, os.path.join(tmp_base_dir, node_id_editable))
     conn.commit()
@@ -624,9 +624,9 @@ def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, pg_test_db, 
     assert not os.path.exists(folder_path_nodes)
     assert node_id_editable not in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
 
-    # Case 2: Non-editable leaf node in non-editable subgraph
+    # Case 2: Referenced leaf node in referenced subgraph
     node_id_noneditable = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=node_id_noneditable, status="ready", editable=0, notes="non-editable node", folder_path=None)
+    db_utils.add_node_to_nodes(cur, node_id=node_id_noneditable, status="ready", referenced=True, notes="referenced node", folder_path=None)
     db_utils.add_node_to_pipeline(cur, node_id=node_id_noneditable, pipeline_id=pipeline_id, position_x=1, position_y=1)
     conn.commit()
     # Should delete node from pipeline (no error)
@@ -634,11 +634,11 @@ def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, pg_test_db, 
     conn.commit()
     assert node_id_noneditable not in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
 
-    # Case 3: Non-editable node that is not a leaf in non-editable subgraph
+    # Case 3: Referenced node that is not a leaf in Referenced subgraph
     parent_id = generate_node_id()
     child_id = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=parent_id, status="ready", editable=0, notes="parent", folder_path=None, node_tag="parent")
-    db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", editable=0, notes="child", folder_path=None, node_tag="child")
+    db_utils.add_node_to_nodes(cur, node_id=parent_id, status="ready", referenced=True, notes="parent", folder_path=None, node_tag="parent")
+    db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", referenced=True, notes="child", folder_path=None, node_tag="child")
     db_utils.add_node_to_pipeline(cur, node_id=parent_id, pipeline_id=pipeline_id, position_x=2, position_y=2)
     db_utils.add_node_to_pipeline(cur, node_id=child_id, pipeline_id=pipeline_id, position_x=3, position_y=3)
     db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
@@ -734,7 +734,7 @@ def test_add_node_relation_safe(pg_test_db):
     """
     Test add_node_relation_safe:
     - Adds a valid relation.
-    - Fails if child is not editable.
+    - Fails if child is referenced.
     - Fails if adding the edge would create a cycle.
     """
     from fusionpipe.utils.pip_utils import add_node_relation_safe, generate_node_id, generate_pip_id
@@ -751,8 +751,8 @@ def test_add_node_relation_safe(pg_test_db):
     parent_id = generate_node_id()
     child_id = generate_node_id()
     db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id)
-    db_utils.add_node_to_nodes(cur, node_id=parent_id, status="ready", editable=True)
-    db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", editable=True)
+    db_utils.add_node_to_nodes(cur, node_id=parent_id, status="ready", referenced=False)
+    db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", referenced=False)
     db_utils.add_node_to_pipeline(cur, node_id=parent_id, pipeline_id=pipeline_id)
     db_utils.add_node_to_pipeline(cur, node_id=child_id, pipeline_id=pipeline_id)
     conn.commit()
@@ -767,9 +767,9 @@ def test_add_node_relation_safe(pg_test_db):
     with pytest.raises(ValueError, match="cycle"):
         add_node_relation_safe(cur, pipeline_id, child_id, parent_id)
 
-    # Should fail: child not editable
-    db_utils.update_editable_status(cur, node_id=child_id, editable=False)
-    with pytest.raises(ValueError, match="not editable"):
+    # Should fail: child referenced
+    db_utils.update_referenced_status(cur, node_id=child_id, referenced=True)
+    with pytest.raises(ValueError, match="referenced"):
         add_node_relation_safe(cur, pipeline_id, parent_id, child_id)
 
 def test_merge_pipelines(pg_test_db):
