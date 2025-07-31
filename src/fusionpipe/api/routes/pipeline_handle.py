@@ -102,7 +102,7 @@ def add_node_to_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
     try:
         node_id = pip_utils.generate_node_id()
         folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"),node_id)
-        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path_nodes)
+        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path_nodes)
         position_x = random.randint(-10, 10)
         position_y = random.randint(-10, 10)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, position_x=position_x, position_y=position_y)
