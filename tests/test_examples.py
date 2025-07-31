@@ -30,7 +30,7 @@ def test_example_execution(pg_test_db, tmp_base_dir, example_name):
     db_utils.add_node_to_nodes(
         cur, 
         node_id=node_id, 
-        editable=True, 
+        referenced=False, 
         folder_path=folder_path_nodes, 
         status="ready"
     )
