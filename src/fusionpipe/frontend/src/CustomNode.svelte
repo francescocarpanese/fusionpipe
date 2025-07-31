@@ -4,7 +4,7 @@
 </script>
 
 <div class="custom-node">
-    {#if !data.editable}
+    {#if data.referenced}
         <img src="/Lock.jpg" alt="Locked" width="12" height="12" />
     {/if}
     <span class="line">{data.line1}</span>

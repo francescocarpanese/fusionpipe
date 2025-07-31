@@ -14,7 +14,6 @@
   } from "@xyflow/svelte";
 
   import ProjectGraph from "./ProjectGraph.svelte";
-  import PipelineGraph from "./PipelineGraph.svelte";
 
   import { Textarea } from "flowbite-svelte";
   import "@xyflow/svelte/dist/style.css";
@@ -889,7 +888,7 @@
         data: {
           line1: `TAG: ${node.tag}`,
           line2: `ID: ${id}`,
-          editable: node.editable,
+          referenced: node.referenced,
           notes: node.notes || "",
           folder_path: node.folder_path || "",
           status: node.status || "ready",
@@ -967,7 +966,7 @@
           line2: `ID: ${id}`,
           notes: node.notes || "",
           tag: node.tag || "",
-          editable: node.editable,
+          referenced: node.referenced,
         },
       }));
 
