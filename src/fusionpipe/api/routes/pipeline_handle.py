@@ -403,8 +403,8 @@ def reference_nodes_into_pipeline_route(payload: dict, db_conn=Depends(get_db)):
     if not source_pipeline_id or not target_pipeline_id or not node_ids or not isinstance(node_ids, list):
         raise HTTPException(status_code=400, detail="Payload must contain source_pipeline_id, target_pipeline_id, and a list of node_ids")
     try:
-        id_map = db_utils.duplicate_node_pipeline_relation(
-            cur, source_pipeline_id, node_ids, target_pipeline_id
+        id_map = pip_utils.reference_nodes_into_pipeline(
+            cur, source_pipeline_id, target_pipeline_id, node_ids
         )
         db_conn.commit()
     except Exception as e:
@@ -573,3 +573,44 @@ def detach_subgraph_from_node(pipeline_id: str, node_id: str, db_conn=Depends(ge
         raise HTTPException(status_code=500, detail=str(e))
     
     return {"message": f"Node {node_id} detached from pipeline {pipeline_id}"}
+
+
+@router.post("/block_nodes")
+def block_nodes_route(payload: dict, db_conn=Depends(get_db)):
+    """
+    Block multiple nodes by updating their blocked status in the database.
+    Payload example: {"node_ids": ["n_123", "n_456"]}
+    """
+    node_ids = payload.get("node_ids")
+    if not node_ids or not isinstance(node_ids, list):
+        raise HTTPException(status_code=400, detail="Payload must contain a list of node_ids")
+    
+    cur = db_conn.cursor()
+    try:
+        pip_utils.block_nodes(cur, node_ids)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    return {"message": f"Nodes {node_ids} blocked successfully"}
+
+@router.post("/unblock_nodes")
+def unblock_nodes_route(payload: dict, db_conn=Depends(get_db)):
+    """
+    Unblock multiple nodes by updating their blocked status in the database.
+    Payload example: {"node_ids": ["n_123", "n_456"]}
+    """
+    node_ids = payload.get("node_ids")
+    if not node_ids or not isinstance(node_ids, list):
+        raise HTTPException(status_code=400, detail="Payload must contain a list of node_ids")
+    
+    cur = db_conn.cursor()
+    try:
+        pip_utils.unblock_nodes(cur, node_ids)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    return {"message": f"Nodes {node_ids} unblocked successfully"}

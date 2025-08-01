@@ -1674,3 +1674,81 @@ def test_is_pipeline_blocked(pg_test_db):
     assert is_blocked is False, f"Expected pipeline {pipeline_id} to be non-blocked when it has at least one referenced node."
 
     raise RuntimeError("This is a remainder error to make the test fail intentionally. The logic for the blocking needs to be updated")
+
+def test_get_node_blocked_status(pg_test_db):
+    from fusionpipe.utils.pip_utils import generate_node_id
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Create a node with blocked status set to False
+    node_id = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id, blocked=False)
+    conn.commit()
+
+    # Test: Get blocked status for the node
+    blocked_status = db_utils.get_node_blocked_status(cur, node_id)
+    assert blocked_status is False, f"Expected blocked status to be False, got {blocked_status}"
+
+    # Update the node's blocked status to True
+    cur.execute("UPDATE nodes SET blocked = TRUE WHERE node_id = %s", (node_id,))
+    conn.commit()
+
+    # Test: Get updated blocked status for the node
+    blocked_status = db_utils.get_node_blocked_status(cur, node_id)
+    assert blocked_status is True, f"Expected blocked status to be True, got {blocked_status}"
+
+    # Test: Get blocked status for a non-existent node
+    non_existent_node_id = "nonexistent_node"
+    blocked_status = db_utils.get_node_blocked_status(cur, non_existent_node_id)
+    assert blocked_status is False, f"Expected blocked status to be False for non-existent node, got {blocked_status}"
+
+
+def test_update_node_blocked_status(pg_test_db):
+    from fusionpipe.utils.pip_utils import generate_node_id
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Create a node with blocked status set to False
+    node_id = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id, blocked=False)
+    conn.commit()
+
+    # Test: Update blocked status to True
+    rows_updated = db_utils.update_node_blocked_status(cur, node_id, True)
+    conn.commit()
+    assert rows_updated == 1, "Blocked status was not updated in the database."
+
+    # Verify the blocked status was updated
+    cur.execute("SELECT blocked FROM nodes WHERE node_id = %s", (node_id,))
+    result = cur.fetchone()
+    assert result is not None, "Node not found in database."
+    assert result[0] is True, f"Expected blocked status to be True, got {result[0]}"
+
+    # Test: Update blocked status back to False
+    rows_updated = db_utils.update_node_blocked_status(cur, node_id, False)
+    conn.commit()
+    assert rows_updated == 1, "Blocked status was not updated in the database."
+
+    # Verify the blocked status was updated
+    cur.execute("SELECT blocked FROM nodes WHERE node_id = %s", (node_id,))
+    result = cur.fetchone()
+    assert result is not None, "Node not found in database."
+    assert result[0] is False, f"Expected blocked status to be False, got {result[0]}"
+
+    # Test: Update blocked status for a non-existent node
+    non_existent_node_id = "nonexistent_node"
+    rows_updated = db_utils.update_node_blocked_status(cur, non_existent_node_id, True)
+    conn.commit()
+    assert rows_updated == 0, "Blocked status should not be updated for a non-existent node."
+
+    # Test: Pass invalid blocked status
+    try:
+        db_utils.update_node_blocked_status(cur, node_id, "invalid_status")
+    except ValueError as e:
+        assert str(e) == "blocked status must be a boolean value.", f"Unexpected error message: {str(e)}"
+    else:
+        assert False, "Expected ValueError for invalid blocked status, but no exception was raised."

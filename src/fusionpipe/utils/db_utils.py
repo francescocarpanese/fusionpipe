@@ -75,7 +75,8 @@ def init_db(conn):
             referenced BOOLEAN DEFAULT FALSE,
             notes TEXT DEFAULT NULL,
             folder_path TEXT DEFAULT NULL,
-            node_tag TEXT
+            node_tag TEXT,
+            blocked BOOLEAN DEFAULT FALSE
         )
     ''')
 
@@ -134,11 +135,11 @@ def add_pipeline_to_pipelines(cur, pipeline_id, tag=None, owner=None, notes=None
     cur.execute('INSERT INTO pipelines (pipeline_id, tag, owner, notes, project_id, blocked) VALUES (%s, %s, %s, %s, %s, %s)', (pipeline_id, tag, owner, notes, project_id, blocked))
     return pipeline_id
 
-def add_node_to_nodes(cur, node_id, status='ready', referenced=False, notes=None, folder_path=None, node_tag=None):
+def add_node_to_nodes(cur, node_id, status='ready', referenced=False, notes=None, folder_path=None, node_tag=None, blocked=False):
     if node_tag is None:
         node_tag = node_id
-    cur.execute('INSERT INTO nodes (node_id, status, referenced, notes, folder_path, node_tag) VALUES (%s, %s, %s, %s, %s, %s)', 
-                (node_id, status, bool(referenced), notes, folder_path, node_tag))
+    cur.execute('INSERT INTO nodes (node_id, status, referenced, notes, folder_path, node_tag, blocked) VALUES (%s, %s, %s, %s, %s, %s, %s)', 
+                (node_id, status, bool(referenced), notes, folder_path, node_tag, blocked))
     return node_id
 
 def remove_node_from_nodes(cur, node_id):
@@ -149,6 +150,25 @@ def get_node_tag(cur, node_id):
     cur.execute('SELECT node_tag FROM nodes WHERE node_id = %s', (node_id,))
     row = cur.fetchone()
     return row[0] if row else None
+
+def get_node_blocked_status(cur, node_id):
+    cur.execute('SELECT blocked FROM nodes WHERE node_id = %s', (node_id,))
+    row = cur.fetchone()
+    return bool(row[0]) if row else False
+
+def update_node_blocked_status(cur, node_id, blocked):
+    """
+    Update the blocked status of a node.
+    :param cur: Database cursor
+    :param node_id: ID of the node to update
+    :param blocked: New blocked status (True or False)
+    :return: Number of rows affected
+    """
+    if not isinstance(blocked, bool):
+        raise ValueError("blocked status must be a boolean value.")
+    
+    cur.execute('UPDATE nodes SET blocked = %s WHERE node_id = %s', (blocked, node_id))
+    return cur.rowcount
 
 def add_node_to_pipeline(cur, node_id, pipeline_id, position_x=0., position_y=0.):
     cur.execute('INSERT INTO node_pipeline_relation (node_id, pipeline_id, position_x, position_y) VALUES (%s, %s, %s, %s)', 
@@ -301,8 +321,7 @@ def duplicate_node_pipeline_relation(cur, source_pipeline_id, node_ids, new_pipe
 
     # As node are now duplicated they cannot be edited anymore.
     for node_id in node_ids:
-        update_referenced_status(cur, node_id, False)
-
+        update_referenced_status(cur, node_id, True)
     return new_pipeline_id
 
 

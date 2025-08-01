@@ -170,3 +170,9 @@ html, body, #app {
   padding: 1rem;
   overflow: auto;
 }
+
+.image-row {
+  display: flex;
+  align-items: center;
+  gap: 4px; /* optional spacing between images */
+}

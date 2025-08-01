@@ -140,7 +140,7 @@ def test_pipeline_graph_to_db_and_db_to_pipeline_graph_roundtrip(pg_test_db, dag
     # Use networkx's is_isomorphic to compare structure and attributes
     def node_match(n1, n2):
         # Compare relevant node attributes
-        for attr in ['status', 'referenced', 'tag', 'notes', 'folder_path']:
+        for attr in ['status', 'referenced', 'tag', 'notes', 'folder_path', 'blocked']:
             if n1.get(attr) != n2.get(attr):
                 return False
         return True
@@ -216,7 +216,7 @@ def test_dict_to_graph(dict_dummy_1, dag_dummy_1):
 
     # Use networkx's is_isomorphic to compare structure and attributes
     def node_match(n1, n2):
-        for attr in ['status', 'referenced', 'tag', 'notes']:
+        for attr in ['status', 'referenced', 'tag', 'notes', 'blocked']:
             if n1.get(attr) != n2.get(attr):
                 return False
         return True
@@ -934,4 +934,49 @@ def test_detach_pipeline_from_node(
                 expected_parents[i] = id_map[parent]
         assert set(new_parents_dict_not_detached_nodes[node]) == set(expected_parents), f"Parents of node {node} do not match expected parents. Expected: {expected_parents}, Found: {new_parents_dict_not_detached_nodes[node]}"
 
-        
+
+def test_reference_node_into_pipeline(pg_test_db):
+    """
+    Test reference_nodes_into_pipeline:
+    - Successfully references a node from one pipeline into another.
+    - Fails if the node does not exist in the source pipeline.
+    - Fails if the source and target pipelines are the same.
+    """
+    from fusionpipe.utils.pip_utils import reference_nodes_into_pipeline, generate_node_id, generate_pip_id
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Create two pipelines
+    source_pipeline_id = generate_pip_id()
+    target_pipeline_id = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=source_pipeline_id)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=target_pipeline_id)
+
+    # Create a node in the source pipeline
+    node_id = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=source_pipeline_id)
+    conn.commit()
+
+    # Case 1: Successfully reference the node into the target pipeline
+    reference_nodes_into_pipeline(cur, source_pipeline_id, target_pipeline_id, [node_id])
+    conn.commit()
+
+    # Check that the node exists in the target pipeline
+    nodes_in_target = db_utils.get_all_nodes_from_pip_id(cur, target_pipeline_id)
+    assert node_id in nodes_in_target, f"Node {node_id} should exist in the target pipeline {target_pipeline_id}."
+
+    # Check that the node's blocked status is updated to True
+    blocked_status = db_utils.get_node_blocked_status(cur, node_id=node_id)
+    assert blocked_status is True, f"Node {node_id} should have blocked status set to True."
+
+    # Case 2: Fail if the node does not exist in the source pipeline
+    non_existent_node_id = generate_node_id()
+    with pytest.raises(ValueError, match=f"Node {non_existent_node_id} does not exist in the source pipeline {source_pipeline_id}."):
+        reference_nodes_into_pipeline(cur, source_pipeline_id, target_pipeline_id, [non_existent_node_id])
+
+    # Case 3: Fail if the source and target pipelines are the same
+    with pytest.raises(ValueError, match="Source pipeline and target pipeline cannot be the same."):
+        reference_nodes_into_pipeline(cur, source_pipeline_id, source_pipeline_id, [node_id])

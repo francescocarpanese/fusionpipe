@@ -893,6 +893,7 @@
           folder_path: node.folder_path || "",
           status: node.status || "ready",
           tag: node.tag || "",
+          blocked: node.blocked || false,
         },
         position: {
           x: node.position[0],
@@ -1429,6 +1430,48 @@
     }
   }
 
+  async function blockSelectedNodes() {
+    const selectedNodeIds = nodes.filter((node) => node.selected).map((node) => node.id);
+    if (!selectedNodeIds.length) {
+      alert("Please select at least one node to block.");
+      return;
+    }
+    try {
+      const response = await fetch(`${BACKEND_URL}/block_nodes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ node_ids: selectedNodeIds }),
+      });
+      if (!response.ok) await handleApiError(response);
+      alert(`Nodes ${selectedNodeIds.join(", ")} blocked successfully.`);
+      await loadPipeline(currentPipelineId);
+    } catch (error) {
+      console.error("Error blocking nodes:", error);
+      alert("Failed to block nodes.");
+    }
+  }
+
+  async function unblockSelectedNodes() {
+    const selectedNodeIds = nodes.filter((node) => node.selected).map((node) => node.id);
+    if (!selectedNodeIds.length) {
+      alert("Please select at least one node to unblock.");
+      return;
+    }
+    try {
+      const response = await fetch(`${BACKEND_URL}/unblock_nodes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ node_ids: selectedNodeIds }),
+      });
+      if (!response.ok) await handleApiError(response);
+      alert(`Nodes ${selectedNodeIds.join(", ")} unblocked successfully.`);
+      await loadPipeline(currentPipelineId);
+    } catch (error) {
+      console.error("Error unblocking nodes:", error);
+      alert("Failed to unblock nodes.");
+    }
+  }
+
   // Helper function for API error handling
   async function handleApiError(response: Response) {
     let errorMsg = response.statusText;
@@ -1941,6 +1984,12 @@
                 >Reference nodes</Button
               >
             </Dropdown>
+            <DropdownItem onclick={blockSelectedNodes}
+              >Block selected nodes</DropdownItem
+            >
+            <DropdownItem onclick={unblockSelectedNodes}  class="text-yellow-600"
+              >Unblock selected nodes</DropdownItem
+            >                        
             <DropdownItem class="text-yellow-600" onclick={setNodeCompleted}
               >Manual set node "completed"</DropdownItem
             >

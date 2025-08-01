@@ -4,9 +4,14 @@
 </script>
 
 <div class="custom-node">
-    {#if data.referenced}
-        <img src="/Lock.jpg" alt="Locked" width="12" height="12" />
-    {/if}
+    <div class="image-row">
+        {#if data.referenced}
+            <img src="/referenced.png" alt="Referenced" width="16" height="16" />
+        {/if}
+        {#if data.blocked}
+            <img src="/Lock.jpg" alt="Blocked" width="14" height="14" />
+        {/if}
+    </div> 
     <span class="line">{data.line1}</span>
     <span class="line">{data.line2}</span>
     <Handle type="target" position={Position.Top} />

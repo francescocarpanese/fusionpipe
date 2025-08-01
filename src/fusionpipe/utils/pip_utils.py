@@ -231,7 +231,8 @@ def pipeline_graph_to_dict(graph):
             'tag': graph.nodes[node].get('tag', None),  # Optional tag for the node
             'notes': graph.nodes[node].get('notes', None),  # Optional notes for the node
             'position': graph.nodes[node].get('position', None),  # Node position
-            'folder_path': graph.nodes[node].get('folder_path', None)  # Optional folder path for the node
+            'folder_path': graph.nodes[node].get('folder_path', None),  # Optional folder path for the node
+            'blocked': graph.nodes[node]['blocked']
         }
     return pipeline_data
 
@@ -305,6 +306,7 @@ def pipeline_graph_to_db(Gnx, cur):
         node_tag = Gnx.nodes[node].get('tag', None)  # Optional tag for the node
         position = Gnx.nodes[node].get('position', None)  # Node position
         folder_path = Gnx.nodes[node].get('folder_path', None)  # Optional folder path for the node
+        blocked = Gnx.nodes[node].get('blocked')  # Optional blocked status for the node
 
         # Add the node to the database
         if not db_utils.check_if_node_exists(cur, node):
@@ -315,7 +317,8 @@ def pipeline_graph_to_db(Gnx, cur):
                 referenced=referenced,
                 notes=node_notes,
                 folder_path=folder_path,
-                node_tag=node_tag
+                node_tag=node_tag,
+                blocked=blocked
             )
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pip_id, 
                                 position_x=position[0], position_y=position[1])
@@ -392,6 +395,7 @@ def db_to_pipeline_graph_from_pip_id(cur, pip_id):
         G.nodes[node_id]['referenced'] = referenced
         G.nodes[node_id]['notes'] = db_utils.get_node_notes(cur, node_id=node_id)
         G.nodes[node_id]['folder_path'] = db_utils.get_node_folder_path(cur, node_id=node_id)
+        G.nodes[node_id]['blocked'] = db_utils.get_node_blocked_status(cur, node_id=node_id)
 
         # Add position if available
         position = db_utils.get_node_position(cur, node_id=node_id, pipeline_id=pip_id)
@@ -469,7 +473,9 @@ def dict_to_graph(graph_dict):
     # Add nodes and their attributes
     for node_id, node_data in graph_dict['nodes'].items():
         G.add_node(node_id, status=node_data.get('status', 'ready'), referenced=node_data['referenced'],
-                   tag=node_data.get('tag', None), notes=node_data.get('notes', None), folder_path=node_data.get('folder_path', None))
+                   tag=node_data.get('tag', None), notes=node_data.get('notes', None),
+                   folder_path=node_data.get('folder_path', None),
+                   blocked=node_data.get('blocked', False))
         for parent in node_data.get('parents', []):
             G.add_edge(parent, node_id)
 
@@ -1024,3 +1030,61 @@ def detach_subgraph_from_node(cur, pipeline_id, node_id):
             db_utils.add_node_relation(cur, child_id=node, parent_id=new_parent)
     
     return id_map
+
+
+def block_node(cur, node_id):
+    # Update the blocked status of the node
+    db_utils.update_node_blocked_status(cur, node_id=node_id, blocked=True)
+
+    # TODO adding writing access change for the folder of the node. Needs to deal with multi access.
+
+
+def unblock_node(cur, node_id):
+    
+    # Update the blocked status of the node
+    db_utils.update_node_blocked_status(cur, node_id=node_id, blocked=False)
+
+    # TODO adding writing access change for the folder of the node. Needs to deal with multi access.
+
+def block_nodes(cur, node_ids):
+    """
+    Block multiple nodes by updating their blocked status in the database.
+    """
+    if isinstance(node_ids, str):
+        node_ids = [node_ids]
+
+    for node_id in node_ids:
+        block_node(cur, node_id)
+
+def unblock_nodes(cur, node_ids):
+    """
+    Unblock multiple nodes by updating their blocked status in the database.
+    """
+    if isinstance(node_ids, str):
+        node_ids = [node_ids]
+
+    for node_id in node_ids:
+        if not db_utils.is_node_referenced(cur, node_id=node_id):
+            unblock_node(cur, node_id)
+
+def reference_nodes_into_pipeline(cur, source_pipeline_id, target_pipeline_id, node_ids):
+    """
+    Reference a node from one pipeline into another.
+    - source_pipeline_id: the pipeline ID from which to reference the node
+    - target_pipeline_id: the pipeline ID into which to reference the node
+    - node_id: the ID of the node to reference
+    """
+    # Check if the node exists in the source pipeline
+    for node_id in node_ids:
+        if not db_utils.check_if_node_exists(cur, node_id):
+            raise ValueError(f"Node {node_id} does not exist in the source pipeline {source_pipeline_id}.")
+
+    # Raise an error if the source pipeline is the same as the target pipeline
+    if source_pipeline_id == target_pipeline_id:
+        raise ValueError("Source pipeline and target pipeline cannot be the same.")
+    
+    db_utils.duplicate_node_pipeline_relation(cur, source_pipeline_id, node_ids, target_pipeline_id)
+
+    # Update the node's blocked status to True
+    for node_id in node_ids:
+        db_utils.update_node_blocked_status(cur, node_id=node_id, blocked=True)

@@ -79,8 +79,10 @@ def dag_dummy_1():
         G.nodes[node]['folder_path'] = f'dummy_folder_path_{node}'
         G.nodes[node]['notes'] = 'test notes'
         G.nodes[node]['position'] = [0, 0]  # Default position
+        G.nodes[node]['blocked'] = False
         if node == "A":
             G.nodes[node]['status'] = "ready"
+            G.nodes[node]['blocked'] = True  # A is blocked
         elif node == "B":
             G.nodes[node]['status'] = "running"
         elif node == "C":
@@ -132,11 +134,11 @@ def dict_dummy_1():
         "project_id": "test_project",
         "blocked": False,
         "nodes": {
-            "A": {"status": "ready", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0], 'folder_path': 'dummy_folder_path_A'},
-            "B": {"status": "running", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_B'},
-            "C": {"status": "completed", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_C'},
-            "D": {"status": "staledata", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_D'},
-            "E": {"status": "ready", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0,], 'folder_path': 'dummy_folder_path_E'}
+            "A": {"status": "ready", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0], 'folder_path': 'dummy_folder_path_A', 'blocked': True},
+            "B": {"status": "running", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_B', 'blocked': False},
+            "C": {"status": "completed", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_C', 'blocked': False},
+            "D": {"status": "staledata", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_D', 'blocked': False},
+            "E": {"status": "ready", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0,], 'folder_path': 'dummy_folder_path_E', 'blocked': False}
         }
     }
 
@@ -234,6 +236,17 @@ def remove_files_starting_with(folder_path, prefix):
                 except Exception:
                     pass  # Ignore errors
 
+def remove_folder_starting_with(folder_path, prefix):
+    if os.path.exists(folder_path):
+        for filename in os.listdir(folder_path):
+            if filename.startswith(prefix):
+                file_path = os.path.join(folder_path, filename)
+                try:
+                    if os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception:
+                    pass  # Ignore errors
+
 
 @pytest.fixture(autouse=True)
 def cleanup_pytest_carpanes():
@@ -245,3 +258,4 @@ def cleanup_pytest_carpanes():
     rm_folder(folder)
 
     remove_files_starting_with('/tmp', "uv-")
+    remove_folder_starting_with('/tmp', "tmp")
