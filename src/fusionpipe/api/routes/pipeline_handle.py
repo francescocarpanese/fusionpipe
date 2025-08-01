@@ -17,11 +17,12 @@ def get_db():
         db.close()
 
 @router.post("/create_pipeline")
-def create_pipeline(db_conn=Depends(get_db)):
+def create_pipeline(payload: dict, db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     pipeline_id = pip_utils.generate_pip_id()
+    project_id = payload.get("project_id")
     try:
-        db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag=None)
+        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag=None, project_id=project_id)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
@@ -74,7 +75,7 @@ def get_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     try:
         # Fetch the pipeline and convert it to a dictionary
-        pipeline_dict = pip_utils.db_to_graph_dict_from_pip_id(cur, pipeline_id)
+        pipeline_dict = pip_utils.db_to_pipeline_dict_from_pip_id(cur, pipeline_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
@@ -87,7 +88,7 @@ def get_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
 def get_project(project_id: str, db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     try:
-        project_dict = db_utils.get_project_dict(cur, project_id)
+        project_dict = pip_utils.db_to_project_dict_from_project_id(cur, project_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return JSONResponse(
@@ -101,7 +102,7 @@ def add_node_to_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
     try:
         node_id = pip_utils.generate_node_id()
         folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"),node_id)
-        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path_nodes)
+        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path_nodes)
         position_x = random.randint(-10, 10)
         position_y = random.randint(-10, 10)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, position_x=position_x, position_y=position_y)
@@ -117,7 +118,7 @@ def add_node_to_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
 def delete_node_from_pipeline(pipeline_id: str, node_id: str, db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     try:
-        pip_utils.delete_node_from_pipeline_with_editable_logic(cur, node_id=node_id, pipeline_id=pipeline_id)
+        pip_utils.delete_node_from_pipeline_with_referenced_logic(cur, node_id=node_id, pipeline_id=pipeline_id)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
@@ -402,8 +403,8 @@ def reference_nodes_into_pipeline_route(payload: dict, db_conn=Depends(get_db)):
     if not source_pipeline_id or not target_pipeline_id or not node_ids or not isinstance(node_ids, list):
         raise HTTPException(status_code=400, detail="Payload must contain source_pipeline_id, target_pipeline_id, and a list of node_ids")
     try:
-        id_map = db_utils.duplicate_node_pipeline_relation(
-            cur, source_pipeline_id, node_ids, target_pipeline_id
+        id_map = pip_utils.reference_nodes_into_pipeline(
+            cur, source_pipeline_id, target_pipeline_id, node_ids
         )
         db_conn.commit()
     except Exception as e:
@@ -481,7 +482,7 @@ def add_pipeline_to_project_route(payload: dict, db_conn=Depends(get_db)):
         raise HTTPException(status_code=400, detail="Missing project_id or pipeline_id")
     cur = db_conn.cursor()
     try:
-        rows_affected = db_utils.add_pipeline_to_project(cur, project_id, pipeline_id)
+        rows_affected = db_utils.add_project_to_pipeline(cur, project_id, pipeline_id)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
@@ -559,3 +560,57 @@ def update_node_parameters_yaml(node_id: str, payload: dict, db_conn=Depends(get
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"node_parameters.yaml updated for node {node_id}"}
+
+
+@router.post("/detach_subgraph_from_node/{pipeline_id}/{node_id}")
+def detach_subgraph_from_node(pipeline_id: str, node_id: str, db_conn=Depends(get_db)):
+    cur = db_conn.cursor()
+    try:
+        pip_utils.detach_subgraph_from_node(cur, pipeline_id=pipeline_id, node_id=node_id)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    return {"message": f"Node {node_id} detached from pipeline {pipeline_id}"}
+
+
+@router.post("/block_nodes")
+def block_nodes_route(payload: dict, db_conn=Depends(get_db)):
+    """
+    Block multiple nodes by updating their blocked status in the database.
+    Payload example: {"node_ids": ["n_123", "n_456"]}
+    """
+    node_ids = payload.get("node_ids")
+    if not node_ids or not isinstance(node_ids, list):
+        raise HTTPException(status_code=400, detail="Payload must contain a list of node_ids")
+    
+    cur = db_conn.cursor()
+    try:
+        pip_utils.block_nodes(cur, node_ids)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    return {"message": f"Nodes {node_ids} blocked successfully"}
+
+@router.post("/unblock_nodes")
+def unblock_nodes_route(payload: dict, db_conn=Depends(get_db)):
+    """
+    Unblock multiple nodes by updating their blocked status in the database.
+    Payload example: {"node_ids": ["n_123", "n_456"]}
+    """
+    node_ids = payload.get("node_ids")
+    if not node_ids or not isinstance(node_ids, list):
+        raise HTTPException(status_code=400, detail="Payload must contain a list of node_ids")
+    
+    cur = db_conn.cursor()
+    try:
+        pip_utils.unblock_nodes(cur, node_ids)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    return {"message": f"Nodes {node_ids} unblocked successfully"}

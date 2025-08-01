@@ -77,17 +77,27 @@ def test_delete_node_folder_nonexistent_folder(tmp_base_dir, capsys):
     assert f"Node folder does not exist" in captured.out
 
 
-
-
-def test_graph_to_dict(dag_dummy_1, dict_dummy_1):
-    from fusionpipe.utils.pip_utils import graph_to_dict
+def test_pipeline_graph_to_dict(dag_dummy_1, dict_dummy_1):
+    from fusionpipe.utils.pip_utils import pipeline_graph_to_dict
     import networkx as nx
 
     # Convert the graph to a dictionary
-    graph_dict = graph_to_dict(dag_dummy_1)
+    graph_dict = pipeline_graph_to_dict(dag_dummy_1)
 
     # Check if the converted dictionary matches the expected dictionary
     assert graph_dict == dict_dummy_1, "Graph to dict conversion did not produce the expected result."
+
+
+def test_project_graph_to_dict(dag_dummy_project, dict_dummy_project):
+    from fusionpipe.utils.pip_utils import project_graph_to_dict
+    import networkx as nx
+
+    # Convert the graph to a dictionary
+    graph_dict = project_graph_to_dict(dag_dummy_project)
+
+    # Check if the converted dictionary matches the expected dictionary
+    assert graph_dict == dict_dummy_project, "Graph to dict conversion did not produce the expected result."
+
 
 def test_graph_dict_to_json(tmp_base_dir, dict_dummy_1):
     from fusionpipe.utils.pip_utils import graph_dict_to_json
@@ -107,12 +117,12 @@ def test_graph_dict_to_json(tmp_base_dir, dict_dummy_1):
     assert loaded == dict_dummy_1, "JSON file content does not match the original dictionary."
 
 
-def test_graph_to_db_and_db_to_graph_roundtrip(pg_test_db, dag_dummy_1):
+def test_pipeline_graph_to_db_and_db_to_pipeline_graph_roundtrip(pg_test_db, dag_dummy_1):
     """
     Test that a graph can be written to the database and then read back,
     and that the structure and attributes are preserved.
     """
-    from fusionpipe.utils.pip_utils import graph_to_db, db_to_graph_from_pip_id
+    from fusionpipe.utils.pip_utils import pipeline_graph_to_db, db_to_pipeline_graph_from_pip_id
     from fusionpipe.utils import db_utils
     import networkx as nx
 
@@ -121,16 +131,16 @@ def test_graph_to_db_and_db_to_graph_roundtrip(pg_test_db, dag_dummy_1):
     cur = db_utils.init_db(conn)
 
     # Write the dummy graph to the database
-    graph_to_db(dag_dummy_1, cur)
+    pipeline_graph_to_db(dag_dummy_1, cur)
     conn.commit()
 
     # Read the graph back from the database
-    G_loaded = db_to_graph_from_pip_id(cur, dag_dummy_1.graph['pipeline_id'])
+    G_loaded = db_to_pipeline_graph_from_pip_id(cur, dag_dummy_1.graph['pipeline_id'])
 
     # Use networkx's is_isomorphic to compare structure and attributes
     def node_match(n1, n2):
         # Compare relevant node attributes
-        for attr in ['status', 'editable', 'tag', 'notes', 'folder_path']:
+        for attr in ['status', 'referenced', 'tag', 'notes', 'folder_path', 'blocked']:
             if n1.get(attr) != n2.get(attr):
                 return False
         return True
@@ -146,31 +156,52 @@ def test_graph_to_db_and_db_to_graph_roundtrip(pg_test_db, dag_dummy_1):
     ), "Loaded graph is not isomorphic to the original graph with respect to structure and node attributes."
 
     # Check graph attributes
-    for attr in ['pipeline_id', 'notes', 'tag', 'owner']:
+    for attr in ['pipeline_id', 'notes', 'tag', 'owner', 'blocked']:
         assert G_loaded.graph[attr] == dag_dummy_1.graph[attr]
 
 
-def test_graph_dict_to_db_and_db_to_graph_dict_roundtrip(pg_test_db, dict_dummy_1):
+def test_project_graph_to_db_and_db_to_project_graph_roundtrip(pg_test_db, dag_dummy_project):
     """
-    Test that a graph dictionary can be written to the database and then read back as a dictionary,
+    Test that a graph can be written to the database and then read back,
     and that the structure and attributes are preserved.
     """
-    from fusionpipe.utils.pip_utils import graph_dict_to_db, db_to_graph_dict_from_pip_id
+    from fusionpipe.utils.pip_utils import project_graph_to_db, db_to_project_graph_from_project_id
     from fusionpipe.utils import db_utils
+    import networkx as nx
 
     # Setup database
     conn = pg_test_db
     cur = db_utils.init_db(conn)
 
-    # Write the dummy graph dict to the database
-    graph_dict_to_db(dict_dummy_1, cur)
+    # Write the dummy graph to the database
+    project_graph_to_db(dag_dummy_project, cur)
     conn.commit()
 
-    # Read the graph dict back from the database
-    loaded_dict = db_to_graph_dict_from_pip_id(cur, dict_dummy_1["pipeline_id"])
+    # Read the graph back from the database
+    G_loaded = db_to_project_graph_from_project_id(cur, dag_dummy_project.graph['project_id'])
 
-    # Check if the loaded dictionary matches the original
-    assert loaded_dict == dict_dummy_1, "Loaded graph dict does not match the original graph dict."
+    # Use networkx's is_isomorphic to compare structure and attributes
+    def node_match(n1, n2):
+        # Compare relevant node attributes
+        for attr in ['tag', 'notes']:
+            if n1.get(attr) != n2.get(attr):
+                return False
+        return True
+
+    def edge_match(e1, e2):
+        # No edge attributes to compare, just return True
+        return True
+
+    assert nx.is_isomorphic(
+        G_loaded, dag_dummy_project,
+        node_match=node_match,
+        edge_match=edge_match
+    ), "Loaded graph is not isomorphic to the original graph with respect to structure and node attributes."
+
+    # Check graph attributes
+    for attr in ['project_id', 'notes', 'tag', 'owner']:
+        assert G_loaded.graph[attr] == dag_dummy_project.graph[attr]
+
 
 def test_dict_to_graph(dict_dummy_1, dag_dummy_1):
     """
@@ -185,7 +216,7 @@ def test_dict_to_graph(dict_dummy_1, dag_dummy_1):
 
     # Use networkx's is_isomorphic to compare structure and attributes
     def node_match(n1, n2):
-        for attr in ['status', 'editable', 'tag', 'notes']:
+        for attr in ['status', 'referenced', 'tag', 'notes', 'blocked']:
             if n1.get(attr) != n2.get(attr):
                 return False
         return True
@@ -200,7 +231,7 @@ def test_dict_to_graph(dict_dummy_1, dag_dummy_1):
     ), "Graph reconstructed from dict is not isomorphic to the original graph."
 
     # Check graph attributes
-    for attr in ['pipeline_id', 'notes', 'tag', 'owner']:
+    for attr in ['pipeline_id', 'notes', 'tag', 'owner','blocked']:
         assert G.graph[attr] == dag_dummy_1.graph[attr]
 
 def test_visualize_pip_static_runs_without_error(monkeypatch, dag_dummy_1):
@@ -219,9 +250,9 @@ def test_visualize_pip_static_runs_without_error(monkeypatch, dag_dummy_1):
 
 def test_get_all_children_nodes(pg_test_db, dag_dummy_1):
     """
-    Test that get_all_children_nodes returns all descendants of a node in the pipeline.
+    Test that get_all_descendants returns all descendants of a node in the pipeline.
     """
-    from fusionpipe.utils.pip_utils import get_all_children_nodes, graph_to_db
+    from fusionpipe.utils.pip_utils import get_all_descendants, pipeline_graph_to_db
     from fusionpipe.utils import db_utils
     import networkx as nx
 
@@ -229,13 +260,13 @@ def test_get_all_children_nodes(pg_test_db, dag_dummy_1):
     cur = db_utils.init_db(conn)
 
     # Add the dummy graph to the database
-    graph_to_db(dag_dummy_1, cur)
+    pipeline_graph_to_db(dag_dummy_1, cur)
     conn.commit()
 
-    # For each node, compare get_all_children_nodes to nx.descendants
+    # For each node, compare get_all_descendants to nx.descendants
     for node in dag_dummy_1.nodes:
         expected = set(nx.descendants(dag_dummy_1, node))
-        result = set(get_all_children_nodes(cur, dag_dummy_1.graph['pipeline_id'], node))
+        result = set(get_all_descendants(cur, dag_dummy_1.graph['pipeline_id'], node))
         assert result == expected, f"Children nodes for {node} do not match expected descendants."
 
 from conftest import PARENT_NODE_LIST
@@ -245,9 +276,10 @@ def test_branch_pipeline_from_node(pg_test_db, dag_dummy_1, start_node):
     Test that branch_pipeline_from_node creates a new pipeline where all nodes are preserved,
     except the provided node and all its descendants, which are replaced with new IDs.
     """
-    from fusionpipe.utils.pip_utils import branch_pipeline_from_node, db_to_graph_from_pip_id
+    from fusionpipe.utils.pip_utils import branch_pipeline_from_node, db_to_pipeline_graph_from_pip_id
     from fusionpipe.utils import db_utils
     import networkx as nx
+    from fusionpipe.utils.pip_utils import pipeline_graph_to_db    
 
     conn = pg_test_db
     cur = db_utils.init_db(conn)
@@ -255,9 +287,7 @@ def test_branch_pipeline_from_node(pg_test_db, dag_dummy_1, start_node):
     # Add the original graph to the database
     original_graph = dag_dummy_1
 
-    from fusionpipe.utils.pip_utils import graph_to_db
-
-    graph_to_db(original_graph, cur)
+    pipeline_graph_to_db(original_graph, cur)
     conn.commit()
 
     # Get all pipeline IDs before
@@ -274,7 +304,7 @@ def test_branch_pipeline_from_node(pg_test_db, dag_dummy_1, start_node):
     new_pip_id = next(iter(new_pipeline_ids))
 
     # Load the new pipeline as a graph
-    new_graph = db_to_graph_from_pip_id(cur, new_pip_id)
+    new_graph = db_to_pipeline_graph_from_pip_id(cur, new_pip_id)
     conn.commit()
 
     # Get descendants of the start_node in the original graph
@@ -287,7 +317,7 @@ def test_branch_pipeline_from_node(pg_test_db, dag_dummy_1, start_node):
     assert len(new_nodes) == len(original_nodes), "New pipeline should have the same number of nodes as the original."
 
     # The original graph in the database should not have changed
-    original_graph_check = db_to_graph_from_pip_id(cur, original_graph.graph['pipeline_id'])
+    original_graph_check = db_to_pipeline_graph_from_pip_id(cur, original_graph.graph['pipeline_id'])
     assert nx.is_isomorphic(original_graph_check, original_graph), "Original graph should remain unchanged in the database."
 
     # Nodes not in nodes_to_replace should be preserved (same IDs)
@@ -302,7 +332,18 @@ def test_branch_pipeline_from_node(pg_test_db, dag_dummy_1, start_node):
     # The set of replaced nodes should be the same size as nodes_to_replace
     assert len(replaced_nodes) == len(nodes_to_replace), "Each replaced node should have a new node ID in the new pipeline."
 
-#@pytest.mark.parametrize("start_node", PARENT_NODE_LIST)
+    # Test that the old pipeline is a parent of the new pipeline
+    parent_pipelines = db_utils.get_pipeline_parents(cur, new_pip_id)
+    assert original_graph.graph['pipeline_id'] in parent_pipelines, "Original pipeline should be a parent of the new pipeline."
+
+    # Assert status of original pipeline has turned to blocked=true
+    original_status = db_utils.get_pipeline_blocked_status(cur, original_graph.graph['pipeline_id'])
+    assert original_status == True, "Original pipeline should be set to blocked=true after branching."
+
+    # Check new pipeline is referenced
+    new_status = db_utils.get_pipeline_blocked_status(cur, new_pip_id)
+    assert new_status == False, "New pipeline should be set to referenced= false after branching."
+
 def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp_base_dir):
     """
     Test that duplicate_node_in_pipeline_w_code_and_data duplicates a node in the pipeline,
@@ -322,8 +363,8 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp
     cur = db_utils.init_db(conn)
     pipeline_id = generate_pip_id()
     node_id = generate_node_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None, node_tag="test")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, notes="test node", folder_path=None, node_tag="test")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, position_x=0, position_y=0)
     db_utils.update_folder_path_nodes(cur, node_id, os.path.join(tmp_base_dir, node_id))
     conn.commit()
@@ -393,9 +434,9 @@ def test_duplicate_node_in_different_pipeline_w_code_and_data(monkeypatch, pg_te
     pipeline_id_src = generate_pip_id()
     pipeline_id_dst = generate_pip_id()
     node_id = generate_node_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id_src, tag="src", owner="tester", notes="src pipeline")
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id_dst, tag="dst", owner="tester", notes="dst pipeline")
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None, node_tag="test")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id_src, tag="src", owner="tester", notes="src pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id_dst, tag="dst", owner="tester", notes="dst pipeline")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, notes="test node", folder_path=None, node_tag="test")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id_src, position_x=0, position_y=0)
     db_utils.update_folder_path_nodes(cur, node_id, os.path.join(tmp_base_dir, node_id))
     conn.commit()
@@ -435,14 +476,14 @@ def test_duplicate_node_in_different_pipeline_w_code_and_data(monkeypatch, pg_te
                               ("B","D"),
                               ]
                           )
-def test_duplicate_duplicate_nodes_in_pipeline_with_relations(monkeypatch, pg_test_db, dag_dummy_1, tmp_base_dir, selected_nodes):
+def test_duplicate_nodes_in_pipeline_with_relations(monkeypatch, pg_test_db, dag_dummy_1, tmp_base_dir, selected_nodes):
     """
     Test that duplicate_subtree_in_pipeline duplicates a subtree rooted at a node,
     with new node IDs and correct parent-child relations, and that head nodes preserve parent relations from outside the subtree.
     """
     import os
     from fusionpipe.utils.pip_utils import (
-        graph_to_db, db_to_graph_from_pip_id, duplicate_nodes_in_pipeline_with_relations, generate_node_id, init_node_folder
+        pipeline_graph_to_db, db_to_pipeline_graph_from_pip_id, duplicate_nodes_in_pipeline_with_relations, generate_node_id, init_node_folder
     )
     from fusionpipe.utils import db_utils
     import networkx as nx
@@ -454,7 +495,7 @@ def test_duplicate_duplicate_nodes_in_pipeline_with_relations(monkeypatch, pg_te
     cur = db_utils.init_db(conn)
 
     # Add the dummy graph to the database
-    graph_to_db(dag_dummy_1, cur)
+    pipeline_graph_to_db(dag_dummy_1, cur)
     conn.commit()
 
     pipeline_id = dag_dummy_1.graph['pipeline_id']
@@ -481,7 +522,7 @@ def test_duplicate_duplicate_nodes_in_pipeline_with_relations(monkeypatch, pg_te
         assert os.path.exists(new_folder)
 
     # Check: parent-child relations are preserved in the duplicated subtree
-    graph = db_to_graph_from_pip_id(cur, pipeline_id)
+    graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
     for old_parent, old_child in dag_dummy_1.subgraph(selected_nodes).edges:
         assert (id_map[old_parent], id_map[old_child]) in graph.edges
 
@@ -515,7 +556,7 @@ def test_delete_node_data_removes_data_contents(monkeypatch, pg_test_db, tmp_bas
     conn = pg_test_db
     cur = db_utils.init_db(conn)
     node_id = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=1, notes="test node", folder_path=None)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, notes="test node", folder_path=None)
     db_utils.update_folder_path_nodes(cur, node_id, os.path.join(tmp_base_dir, node_id))
     conn.commit()
 
@@ -548,14 +589,14 @@ def test_delete_node_data_removes_data_contents(monkeypatch, pg_test_db, tmp_bas
     assert os.path.exists(data_folder)
     assert not any(os.scandir(data_folder)), "Data folder is not empty after deletion"
 
-def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, pg_test_db, tmp_base_dir):
+def test_delete_node_from_pipeline_with_referenced_logic(monkeypatch, pg_test_db, tmp_base_dir):
     """
-    Test delete_node_from_pipeline_with_editable_logic for editable and non-editable nodes.
+    Test delete_node_from_pipeline_with_referenced_logic for referenced and non-referenced nodes.
     """
     import os
     import shutil
     from fusionpipe.utils.pip_utils import (
-        generate_node_id, generate_pip_id, init_node_folder, delete_node_from_pipeline_with_editable_logic
+        generate_node_id, generate_pip_id, init_node_folder, delete_node_from_pipeline_with_referenced_logic
     )
     from fusionpipe.utils import db_utils
     import networkx as nx
@@ -566,38 +607,38 @@ def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, pg_test_db, 
     conn = pg_test_db
     cur = db_utils.init_db(conn)
     pipeline_id = generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
 
-    # Case 1: Editable node
-    node_id_editable = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=node_id_editable, status="ready", editable=1, notes="editable node", folder_path=None)
-    db_utils.add_node_to_pipeline(cur, node_id=node_id_editable, pipeline_id=pipeline_id, position_x=0, position_y=0)
-    db_utils.update_folder_path_nodes(cur, node_id_editable, os.path.join(tmp_base_dir, node_id_editable))
+    # Case 1: Not Referenced node
+    node_id_not_referenced = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id_not_referenced, status="ready", referenced=False, notes="not referenced node", folder_path=None)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id_not_referenced, pipeline_id=pipeline_id, position_x=0, position_y=0)
+    db_utils.update_folder_path_nodes(cur, node_id_not_referenced, os.path.join(tmp_base_dir, node_id_not_referenced))
     conn.commit()
-    folder_path_nodes = os.path.join(tmp_base_dir, node_id_editable)
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id_not_referenced)
     init_node_folder(folder_path_nodes, verbose=True)
     assert os.path.exists(folder_path_nodes)
     # Should delete node and folder
-    delete_node_from_pipeline_with_editable_logic(cur, pipeline_id, node_id_editable)
+    delete_node_from_pipeline_with_referenced_logic(cur, pipeline_id, node_id_not_referenced)
     conn.commit()
     assert not os.path.exists(folder_path_nodes)
-    assert node_id_editable not in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
+    assert node_id_not_referenced not in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
 
-    # Case 2: Non-editable leaf node in non-editable subgraph
-    node_id_noneditable = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=node_id_noneditable, status="ready", editable=0, notes="non-editable node", folder_path=None)
-    db_utils.add_node_to_pipeline(cur, node_id=node_id_noneditable, pipeline_id=pipeline_id, position_x=1, position_y=1)
+    # Case 2: Referenced leaf node in referenced subgraph
+    node_id_referenced = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id_referenced, status="ready", referenced=True, notes="referenced node", folder_path=None)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id_referenced, pipeline_id=pipeline_id, position_x=1, position_y=1)
     conn.commit()
     # Should delete node from pipeline (no error)
-    delete_node_from_pipeline_with_editable_logic(cur, pipeline_id, node_id_noneditable)
+    delete_node_from_pipeline_with_referenced_logic(cur, pipeline_id, node_id_referenced)
     conn.commit()
-    assert node_id_noneditable not in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
+    assert node_id_referenced not in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
 
-    # Case 3: Non-editable node that is not a leaf in non-editable subgraph
+    # Case 3: Referenced node that is not a leaf in Referenced subgraph
     parent_id = generate_node_id()
     child_id = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=parent_id, status="ready", editable=0, notes="parent", folder_path=None, node_tag="parent")
-    db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", editable=0, notes="child", folder_path=None, node_tag="child")
+    db_utils.add_node_to_nodes(cur, node_id=parent_id, status="ready", referenced=True, notes="parent", folder_path=None, node_tag="parent")
+    db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", referenced=True, notes="child", folder_path=None, node_tag="child")
     db_utils.add_node_to_pipeline(cur, node_id=parent_id, pipeline_id=pipeline_id, position_x=2, position_y=2)
     db_utils.add_node_to_pipeline(cur, node_id=child_id, pipeline_id=pipeline_id, position_x=3, position_y=3)
     db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
@@ -605,13 +646,13 @@ def test_delete_node_from_pipeline_with_editable_logic(monkeypatch, pg_test_db, 
     # Should raise ValueError because parent_id is not a leaf
     import pytest
     with pytest.raises(ValueError):
-        delete_node_from_pipeline_with_editable_logic(cur, pipeline_id, parent_id)
+        delete_node_from_pipeline_with_referenced_logic(cur, pipeline_id, parent_id)
 
 def test_set_children_stale_sets_descendants_to_staledata(pg_test_db, dag_dummy_1):
     """
     Test that set_children_stale sets all descendants of a node to 'staledata' status.
     """
-    from fusionpipe.utils.pip_utils import graph_to_db, set_children_stale
+    from fusionpipe.utils.pip_utils import pipeline_graph_to_db, set_children_stale
     from fusionpipe.utils import db_utils
     import networkx as nx
 
@@ -619,7 +660,7 @@ def test_set_children_stale_sets_descendants_to_staledata(pg_test_db, dag_dummy_
     cur = db_utils.init_db(conn)
 
     # Add the dummy graph to the database
-    graph_to_db(dag_dummy_1, cur)
+    pipeline_graph_to_db(dag_dummy_1, cur)
     conn.commit()
 
     pipeline_id = dag_dummy_1.graph['pipeline_id']
@@ -647,7 +688,7 @@ def test_update_stale_status_for_pipeline_nodes(pg_test_db, dag_dummy_1):
     """
     Test that update_stale_status_for_pipeline_nodes propagates 'staledata' from a parent to all descendants.
     """
-    from fusionpipe.utils.pip_utils import graph_to_db, update_stale_status_for_pipeline_nodes
+    from fusionpipe.utils.pip_utils import pipeline_graph_to_db, update_stale_status_for_pipeline_nodes
     from fusionpipe.utils import db_utils
     import networkx as nx
 
@@ -655,7 +696,7 @@ def test_update_stale_status_for_pipeline_nodes(pg_test_db, dag_dummy_1):
     cur = db_utils.init_db(conn)
 
     # Add the dummy graph to the database
-    graph_to_db(dag_dummy_1, cur)
+    pipeline_graph_to_db(dag_dummy_1, cur)
     conn.commit()
 
     pipeline_id = dag_dummy_1.graph['pipeline_id']
@@ -693,11 +734,11 @@ def test_add_node_relation_safe(pg_test_db):
     """
     Test add_node_relation_safe:
     - Adds a valid relation.
-    - Fails if child is not editable.
+    - Fails if child is referenced.
     - Fails if adding the edge would create a cycle.
     """
     from fusionpipe.utils.pip_utils import add_node_relation_safe, generate_node_id, generate_pip_id
-    from fusionpipe.utils.pip_utils import graph_to_db, db_to_graph_from_pip_id
+    from fusionpipe.utils.pip_utils import pipeline_graph_to_db, db_to_pipeline_graph_from_pip_id
     from fusionpipe.utils import db_utils
     import networkx as nx
     import pytest
@@ -709,9 +750,9 @@ def test_add_node_relation_safe(pg_test_db):
     pipeline_id = generate_pip_id()
     parent_id = generate_node_id()
     child_id = generate_node_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id)
-    db_utils.add_node_to_nodes(cur, node_id=parent_id, status="ready", editable=True)
-    db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", editable=True)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id)
+    db_utils.add_node_to_nodes(cur, node_id=parent_id, status="ready", referenced=False)
+    db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", referenced=False)
     db_utils.add_node_to_pipeline(cur, node_id=parent_id, pipeline_id=pipeline_id)
     db_utils.add_node_to_pipeline(cur, node_id=child_id, pipeline_id=pipeline_id)
     conn.commit()
@@ -719,16 +760,16 @@ def test_add_node_relation_safe(pg_test_db):
     # Should succeed: add parent -> child
     assert add_node_relation_safe(cur, pipeline_id, parent_id, child_id) is True
     conn.commit()
-    G = db_to_graph_from_pip_id(cur, pipeline_id)
+    G = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
     assert (parent_id, child_id) in G.edges
 
     # Should fail: adding child -> parent (would create a cycle)
     with pytest.raises(ValueError, match="cycle"):
         add_node_relation_safe(cur, pipeline_id, child_id, parent_id)
 
-    # Should fail: child not editable
-    db_utils.update_editable_status(cur, node_id=child_id, editable=False)
-    with pytest.raises(ValueError, match="not editable"):
+    # Should fail: child referenced
+    db_utils.update_referenced_status(cur, node_id=child_id, referenced=True)
+    with pytest.raises(ValueError, match="referenced"):
         add_node_relation_safe(cur, pipeline_id, parent_id, child_id)
 
 def test_merge_pipelines(pg_test_db):
@@ -747,8 +788,8 @@ def test_merge_pipelines(pg_test_db):
     node_ids1 = [generate_node_id() for _ in range(2)]
     node_ids2 = [generate_node_id() for _ in range(2)]
 
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id1)
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id2)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2)
     for node_id in node_ids1:
         db_utils.add_node_to_nodes(cur, node_id=node_id)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id1)
@@ -791,8 +832,8 @@ def test_merge_pipelines_with_duplicate_nodes(pg_test_db):
     unique_node_id1 = generate_node_id()
     unique_node_id2 = generate_node_id()
 
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id1)
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id2)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2)
 
     # Add nodes to the first pipeline
     db_utils.add_node_to_nodes(cur, node_id=common_node_id)
@@ -823,3 +864,119 @@ def test_merge_pipelines_with_duplicate_nodes(pg_test_db):
 
     # The merged pipeline should be a new pipeline
     assert merged_pipeline_id not in [pipeline_id1, pipeline_id2]
+
+
+
+
+
+
+from conftest import dag_detach_1, dag_detach_2
+@pytest.mark.parametrize("dag, start_node, expected_detached_nodes, not_detached_nodes", [
+    (dag_detach_1,"A",["A","B","C"],["D"]),
+    (dag_detach_1,"B",["B","C"],["D"]),
+    (dag_detach_2,"A",["A","B","C"],["D"]),      
+    ])
+def test_detach_pipeline_from_node(
+    monkeypatch,
+    pg_test_db,
+    tmp_base_dir,
+    dag,
+    start_node,
+    expected_detached_nodes,
+    not_detached_nodes
+    ):
+    from fusionpipe.utils.pip_utils import detach_subgraph_from_node, db_to_pipeline_graph_from_pip_id
+    from fusionpipe.utils import db_utils
+    import networkx as nx
+    from fusionpipe.utils.pip_utils import pipeline_graph_to_db
+    from fusionpipe.utils.pip_utils import init_node_folder
+
+
+    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add the original graph to the database
+    original_graph = dag()
+
+    pipeline_graph_to_db(original_graph, cur)
+    conn.commit()
+
+    # Setup folders for all nodes to be duplicated
+    for node_id in original_graph:
+        folder_path = os.path.join(tmp_base_dir, node_id)
+        init_node_folder(folder_path)
+        db_utils.update_folder_path_nodes(cur, node_id, folder_path)
+    conn.commit()
+
+    id_map = detach_subgraph_from_node(cur, original_graph.graph['pipeline_id'], start_node)
+
+    # Check that the keys in id_map correspond to the expected detached nodes
+    assert set(id_map.keys()) == set(expected_detached_nodes), f"Detached nodes do not match expected nodes. Expected: {expected_detached_nodes}, Found: {list(id_map.keys())}"
+
+    # Get the parents of the nodes that are not deteached in the original graph
+    original_parents_dict_not_detached_nodes = { node: list(original_graph.predecessors(node)) for node in not_detached_nodes}
+    
+    # Get the modified graph from the database
+    modified_graph = db_to_pipeline_graph_from_pip_id(cur, original_graph.graph['pipeline_id'])
+
+    # Get the parents of the nodes that are not detached in the modified graph
+    new_parents_dict_not_detached_nodes = { node: list(modified_graph.predecessors(node)) for node in not_detached_nodes}
+
+    # The expected new parentes of the nodes which are not detached should be the original ones, where the nodes that have been detached
+    # are replaced with the new detached ones
+    for node in not_detached_nodes:
+        expected_parents = original_parents_dict_not_detached_nodes[node].copy()
+        for i, parent in enumerate(expected_parents):
+            if parent in id_map:
+                expected_parents[i] = id_map[parent]
+        assert set(new_parents_dict_not_detached_nodes[node]) == set(expected_parents), f"Parents of node {node} do not match expected parents. Expected: {expected_parents}, Found: {new_parents_dict_not_detached_nodes[node]}"
+
+
+def test_reference_node_into_pipeline(pg_test_db):
+    """
+    Test reference_nodes_into_pipeline:
+    - Successfully references a node from one pipeline into another.
+    - Fails if the node does not exist in the source pipeline.
+    - Fails if the source and target pipelines are the same.
+    """
+    from fusionpipe.utils.pip_utils import reference_nodes_into_pipeline, generate_node_id, generate_pip_id
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Create two pipelines
+    source_pipeline_id = generate_pip_id()
+    target_pipeline_id = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=source_pipeline_id)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=target_pipeline_id)
+
+    # Create a node in the source pipeline
+    node_id = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=source_pipeline_id)
+    conn.commit()
+
+    # Case 1: Successfully reference the node into the target pipeline
+    reference_nodes_into_pipeline(cur, source_pipeline_id, target_pipeline_id, [node_id])
+    conn.commit()
+
+    # Check that the node exists in the target pipeline
+    nodes_in_target = db_utils.get_all_nodes_from_pip_id(cur, target_pipeline_id)
+    assert node_id in nodes_in_target, f"Node {node_id} should exist in the target pipeline {target_pipeline_id}."
+
+    # Check that the node's blocked status is updated to True
+    blocked_status = db_utils.get_node_blocked_status(cur, node_id=node_id)
+    assert blocked_status is True, f"Node {node_id} should have blocked status set to True."
+
+    # Case 2: Fail if the node does not exist in the source pipeline
+    non_existent_node_id = generate_node_id()
+    with pytest.raises(ValueError, match=f"Node {non_existent_node_id} does not exist in the source pipeline {source_pipeline_id}."):
+        reference_nodes_into_pipeline(cur, source_pipeline_id, target_pipeline_id, [non_existent_node_id])
+
+    # Case 3: Fail if the source and target pipelines are the same
+    with pytest.raises(ValueError, match="Source pipeline and target pipeline cannot be the same."):
+        reference_nodes_into_pipeline(cur, source_pipeline_id, source_pipeline_id, [node_id])

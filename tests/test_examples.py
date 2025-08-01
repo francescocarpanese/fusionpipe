@@ -20,7 +20,7 @@ def test_example_execution(pg_test_db, tmp_base_dir, example_name):
     conn = pg_test_db
     cur = db_utils.init_db(conn)
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag=f"test_example_{example_name}")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag=f"test_example_{example_name}")
 
     # Create a new node for this example
     node_id = pip_utils.generate_node_id()
@@ -30,7 +30,7 @@ def test_example_execution(pg_test_db, tmp_base_dir, example_name):
     db_utils.add_node_to_nodes(
         cur, 
         node_id=node_id, 
-        editable=True, 
+        referenced=False, 
         folder_path=folder_path_nodes, 
         status="ready"
     )
