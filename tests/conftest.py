@@ -7,7 +7,7 @@ import psycopg2
 import random
 import string
 import re
-
+import shutil
 
 DATABASE_URL_TEST = os.getenv('DATABASE_URL_TEST')
 
@@ -208,3 +208,40 @@ def dag_detach_2():
     for node in G.nodes:
         G.nodes[node]['position'] = [0, 0]  # Default position
     return G
+
+
+def rm_folder(folder_path):
+    if os.path.exists(folder_path):
+        # Remove all contents but keep the folder itself
+        for filename in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, filename)
+            try:
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)
+            except Exception:
+                pass  # Ignore errors    
+
+def remove_files_starting_with(folder_path, prefix):
+    if os.path.exists(folder_path):
+        for filename in os.listdir(folder_path):
+            if filename.startswith(prefix):
+                file_path = os.path.join(folder_path, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)
+                except Exception:
+                    pass  # Ignore errors
+
+
+@pytest.fixture(autouse=True)
+def cleanup_pytest_carpanes():
+    yield
+    folder = "/tmp/pytest-of-carpanes"
+    rm_folder(folder)
+
+    folder = "/tmp/ray"
+    rm_folder(folder)
+
+    remove_files_starting_with('/tmp', "uv-")
