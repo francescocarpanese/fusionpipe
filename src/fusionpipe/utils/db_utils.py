@@ -80,6 +80,20 @@ def init_db(conn):
         )
     ''')
 
+    # blocked=true:
+    # - cannot be deleted from pipeline
+    # - cannot run 
+    # - writing permission are removed from owener and group
+    # - can be referenced and duplicated
+
+    # referenced=true:
+    # - Present in multiple pipelines
+    # - Can be deleted from pipeline
+    # - Delete from pipeline, do not delete the folder, only remove relation.
+    # - No writing permission for owner and group, independently of the blocked status.
+    # - Cannot run
+    # - A node that is not referenced can be referenced in another pipeline only if it is a head note of the pipeline
+
     cur.execute('''
         CREATE TABLE IF NOT EXISTS processes (
             process_id TEXT PRIMARY KEY,
@@ -422,7 +436,7 @@ def count_pipeline_with_node(cur, node_id):
     row = cur.fetchone()
     return row[0] if row else 0
 
-def is_node_referenced(cur, node_id):
+def get_node_referenced_status(cur, node_id):
     cur.execute('SELECT referenced FROM nodes WHERE node_id = %s', (node_id,))
     row = cur.fetchone()
     return bool(row[0])
@@ -498,7 +512,7 @@ def sanitize_node_relation(cur, pipeline_id):
     relations = cur.fetchall()
 
     for node_id in pipeline_nodes:
-        if not is_node_referenced(cur, node_id):
+        if not get_node_referenced_status(cur, node_id):
             # Get all relations where the node is a child
             cur.execute('SELECT id, parent_id FROM node_relation WHERE child_id = %s', (node_id,))
             child_relations = cur.fetchall()
@@ -513,7 +527,7 @@ def remove_node_relation_with_referenced_logic(cur, parent_id, child_id):
     """
     Can only remove relation between nodes if child is not referenced
     """
-    if not is_node_referenced(cur,child_id):
+    if not get_node_referenced_status(cur,child_id):
         # Remove the relation
         cur.execute('DELETE FROM node_relation WHERE parent_id = %s AND child_id = %s', (parent_id, child_id))
         return cur.rowcount

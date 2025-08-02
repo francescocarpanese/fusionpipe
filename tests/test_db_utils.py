@@ -76,7 +76,7 @@ def test_add_node_to_pipline(pg_test_db):
     assert result[1] == pipeline_id, "Pipeline ID in entry does not match."
 
 def test_remove_node_from_pipeline(pg_test_db):
-    from fusionpipe.utils.db_utils import remove_node_from_pipeline, get_rows_with_node_id_in_entries, get_rows_node_id_in_nodes, is_node_referenced
+    from fusionpipe.utils.db_utils import remove_node_from_pipeline, get_rows_with_node_id_in_entries, get_rows_node_id_in_nodes, get_node_referenced_status
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
@@ -111,7 +111,7 @@ def test_remove_node_from_pipeline(pg_test_db):
     assert cur.fetchone() is not None, "Node entry for second pipeline was removed unexpectedly."
 
     # The node should be referenced only if it is present > 1 pipelines
-    referenced = is_node_referenced(cur, node_id)
+    referenced = get_node_referenced_status(cur, node_id)
     cur.execute("SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id=%s", (node_id,))
     count = cur.fetchone()[0]
     if count <= 1:
@@ -127,7 +127,7 @@ def test_remove_node_from_pipeline(pg_test_db):
     assert db_utils.get_rows_node_id_in_nodes(cur, node_id), "Node was unexpectedly removed from nodes table after removing from all pipelines."
 
     # Node should now not be referenced (since it's not in any pipeline)
-    referenced = is_node_referenced(cur, node_id)
+    referenced = get_node_referenced_status(cur, node_id)
     assert referenced is False, "Node should not be referenced when not present in any pipeline."
 
 
@@ -781,7 +781,7 @@ def test_count_pipeline_with_node(pg_test_db):
     new_node_pipeline_count = db_utils.count_pipeline_with_node(cur, new_node_id)
     assert new_node_pipeline_count == 0, f"Expected 0 pipelines for node {new_node_id}, got {new_node_pipeline_count}"
 
-def test_is_node_referenced(pg_test_db):
+def test_get_node_referenced_status(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id
     from fusionpipe.utils import db_utils
 
@@ -793,7 +793,7 @@ def test_is_node_referenced(pg_test_db):
     db_utils.add_node_to_nodes(cur, node_id=node_id)
 
     # Test case: Node does not belong to any pipeline
-    referenced = db_utils.is_node_referenced(cur, node_id)
+    referenced = db_utils.get_node_referenced_status(cur, node_id)
     assert referenced is False, f"Expected node {node_id} to not be referenced when not associated with any pipeline."
 
     # Test case: Node belongs to one pipeline
@@ -802,7 +802,7 @@ def test_is_node_referenced(pg_test_db):
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
-    referenced = db_utils.is_node_referenced(cur, node_id)
+    referenced = db_utils.get_node_referenced_status(cur, node_id)
     assert referenced is False, f"Expected node {node_id} to not be referenced when associated with only one pipeline."
 
     # Test case: Node belongs to more than one pipeline
@@ -811,7 +811,7 @@ def test_is_node_referenced(pg_test_db):
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=another_pipeline_id)
     conn.commit()
 
-    referenced = db_utils.is_node_referenced(cur, node_id)
+    referenced = db_utils.get_node_referenced_status(cur, node_id)
     assert referenced is True, f"Expected node {node_id} to be referenced when associated with more than one pipeline."
 
 
@@ -847,13 +847,13 @@ def test_update_referenced_status_for_all_nodes(pg_test_db):
     conn.commit()
 
     # Verify referenced status for each node
-    referenced_node1 = db_utils.is_node_referenced(cur, node1)
+    referenced_node1 = db_utils.get_node_referenced_status(cur, node1)
     assert referenced_node1 is False, f"Expected node1 to not be referenced, got {referenced_node1}"
 
-    referenced_node2 =  db_utils.is_node_referenced(cur, node2)
+    referenced_node2 =  db_utils.get_node_referenced_status(cur, node2)
     assert referenced_node2 is True, f"Expected node2 to be referenced, got {referenced_node2}"
 
-    referenced_node3 = db_utils.is_node_referenced(cur, node3)
+    referenced_node3 = db_utils.get_node_referenced_status(cur, node3)
     assert referenced_node3 is False, f"Expected node3 to not be referenced, got {referenced_node3}"
 
 
@@ -1060,14 +1060,18 @@ def test_remove_pipeline_from_everywhere(pg_test_db):
     cur.execute("SELECT * FROM nodes WHERE node_id=%s", (node_id,))
     assert cur.fetchone() is not None, "Node was unexpectedly removed."
 
-@pytest.mark.parametrize("node_status, blocked_status, expected_can_run", [
-    ("ready", False, True),  # Node is ready and not blocked
-    ("ready", True, False),  # Node is ready but blocked
-    ("running", False, False),  # Node is running
-    ("failed", False, False),  # Node has failed
-    ("completed", False, False),  # Node is completed
+@pytest.mark.parametrize("node_status, blocked_status,referenced_status, expected_can_run", [
+    ("ready", False, False, True),  # Node is ready and not blocked
+    ("ready", True, False, False),  # Node is ready but blocked
+    ("running", False, False,  False),  # Node is running
+    ("failed", False, False, False),  # Node has failed
+    ("completed", False, False, False),  # Node is completed
+    ("ready", False, True, False),  # Node is ready but referenced
+    ("running", False, True, False),  # Node is running and referenced
+    ("failed", False, True, False),  # Node has failed and referenced
+    ("completed", False, True, False),  # Node is completed and referenced
 ])
-def test_can_node_run_logic(pg_test_db, node_status, blocked_status, expected_can_run):
+def test_can_node_run_logic(pg_test_db, node_status, blocked_status, referenced_status, expected_can_run):
     """
     Test logic for determining if a node can run based on its status.
     """
@@ -1087,7 +1091,8 @@ def test_can_node_run_logic(pg_test_db, node_status, blocked_status, expected_ca
 
     # Update node status to 'running' and check again
     cur.execute("UPDATE nodes SET status=%s WHERE node_id=%s", (node_status, node_id,))
-    cur.execute("UPDATE nodes SET blocked=%s WHERE node_id=%s", (blocked_status, node_id,))    
+    cur.execute("UPDATE nodes SET blocked=%s WHERE node_id=%s", (blocked_status, node_id,))
+    cur.execute("UPDATE nodes SET referenced=%s WHERE node_id=%s", (referenced_status, node_id,))
     conn.commit()
     canrun = pip_utils.can_node_run(cur, node_id)
     assert canrun is expected_can_run, "Node should not be able to run when status is 'running'."

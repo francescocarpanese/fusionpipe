@@ -525,7 +525,7 @@
       );
       if (!response.ok) await handleApiError(response);
       await loadPipeline(currentTargetPipelineId);
-      alert(`Nodes ${selectedNodeIds.join(", ")} duplicated successfully.`);
+      alert(`Nodes ${selectedNodeIds.join(", ")} referenced successfully from pipeline ${pipelineId} into pipeline ${currentTargetPipelineId}.`);
       currentTargetPipelineId = "";
     } catch (error) {
       console.error("Error duplicating nodes:", error);

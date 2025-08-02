@@ -390,7 +390,7 @@ def db_to_pipeline_graph_from_pip_id(cur, pip_id):
         status = db_utils.get_node_status(cur, node_id=node_id)
         if status not in NodeState._value2member_map_:
             raise ValueError(f"Invalid status '{status}' for node {node_id}. Must be one of {list(NodeState._value2member_map_.keys())}.")
-        referenced = db_utils.is_node_referenced(cur, node_id=node_id)
+        referenced = db_utils.get_node_referenced_status(cur, node_id=node_id)
         G.nodes[node_id]['status'] = status
         G.nodes[node_id]['referenced'] = referenced
         G.nodes[node_id]['notes'] = db_utils.get_node_notes(cur, node_id=node_id)
@@ -607,27 +607,56 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
     return new_pip_id
 
 def delete_node_from_pipeline_with_referenced_logic(cur,pipeline_id, node_id):
-    # Check if the node is referenced
-    if not db_utils.is_node_referenced(cur, node_id=node_id):
+    if db_utils.get_node_blocked_status(cur, node_id=node_id):
+        raise ValueError(f"Node {node_id} is blocked and cannot be deleted.")
+
+    # Deal with reference logics
+    if not db_utils.get_node_referenced_status(cur, node_id=node_id):
         # If not referenced, delete the node directly from the pipeline database
         set_children_stale(cur, pipeline_id, node_id)
         db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node_id)
         delete_node_folder(db_utils.get_node_folder_path(cur, node_id=node_id))
-        return
+    else:
+        # Check if the node is a leaf (no children) of a referenced subgraph or is has no parents
+        if not node_is_leaf_of_referenced_subgraph(cur, pipeline_id, node_id):
+            raise ValueError(f"Node {node_id} is not a leaf of referenced subgraph.")
 
+        # Delete the node from the pipeline
+        db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node_id)
+
+def node_is_leaf_of_referenced_subgraph(cur, pipeline_id, node_id):
     # Get the pipeline graph from the database
     graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
 
     # Get subgraph of referenced nodes
     referenced_nodes = [n for n in graph.nodes if graph.nodes[n]['referenced']]
-    subgraph = graph.subgraph(referenced_nodes)
+    subgraph = graph.subgraph(referenced_nodes).copy()
 
-    # Check if the node is a leaf (no children)
-    if list(subgraph.successors(node_id)):
-        raise ValueError(f"Node {node_id} is not a leaf of referenced subgraph.")
+    return not list(subgraph.successors(node_id))
 
-    # Delete the node from the pipeline
-    db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node_id)
+def node_is_leaf_of_subgraph(cur, pipeline_id, node_id):
+    """
+    Check if a node is a leaf of the subgraph of referenced 
+    A leaf node is a node that has no children in the subgraph.
+    """
+    # Get the pipeline graph from the database
+    graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
+
+    return not list(graph.successors(node_id))
+
+def node_is_head_of_subgraph(cur, pipeline_id, node_id):
+    """
+    Check if a node is a head of the subgraph of referenced 
+    A head node is a node that has no parents in the subgraph.
+    """
+    # Get the pipeline graph from the database
+    graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
+
+    return not list(graph.predecessors(node_id))
+
+def can_node_be_referenced(cur, pipeline_id, node_id):
+    # Check if the node is a head of the subgraph
+    return node_is_head_of_subgraph(cur, pipeline_id, node_id)
 
 def can_node_run(cur, node_id):
     # Check if the node is in 'ready' state
@@ -638,6 +667,10 @@ def can_node_run(cur, node_id):
     # Cannot run node if bloceked
     if db_utils.get_node_blocked_status(cur, node_id=node_id):
         return False
+    
+    # Cannot run node if referenced
+    if db_utils.get_node_referenced_status(cur, node_id=node_id):
+        return False    
 
     # Get all parent nodes
     parent_ids = db_utils.get_node_parents(cur, node_id=node_id)
@@ -648,6 +681,7 @@ def can_node_run(cur, node_id):
             return False
     # If node has no parents, it can run
     return True
+
 
 def get_all_descendants(cur, pipeline_id, node_id):
     """
@@ -887,8 +921,8 @@ def update_stale_status_for_pipeline_nodes(cur, pipeline_id):
 
 def delete_edge_and_update_status(cur, pipeline_id, parent_id, child_id):
     # Check if the child node is referenced
-    if db_utils.is_node_referenced(cur, node_id=child_id):
-        raise ValueError(f"Child node {child_id} is referenced. You cannot delete edges from it. Consider duplicating the node if you want to branch the pipeline")
+    if db_utils.get_node_referenced_status(cur, node_id=child_id):
+        raise ValueError(f"Child node {child_id} is referenced. You cannot delete edges from it. Consider duplicating the node if you want to branch the pipeline.")
 
     # Set all descendants of the child node to 'staledata'
     set_children_stale(cur, pipeline_id, parent_id)
@@ -910,7 +944,7 @@ def add_node_relation_safe(cur, pipeline_id, parent_id, child_id):
     graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
 
     # Check if the child node is referenced
-    if db_utils.is_node_referenced(cur, node_id=child_id):
+    if db_utils.get_node_referenced_status(cur, node_id=child_id):
         raise ValueError(f"Child node {child_id} is referenced. Cannot add relation.")
 
     # Check if adding the edge would create a cycle
@@ -970,7 +1004,7 @@ def lock_pipeline(cur, pipeline_id):
 def detach_node_from_pipeline(cur, pipeline_id, node_id):
 
     # Check if the node is referenced
-    if not db_utils.is_node_referenced(cur, node_id=node_id):
+    if not db_utils.get_node_referenced_status(cur, node_id=node_id):
         raise ValueError(f"Node {node_id} is not referenced. You can detach only nodes which are referenced.")
 
     new_node_id = generate_node_id()
@@ -1003,13 +1037,13 @@ def detach_subgraph_from_node(cur, pipeline_id, node_id):
     subgraph_nodes = set(nx.descendants(graph, node_id))
     subgraph_nodes.add(node_id)
 
-    not_referenced_nodes_in_subgraph = [n for n in subgraph_nodes if not db_utils.is_node_referenced(cur, node_id=n)]
+    not_referenced_nodes_in_subgraph = [n for n in subgraph_nodes if not db_utils.get_node_referenced_status(cur, node_id=n)]
     referenced_parents_dict_of_referenced_node = {}
 
     for node in not_referenced_nodes_in_subgraph:
         # Find direct parents
         parents = list(graph.predecessors(node))
-        referenced_parents = [parent for parent in parents if db_utils.is_node_referenced(cur, node_id=parent)]
+        referenced_parents = [parent for parent in parents if db_utils.get_node_referenced_status(cur, node_id=parent)]
         if referenced_parents:
             referenced_parents_dict_of_referenced_node[node] = referenced_parents
 
@@ -1040,8 +1074,8 @@ def block_node(cur, node_id):
     # Update the blocked status of the node
     db_utils.update_node_blocked_status(cur, node_id=node_id, blocked=True)
 
-    # Remove writing permission to the group
-    change_permissions_recursive(db_utils.get_node_folder_path(cur, node_id=node_id), 0o2750)
+    # Remove writing permission
+    change_permissions_recursive(db_utils.get_node_folder_path(cur, node_id=node_id), 0o2550)
 
 
 def unblock_node(cur, node_id):
@@ -1070,8 +1104,7 @@ def unblock_nodes(cur, node_ids):
         node_ids = [node_ids]
 
     for node_id in node_ids:
-        if not db_utils.is_node_referenced(cur, node_id=node_id):
-            unblock_node(cur, node_id)
+        unblock_node(cur, node_id)
 
 def reference_nodes_into_pipeline(cur, source_pipeline_id, target_pipeline_id, node_ids):
     """
@@ -1084,13 +1117,11 @@ def reference_nodes_into_pipeline(cur, source_pipeline_id, target_pipeline_id, n
     for node_id in node_ids:
         if not db_utils.check_if_node_exists(cur, node_id):
             raise ValueError(f"Node {node_id} does not exist in the source pipeline {source_pipeline_id}.")
+        if not can_node_be_referenced(cur, source_pipeline_id, node_id):
+            raise ValueError(f"Node {node_id} cannot be referenced from pipeline {source_pipeline_id}. It is not a head of a subgraph. Consider duplicating the node with data first.")
 
     # Raise an error if the source pipeline is the same as the target pipeline
     if source_pipeline_id == target_pipeline_id:
         raise ValueError("Source pipeline and target pipeline cannot be the same.")
     
     db_utils.duplicate_node_pipeline_relation(cur, source_pipeline_id, node_ids, target_pipeline_id)
-
-    # Update the node's blocked status to True
-    for node_id in node_ids:
-        db_utils.update_node_blocked_status(cur, node_id=node_id, blocked=True)

@@ -624,7 +624,7 @@ def test_delete_node_from_pipeline_with_referenced_logic(monkeypatch, pg_test_db
     assert not os.path.exists(folder_path_nodes)
     assert node_id_not_referenced not in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
 
-    # Case 2: Referenced leaf node in referenced subgraph
+    # Case 2: Node is referenced and a leaf in the referenced subgraph
     node_id_referenced = generate_node_id()
     db_utils.add_node_to_nodes(cur, node_id=node_id_referenced, status="ready", referenced=True, notes="referenced node", folder_path=None)
     db_utils.add_node_to_pipeline(cur, node_id=node_id_referenced, pipeline_id=pipeline_id, position_x=1, position_y=1)
@@ -634,19 +634,61 @@ def test_delete_node_from_pipeline_with_referenced_logic(monkeypatch, pg_test_db
     conn.commit()
     assert node_id_referenced not in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
 
-    # Case 3: Referenced node that is not a leaf in Referenced subgraph
-    parent_id = generate_node_id()
+    # Case 3: Referenced node that is not a leaf in referenced subgraph
+    to_be_deleted_id = generate_node_id()
     child_id = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=parent_id, status="ready", referenced=True, notes="parent", folder_path=None, node_tag="parent")
+    db_utils.add_node_to_nodes(cur, node_id=to_be_deleted_id, status="ready", referenced=True, notes="parent", folder_path=None, node_tag="parent")
     db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", referenced=True, notes="child", folder_path=None, node_tag="child")
-    db_utils.add_node_to_pipeline(cur, node_id=parent_id, pipeline_id=pipeline_id, position_x=2, position_y=2)
+    db_utils.add_node_to_pipeline(cur, node_id=to_be_deleted_id, pipeline_id=pipeline_id, position_x=2, position_y=2)
     db_utils.add_node_to_pipeline(cur, node_id=child_id, pipeline_id=pipeline_id, position_x=3, position_y=3)
-    db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
+    db_utils.add_node_relation(cur, child_id=child_id, parent_id=to_be_deleted_id)
     conn.commit()
-    # Should raise ValueError because parent_id is not a leaf
+    # Should raise ValueError because to_be_deleted_id is not a leaf
     import pytest
     with pytest.raises(ValueError):
-        delete_node_from_pipeline_with_referenced_logic(cur, pipeline_id, parent_id)
+        delete_node_from_pipeline_with_referenced_logic(cur, pipeline_id, to_be_deleted_id)
+
+
+
+def test_delete_node_from_pipeline_with_referenced_logic_blocked_node(monkeypatch, pg_test_db, tmp_base_dir):
+    """
+    Test delete_node_from_pipeline_with_referenced_logic for the case when the node is blocked.
+    """
+    import os
+    import warnings
+    from fusionpipe.utils import db_utils
+    from fusionpipe.utils.pip_utils import (
+        generate_node_id, generate_pip_id, init_node_folder, delete_node_from_pipeline_with_referenced_logic
+    )
+
+    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
+
+    # Create a blocked node
+    node_id_blocked = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id_blocked, status="ready", referenced=False, notes="blocked node", folder_path=None)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id_blocked, pipeline_id=pipeline_id, position_x=0, position_y=0)
+    db_utils.update_node_blocked_status(cur, node_id=node_id_blocked, blocked=True)
+    db_utils.update_folder_path_nodes(cur, node_id_blocked, os.path.join(tmp_base_dir, node_id_blocked))
+    conn.commit()
+
+    folder_path_nodes = os.path.join(tmp_base_dir, node_id_blocked)
+    init_node_folder(folder_path_nodes, verbose=True)
+    assert os.path.exists(folder_path_nodes)
+    # Attempt to delete the blocked node and expect an error
+    with pytest.raises(ValueError, match=f"Node {node_id_blocked} is blocked and cannot be deleted."):
+        delete_node_from_pipeline_with_referenced_logic(cur, pipeline_id, node_id_blocked)
+        conn.commit()
+
+    # Ensure the node was not deleted
+    assert node_id_blocked in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id), "Blocked node should not be deleted."
+    assert os.path.exists(folder_path_nodes), "Blocked node's folder should not be deleted."
+
 
 def test_set_children_stale_sets_descendants_to_staledata(pg_test_db, dag_dummy_1):
     """
@@ -970,7 +1012,7 @@ def test_reference_node_into_pipeline(pg_test_db):
 
     # Check that the node's blocked status is updated to True
     blocked_status = db_utils.get_node_blocked_status(cur, node_id=node_id)
-    assert blocked_status is True, f"Node {node_id} should have blocked status set to True."
+    assert blocked_status is False, f"Node {node_id} should have blocked status set to False."
 
     # Case 2: Fail if the node does not exist in the source pipeline
     non_existent_node_id = generate_node_id()
@@ -980,3 +1022,43 @@ def test_reference_node_into_pipeline(pg_test_db):
     # Case 3: Fail if the source and target pipelines are the same
     with pytest.raises(ValueError, match="Source pipeline and target pipeline cannot be the same."):
         reference_nodes_into_pipeline(cur, source_pipeline_id, source_pipeline_id, [node_id])
+
+    # Case 4: Fail if the node is not head of the subgraph
+    # Create a second node in the source pipeline and create a relation
+    second_node_id = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=second_node_id, status="ready", referenced=False)
+    db_utils.add_node_to_pipeline(cur, node_id=second_node_id, pipeline_id=source_pipeline_id)
+    db_utils.add_node_relation(cur, parent_id=node_id, child_id=second_node_id)
+    conn.commit()
+    # Attempt to reference the second, which is not a head of the subgraph
+    with pytest.raises(ValueError, match=f"Node {second_node_id} cannot be referenced from pipeline {source_pipeline_id}. It is not a head of a subgraph. Consider duplicating the node with data first."):
+        reference_nodes_into_pipeline(cur, source_pipeline_id, target_pipeline_id, [second_node_id])
+
+
+def test_node_is_head_of_subgraph(pg_test_db, dag_dummy_1):
+    """
+    Test that node_is_head_of_subgraph correctly identifies head nodes in the subgraph of referenced nodes.
+    """
+    from fusionpipe.utils.pip_utils import pipeline_graph_to_db, node_is_head_of_subgraph
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add the dummy graph to the database
+    pipeline_graph_to_db(dag_dummy_1, cur)
+    conn.commit()
+
+    pipeline_id = dag_dummy_1.graph['pipeline_id']
+
+    # Mark some nodes as referenced
+    referenced_nodes = [n for n in dag_dummy_1.nodes if dag_dummy_1.in_degree(n) == 0]
+    for node in referenced_nodes:
+        db_utils.update_referenced_status(cur, node_id=node, referenced=True)
+    conn.commit()
+
+    # Test each node
+    for node in dag_dummy_1.nodes:
+        is_head = node_is_head_of_subgraph(cur, pipeline_id, node)
+        expected_is_head = node in referenced_nodes
+        assert is_head == expected_is_head, f"Node {node} head status mismatch. Expected: {expected_is_head}, Found: {is_head}"
