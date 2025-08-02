@@ -634,6 +634,10 @@ def can_node_run(cur, node_id):
     status = db_utils.get_node_status(cur, node_id=node_id)
     if status != NodeState.READY.value:
         return False
+    
+    # Cannot run node if bloceked
+    if db_utils.get_node_blocked_status(cur, node_id=node_id):
+        return False
 
     # Get all parent nodes
     parent_ids = db_utils.get_node_parents(cur, node_id=node_id)

@@ -1060,7 +1060,14 @@ def test_remove_pipeline_from_everywhere(pg_test_db):
     cur.execute("SELECT * FROM nodes WHERE node_id=%s", (node_id,))
     assert cur.fetchone() is not None, "Node was unexpectedly removed."
 
-def test_can_node_run_logic(pg_test_db):
+@pytest.mark.parametrize("node_status, blocked_status, expected_can_run", [
+    ("ready", False, True),  # Node is ready and not blocked
+    ("ready", True, False),  # Node is ready but blocked
+    ("running", False, False),  # Node is running
+    ("failed", False, False),  # Node has failed
+    ("completed", False, False),  # Node is completed
+])
+def test_can_node_run_logic(pg_test_db, node_status, blocked_status, expected_can_run):
     """
     Test logic for determining if a node can run based on its status.
     """
@@ -1075,19 +1082,15 @@ def test_can_node_run_logic(pg_test_db):
     node_id = pip_utils.generate_node_id()
     db_utils.add_node_to_nodes(cur, node_id=node_id)
     conn.commit()
-
     canrun = pip_utils.can_node_run(cur, node_id)
     assert canrun is True, "Node should be able to run when status is 'ready' and referenced is False."
+
     # Update node status to 'running' and check again
-    cur.execute("UPDATE nodes SET status='running' WHERE node_id=%s", (node_id,))
+    cur.execute("UPDATE nodes SET status=%s WHERE node_id=%s", (node_status, node_id,))
+    cur.execute("UPDATE nodes SET blocked=%s WHERE node_id=%s", (blocked_status, node_id,))    
     conn.commit()
     canrun = pip_utils.can_node_run(cur, node_id)
-    assert canrun is False, "Node should not be able to run when status is 'running'."
-    # Update node status to 'failed' and check again
-    cur.execute("UPDATE nodes SET status='failed' WHERE node_id=%s", (node_id,))
-    conn.commit()
-    canrun = pip_utils.can_node_run(cur, node_id)
-    assert canrun is False, "Node should not be able to run when status is 'failed'."
+    assert canrun is expected_can_run, "Node should not be able to run when status is 'running'."
 
 def test_update_referenced_status(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id
