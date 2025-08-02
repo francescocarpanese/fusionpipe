@@ -1619,7 +1619,6 @@
         notes: "",
         node_parameters_yaml: "",
       };
-      nodeParametersYaml = "";
     }
   });
 
