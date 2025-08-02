@@ -1036,7 +1036,8 @@ def block_node(cur, node_id):
     # Update the blocked status of the node
     db_utils.update_node_blocked_status(cur, node_id=node_id, blocked=True)
 
-    # TODO adding writing access change for the folder of the node. Needs to deal with multi access.
+    # Remove writing permission to the group
+    change_permissions_recursive(db_utils.get_node_folder_path(cur, node_id=node_id), 0o2750)
 
 
 def unblock_node(cur, node_id):
@@ -1044,7 +1045,8 @@ def unblock_node(cur, node_id):
     # Update the blocked status of the node
     db_utils.update_node_blocked_status(cur, node_id=node_id, blocked=False)
 
-    # TODO adding writing access change for the folder of the node. Needs to deal with multi access.
+    # Give back writing permission to the group
+    change_permissions_recursive(db_utils.get_node_folder_path(cur, node_id=node_id), 0o2770)
 
 def block_nodes(cur, node_ids):
     """
