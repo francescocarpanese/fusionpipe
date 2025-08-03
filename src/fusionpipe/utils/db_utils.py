@@ -299,11 +299,8 @@ def get_rows_with_pipeline_id_in_pipelines(cur, pipeline_id):
 
 def remove_node_from_pipeline(cur, node_id, pipeline_id):
     cur.execute('DELETE FROM node_pipeline_relation WHERE node_id = %s AND pipeline_id = %s', (node_id,pipeline_id))
-    # Make node not referenced if present in only 1 pipeline.
-    cur.execute('SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id = %s', (node_id,))
-    count = cur.fetchone()[0]
-    if count <= 1:
-        cur.execute('UPDATE nodes SET referenced = FALSE WHERE node_id = %s', (node_id,))
+    # Check if the node is still referenced in any other pipeline
+    check_and_update_node_referenced_status(cur, node_id)
     sanitize_node_relation(cur, pipeline_id)
     return cur.rowcount    
 
@@ -441,30 +438,25 @@ def get_node_referenced_status(cur, node_id):
     row = cur.fetchone()
     return bool(row[0])
 
+def check_and_update_node_referenced_status(cur, node_id):
+    # Check the number of pipelines the node is associated with
+    cur.execute('SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id = %s', (node_id,))
+    pipeline_count = cur.fetchone()[0]
+
+    # Update referenced status based on the pipeline count
+    if pipeline_count <= 1:
+        cur.execute('UPDATE nodes SET referenced = FALSE WHERE node_id = %s', (node_id,))
+    else:
+        cur.execute('UPDATE nodes SET referenced = TRUE WHERE node_id = %s', (node_id,))    
+
 def update_referenced_status_for_all_nodes(cur):
     # Get the list of all nodes
     cur.execute('SELECT node_id FROM nodes')
     nodes = [row[0] for row in cur.fetchall()]
 
-    report = []
-
     for node_id in nodes:
-        # Check the number of pipelines the node is associated with
-        cur.execute('SELECT COUNT(*) FROM node_pipeline_relation WHERE node_id = %s', (node_id,))
-        pipeline_count = cur.fetchone()[0]
-
-        # Update referenced status based on the pipeline count
-        if pipeline_count <= 1:
-            cur.execute('UPDATE nodes SET referenced = FALSE WHERE node_id = %s', (node_id,))
-        else:
-            cur.execute('UPDATE nodes SET referenced = TRUE WHERE node_id = %s', (node_id,))
-            report.append(node_id)
-
-    # Print a report of nodes that did not match the logic
-    if report:
-        print("Nodes with referenced set to TRUE due to being in multiple pipelines:")
-        for node_id in report:
-            print(f" - Node ID: {node_id}")
+        # Update the referenced status for each node
+        check_and_update_node_referenced_status(cur, node_id)
 
 def get_pipeline_notes(cur, pipeline_id):
     cur.execute('SELECT notes FROM pipelines WHERE pipeline_id = %s', (pipeline_id,))
@@ -563,7 +555,7 @@ def update_node_position(cur, node_id, pipeline_id, position_x, position_y):
                (position_x, position_y, node_id, pipeline_id))
     return cur.rowcount
 
-def update_folder_path_nodes(cur, node_id, folder_path):
+def update_folder_path_node(cur, node_id, folder_path):
     cur.execute('UPDATE nodes SET folder_path = %s WHERE node_id = %s', (folder_path, node_id))
     return cur.rowcount
 
@@ -916,3 +908,12 @@ def check_node_relation_exists(cur, child_id, parent_id):
     """
     cur.execute('SELECT 1 FROM node_relation WHERE child_id = %s AND parent_id = %s', (child_id, parent_id))
     return cur.fetchone() is not None
+
+def get_all_node_ids(cur):
+    """
+    Get all node IDs from the nodes table.
+    :param cur: Database cursor
+    :return: List of all node IDs
+    """
+    cur.execute('SELECT node_id FROM nodes')
+    return [row[0] for row in cur.fetchall()]

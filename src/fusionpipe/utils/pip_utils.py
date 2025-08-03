@@ -13,6 +13,9 @@ import stat
 
 def change_permissions_recursive(path, mode):
     """Recursively change permissions of a directory and its contents."""
+    if not os.path.exists(path):
+        return
+
     for root, dirs, files in os.walk(path):
         for d in dirs:
             os.chmod(os.path.join(root, d), mode)
@@ -624,6 +627,9 @@ def delete_node_from_pipeline_with_referenced_logic(cur,pipeline_id, node_id):
         # Delete the node from the pipeline
         db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node_id)
 
+    # Update R/W permission for nodes
+    update_all_referenced_node_permission(cur)
+
 def node_is_leaf_of_referenced_subgraph(cur, pipeline_id, node_id):
     # Get the pipeline graph from the database
     graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
@@ -721,13 +727,13 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
         childrens=childrens,
         )
 
-    # New node is 
+    # New node is not referenced, even if original was
     db_utils.update_referenced_status(cur, node_id=new_node_id, referenced=False)
 
     # Copy the folder into the new node folder
     new_folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"), new_node_id)
     # Update database
-    db_utils.update_folder_path_nodes(cur, new_node_id, new_folder_path_nodes)
+    db_utils.update_folder_path_node(cur, new_node_id, new_folder_path_nodes)
     source_node_tag = db_utils.get_node_tag(cur, node_id=source_node_id)
     db_utils.update_node_tag(cur, node_id=new_node_id, node_tag=source_node_tag)
 
@@ -772,6 +778,10 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
                 os.makedirs(new_data_folder, exist_ok=True)
         else:
             os.makedirs(os.path.join(new_folder_path_nodes, "data"), exist_ok=True)
+
+    # Update read and write permission for the new node
+    update_referenced_node_permissions(cur, node_id=new_node_id)
+    
 
     # Load and update the project.toml file
     project_toml_path = os.path.join(new_folder_path_nodes, "code", "pyproject.toml")
@@ -996,7 +1006,6 @@ def merge_pipelines(cur, source_pipeline_ids):
 
 
 def lock_pipeline(cur, pipeline_id):
-    # TODO add the change of the wirting permission when locking a pipeline
     blocked = True  # If locking, set blocked to True; if unlocking, set it to True
     db_utils.update_pipeline_blocked_status(cur, pipeline_id=pipeline_id, blocked=blocked)
 
@@ -1074,8 +1083,9 @@ def block_node(cur, node_id):
     # Update the blocked status of the node
     db_utils.update_node_blocked_status(cur, node_id=node_id, blocked=True)
 
-    # Remove writing permission
-    change_permissions_recursive(db_utils.get_node_folder_path(cur, node_id=node_id), 0o2550)
+    if not db_utils.get_node_referenced_status(cur, node_id=node_id):
+        # Remove writing permission
+        change_permissions_recursive(db_utils.get_node_folder_path(cur, node_id=node_id), 0o2550)
 
 
 def unblock_node(cur, node_id):
@@ -1083,8 +1093,9 @@ def unblock_node(cur, node_id):
     # Update the blocked status of the node
     db_utils.update_node_blocked_status(cur, node_id=node_id, blocked=False)
 
-    # Give back writing permission to the group
-    change_permissions_recursive(db_utils.get_node_folder_path(cur, node_id=node_id), 0o2770)
+    if not db_utils.get_node_referenced_status(cur, node_id=node_id):
+        # Give back writing permission to the group
+        change_permissions_recursive(db_utils.get_node_folder_path(cur, node_id=node_id), 0o2770)
 
 def block_nodes(cur, node_ids):
     """
@@ -1125,3 +1136,39 @@ def reference_nodes_into_pipeline(cur, source_pipeline_id, target_pipeline_id, n
         raise ValueError("Source pipeline and target pipeline cannot be the same.")
     
     db_utils.duplicate_node_pipeline_relation(cur, source_pipeline_id, node_ids, target_pipeline_id)
+    # Update R/W permission for referneced nodes
+    update_all_referenced_node_permission(cur)
+
+
+def update_referenced_node_permissions(cur, node_id):
+    """
+    Update the permissions of a referenced node based on its status.
+    If the node is referenced, it should have read-only permissions.
+    If the node is not referenced, it should have read-write permissions.
+    """
+    if db_utils.get_node_referenced_status(cur, node_id=node_id):
+        # Node is referenced, set read-only permissions
+        change_permissions_recursive(db_utils.get_node_folder_path(cur, node_id=node_id), 0o2550)
+    else:
+        # Node is not referenced, set read-write permissions
+        if not db_utils.get_node_blocked_status(cur, node_id=node_id):
+            change_permissions_recursive(db_utils.get_node_folder_path(cur, node_id=node_id), 0o2770)
+
+def update_all_referenced_node_permission_by_pipeline(cur, pipeline_id):
+    """
+    Update the permissions of all nodes in a pipeline based on their referenced status.
+    """
+    # Get all nodes in the pipeline
+    node_ids = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id=pipeline_id)
+    
+    for node_id in node_ids:
+        update_referenced_node_permissions(cur, node_id=node_id)
+
+def update_all_referenced_node_permission(cur):
+    """
+    Update the permissions of all referenced nodes in the database.
+    This function iterates through all pipelines and updates the permissions of each node based on its referenced status.
+    """
+    nodes = db_utils.get_all_node_ids(cur)
+    for node_id in nodes:
+        update_referenced_node_permissions(cur, node_id=node_id)
