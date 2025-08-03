@@ -2,11 +2,13 @@ import psycopg2
 import os
 
 table_names = [
-    'pipelines',
-    'nodes',
-    'node_pipeline_relation',
     'node_relation',
-    'pipeline_description'
+    'node_pipeline_relation',
+    'nodes',
+    'pipeline_relation',
+    'pipelines',
+    'projects',
+    'processes'
 ]
 
 def connect_to_db(db_url=os.environ.get("DATABASE_URL")):
@@ -26,8 +28,7 @@ def clear_all_tables(conn):
     """
     cur = conn.cursor()
     # Clear all tables in the correct order
-    tables = ["node_relation", "node_pipeline_relation", "nodes", "projects", "processes", "pipelines"]
-    for table in tables:
+    for table in table_names:
         cur.execute(f"DELETE FROM {table}")
     conn.commit()
     cur.close()

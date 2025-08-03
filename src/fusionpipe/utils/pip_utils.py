@@ -11,16 +11,31 @@ import shutil
 import toml
 import stat
 
-def change_permissions_recursive(path, mode):
+
+FILE_CHMOD_DEFAULT = 0o664  # Read and write for owner and group, read for others
+DIR_CHMOD_DEFAULT = 0o775  # Read, write, and execute for owner and group, read and execute for others
+FILE_CHMOD_BLOCKED = 0o444  # Read-only for owner, group, and others
+DIR_CHMOD_BLOCKED = 0o555  # Read and execute for owner, group, and others, no write permission
+
+def change_permissions_recursive(path, file_mode=FILE_CHMOD_DEFAULT, dir_mode=DIR_CHMOD_DEFAULT):
     """Recursively change permissions of a directory and its contents."""
+    
+    if not path:
+        # Skip if not path provided
+        return    
     if not os.path.exists(path):
         return
 
+    # Avoid links, or it will change permission for python executable too.
     for root, dirs, files in os.walk(path):
         for d in dirs:
-            os.chmod(os.path.join(root, d), mode)
+            dir_path = os.path.join(root, d)
+            if not os.path.islink(dir_path):
+                os.chmod(dir_path, dir_mode)
         for f in files:
-            os.chmod(os.path.join(root, f), mode)
+            file_path = os.path.join(root, f)
+            if os.path.isfile(file_path) and not os.path.islink(file_path):
+                os.chmod(file_path, file_mode)
 
 class NodeState(Enum):
     READY = "ready"       # Node is created but not yet processed
@@ -127,35 +142,35 @@ def init_node_folder(folder_path_nodes, verbose=False):
         # Copy and grand writing access to the example files
         if os.path.exists(example_defuse_path):
             shutil.copy(example_defuse_path, node_examples_folder_path)
-            os.chmod(os.path.join(node_examples_folder_path, "DEFUSE_example.m"), 0o664)
+            os.chmod(os.path.join(node_examples_folder_path, "DEFUSE_example.m"), FILE_CHMOD_DEFAULT)
 
         if os.path.exists(parmameter_yaml_path):
             shutil.copy(parmameter_yaml_path, code_folder_path)
-            os.chmod(os.path.join(code_folder_path, "node_parameters.yaml"), 0o664)
+            os.chmod(os.path.join(code_folder_path, "node_parameters.yaml"), FILE_CHMOD_DEFAULT)
         else:
             raise FileNotFoundError(f"Parameters YAML file not found at {parmameter_yaml_path}")
 
         if os.path.exists(example_python_path):
             shutil.copy(example_python_path, node_examples_folder_path)
-            os.chmod(os.path.join(node_examples_folder_path, "example_python.py"), 0o664)
+            os.chmod(os.path.join(node_examples_folder_path, "example_python.py"), FILE_CHMOD_DEFAULT)
         else:
             raise FileNotFoundError(f"Example Python file not found at {example_python_path}")
         
         if os.path.exists(init_node_kernel_path):
             shutil.copy(init_node_kernel_path, code_folder_path)
-            os.chmod(os.path.join(code_folder_path, "init_node_kernel.py"), 0o664)
+            os.chmod(os.path.join(code_folder_path, "init_node_kernel.py"), FILE_CHMOD_DEFAULT)
         else:
             raise FileNotFoundError(f"Example Python file not found at {init_node_kernel_path}")
 
         if os.path.exists(example_matlab_path):
             shutil.copy(example_matlab_path, node_examples_folder_path)
-            os.chmod(os.path.join(node_examples_folder_path, "example_matlab.m"), 0o664)
+            os.chmod(os.path.join(node_examples_folder_path, "example_matlab.m"), FILE_CHMOD_DEFAULT)
         else:
             raise FileNotFoundError(f"Example MATLAB file not found at {example_matlab_path}")
         
         if os.path.exists(example_notebook_path):
             shutil.copy(example_notebook_path, node_examples_folder_path)
-            os.chmod(os.path.join(node_examples_folder_path, "example_notebook.ipynb"), 0o664)
+            os.chmod(os.path.join(node_examples_folder_path, "example_notebook.ipynb"), FILE_CHMOD_DEFAULT)
         else:
             raise FileNotFoundError(f"Example Notebook file not found at {example_notebook_path}")
 
@@ -628,7 +643,7 @@ def delete_node_from_pipeline_with_referenced_logic(cur,pipeline_id, node_id):
         db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node_id)
 
     # Update R/W permission for nodes
-    update_all_referenced_node_permission(cur)
+    update_referenced_node_permissions(cur, node_id)
 
 def node_is_leaf_of_referenced_subgraph(cur, pipeline_id, node_id):
     # Get the pipeline graph from the database
@@ -743,7 +758,7 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
         # Ensure the source .git directory is readable before copying
         source_git_dir = os.path.join(old_folder_path_nodes, 'code', '.git')
         if os.path.exists(source_git_dir):
-            change_permissions_recursive(source_git_dir, 0o755)
+            change_permissions_recursive(source_git_dir, dir_mode=DIR_CHMOD_DEFAULT)
 
         # Copy only the 'code' and 'reports' subfolders, skipping '.venv'
         os.makedirs(new_folder_path_nodes, exist_ok=True)
@@ -767,7 +782,7 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
         # Ensure the new .git directory is writable after copying
         new_git_dir = os.path.join(new_folder_path_nodes, 'code', '.git')
         if os.path.exists(new_git_dir):
-            change_permissions_recursive(new_git_dir, 0o755)
+            change_permissions_recursive(new_git_dir, dir_mode=DIR_CHMOD_DEFAULT)
 
         if withdata:
             old_data_folder = os.path.join(old_folder_path_nodes, "data")
@@ -1027,6 +1042,13 @@ def detach_node_from_pipeline(cur, pipeline_id, node_id):
     # Remove the original node from the pipeline
     db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node_id)
 
+    # Update update the permissions of the new node
+    update_referenced_node_permissions(cur, node_id=node_id)
+
+    return new_node_id
+
+    
+
 
 def detach_subgraph_from_node(cur, pipeline_id, node_id):
     """
@@ -1085,7 +1107,9 @@ def block_node(cur, node_id):
 
     if not db_utils.get_node_referenced_status(cur, node_id=node_id):
         # Remove writing permission
-        change_permissions_recursive(db_utils.get_node_folder_path(cur, node_id=node_id), 0o2550)
+        change_permissions_recursive(
+            db_utils.get_node_folder_path(cur, node_id=node_id),
+            dir_mode=DIR_CHMOD_BLOCKED, file_mode=FILE_CHMOD_BLOCKED)
 
 
 def unblock_node(cur, node_id):
@@ -1095,7 +1119,9 @@ def unblock_node(cur, node_id):
 
     if not db_utils.get_node_referenced_status(cur, node_id=node_id):
         # Give back writing permission to the group
-        change_permissions_recursive(db_utils.get_node_folder_path(cur, node_id=node_id), 0o2770)
+        change_permissions_recursive(
+            db_utils.get_node_folder_path(cur, node_id=node_id),
+            dir_mode=DIR_CHMOD_DEFAULT, file_mode=FILE_CHMOD_DEFAULT)
 
 def block_nodes(cur, node_ids):
     """
@@ -1137,7 +1163,7 @@ def reference_nodes_into_pipeline(cur, source_pipeline_id, target_pipeline_id, n
     
     db_utils.duplicate_node_pipeline_relation(cur, source_pipeline_id, node_ids, target_pipeline_id)
     # Update R/W permission for referneced nodes
-    update_all_referenced_node_permission(cur)
+    update_all_referenced_node_permission_by_pipeline(cur, pipeline_id=target_pipeline_id)
 
 
 def update_referenced_node_permissions(cur, node_id):
@@ -1148,11 +1174,16 @@ def update_referenced_node_permissions(cur, node_id):
     """
     if db_utils.get_node_referenced_status(cur, node_id=node_id):
         # Node is referenced, set read-only permissions
-        change_permissions_recursive(db_utils.get_node_folder_path(cur, node_id=node_id), 0o2550)
+        change_permissions_recursive(
+            db_utils.get_node_folder_path(cur, node_id=node_id),
+            dir_mode=DIR_CHMOD_BLOCKED, file_mode=FILE_CHMOD_BLOCKED
+        )
     else:
         # Node is not referenced, set read-write permissions
         if not db_utils.get_node_blocked_status(cur, node_id=node_id):
-            change_permissions_recursive(db_utils.get_node_folder_path(cur, node_id=node_id), 0o2770)
+            change_permissions_recursive(
+                db_utils.get_node_folder_path(cur, node_id=node_id),
+                dir_mode=DIR_CHMOD_DEFAULT, file_mode=FILE_CHMOD_DEFAULT)
 
 def update_all_referenced_node_permission_by_pipeline(cur, pipeline_id):
     """

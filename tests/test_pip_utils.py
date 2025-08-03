@@ -687,8 +687,9 @@ def test_delete_referenced_node_from_pipeline(tmp_base_dir, pg_test_db):
     assert referenced_status is False, f"Node {node_id} should have referenced status set to False in pipeline {pipeline_id1}."
 
     # Ensure R/W permission is granted to user and group for the node
-    permissions = oct(os.stat(os.path.join(folder_path_node, 'code')).st_mode)[-3:]
-    assert permissions in ["770", "775"], f"Folder {folder_path_node} should have R/W permissions for user and group."
+    permissions = os.stat(os.path.join(folder_path_node, 'code')).st_mode & 0o777
+    from fusionpipe.utils.pip_utils import DIR_CHMOD_DEFAULT
+    assert permissions == DIR_CHMOD_DEFAULT, f"Folder {folder_path_node} should have R/W permissions for user and group."
 
 
 def test_delete_node_from_pipeline_with_referenced_logic_blocked_node(monkeypatch, pg_test_db, tmp_base_dir):
@@ -1057,8 +1058,10 @@ def test_reference_node_into_pipeline(tmp_base_dir, pg_test_db):
     assert blocked_status is False, f"Node {node_id} should have blocked status set to False."
 
     # Ensure referenced node has not Writing permission for user and group
-    permissions = oct(os.stat(os.path.join(folder_path_node, 'code')).st_mode)[-3:]
-    assert permissions in ["550", "2550"], f"Folder {folder_path_node} should have R/W permissions for user and group."
+    permissions = os.stat(os.path.join(folder_path_node, 'code')).st_mode & 0o777
+
+    from fusionpipe.utils.pip_utils import DIR_CHMOD_BLOCKED
+    assert permissions == DIR_CHMOD_BLOCKED, f"Folder {folder_path_node} should have R/W permissions for user and group."
 
     # Case 2: Fail if the node does not exist in the source pipeline
     non_existent_node_id = generate_node_id()
@@ -1079,6 +1082,142 @@ def test_reference_node_into_pipeline(tmp_base_dir, pg_test_db):
     # Attempt to reference the second, which is not a head of the subgraph
     with pytest.raises(ValueError, match=f"Node {second_node_id} cannot be referenced from pipeline {source_pipeline_id}. It is not a head of a subgraph. Consider duplicating the node with data first."):
         reference_nodes_into_pipeline(cur, source_pipeline_id, target_pipeline_id, [second_node_id])
+
+def test_reference_and_delete_node_logic(monkeypatch, pg_test_db, tmp_base_dir):
+    """
+    Test the following sequence:
+    - Create a node.
+    - Initialize the node folder.
+    - Create a pipeline.
+    - Create a second pipeline.
+    - Reference the node in the second pipeline.
+    - Check that the status of the node is referenced=True.
+    - Check that the code folder in the referenced node is DIR_CHMOD_BLOCKED.
+    - Delete the node from the second pipeline with delete_node_from_pipeline_with_referenced_logic.
+    - Check that the code folder in the node is now in DIR_CHMOD_DEFAULT.
+    """
+    from fusionpipe.utils.pip_utils import (
+        generate_node_id,
+        generate_pip_id,
+        init_node_folder,
+        reference_nodes_into_pipeline,
+        delete_node_from_pipeline_with_referenced_logic,
+        DIR_CHMOD_BLOCKED,
+        DIR_CHMOD_DEFAULT,
+    )
+    from fusionpipe.utils import db_utils
+
+    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Step 1: Create a node and initialize its folder
+    node_id = generate_node_id()
+    folder_path_node = os.path.join(tmp_base_dir, node_id)
+    init_node_folder(folder_path_node, verbose=True)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path_node)
+    conn.commit()
+
+    # Step 2: Create two pipelines
+    pipeline_id1 = generate_pip_id()
+    pipeline_id2 = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id1)
+    conn.commit()
+
+    # Step 3: Reference the node in the second pipeline
+    reference_nodes_into_pipeline(cur, pipeline_id1, pipeline_id2, [node_id])
+    conn.commit()
+
+    # Step 4: Check that the node's status is referenced=True
+    referenced_status = db_utils.get_node_referenced_status(cur, node_id=node_id)
+    assert referenced_status is True, f"Node {node_id} should have referenced status set to True."
+
+    # Step 5: Check that the code folder in the referenced node is DIR_CHMOD_BLOCKED
+    permissions = os.stat(os.path.join(folder_path_node, "code")).st_mode & 0o777
+    assert permissions == DIR_CHMOD_BLOCKED, f"Code folder should have permissions {oct(DIR_CHMOD_BLOCKED)}, got {oct(permissions)}."
+
+    # Step 6: Delete the node from the second pipeline
+    delete_node_from_pipeline_with_referenced_logic(cur, pipeline_id2, node_id)
+    conn.commit()
+
+    # Step 7: Check that the code folder in the node is now DIR_CHMOD_DEFAULT
+    permissions = os.stat(os.path.join(folder_path_node, "code")).st_mode & 0o777
+    assert permissions == DIR_CHMOD_DEFAULT, f"Code folder should have permissions {oct(DIR_CHMOD_DEFAULT)}, got {oct(permissions)}."
+
+
+
+def test_reference_and_detach_node_logic(monkeypatch, pg_test_db, tmp_base_dir):
+    """
+    Test the following sequence:
+    - Create a node.
+    - Initialize the node folder.
+    - Create a pipeline.
+    - Create a second pipeline.
+    - Reference the node in the second pipeline.
+    - Check that the status of the node is referenced=True.
+    - Check that the code folder in the referenced node is DIR_CHMOD_BLOCKED.
+    - Detach the node from the second pipeline with detach_node_from_pipeline.
+    - Check that the code folder in the node is now in DIR_CHMOD_DEFAULT.
+    """
+    from fusionpipe.utils.pip_utils import (
+        generate_node_id,
+        generate_pip_id,
+        init_node_folder,
+        reference_nodes_into_pipeline,
+        detach_node_from_pipeline,
+        DIR_CHMOD_BLOCKED,
+        DIR_CHMOD_DEFAULT,
+    )
+    from fusionpipe.utils import db_utils
+
+    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Step 1: Create a node and initialize its folder
+    node_id = generate_node_id()
+    folder_path_node = os.path.join(tmp_base_dir, node_id)
+    init_node_folder(folder_path_node, verbose=True)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path_node)
+    conn.commit()
+
+    # Step 2: Create two pipelines
+    pipeline_id1 = generate_pip_id()
+    pipeline_id2 = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id1)
+    conn.commit()
+
+    # Step 3: Reference the node in the second pipeline
+    reference_nodes_into_pipeline(cur, pipeline_id1, pipeline_id2, [node_id])
+    conn.commit()
+
+    # Step 4: Check that the node's status is referenced=True
+    referenced_status = db_utils.get_node_referenced_status(cur, node_id=node_id)
+    assert referenced_status is True, f"Node {node_id} should have referenced status set to True."
+
+    # Step 5: Check that the code folder in the referenced node is DIR_CHMOD_BLOCKED
+    permissions = os.stat(os.path.join(folder_path_node, "code")).st_mode & 0o777
+    assert permissions == DIR_CHMOD_BLOCKED, f"Code folder should have permissions {oct(DIR_CHMOD_BLOCKED)}, got {oct(permissions)}."
+
+    # Step 6: Detach the node from the second pipeline
+    new_node_id = detach_node_from_pipeline(cur, pipeline_id2, node_id)
+    conn.commit()
+
+    # Step 7: Check that the code folder in the node is now DIR_CHMOD_DEFAULT
+    permissions = os.stat(os.path.join(folder_path_node, "code")).st_mode & 0o777
+    assert permissions == DIR_CHMOD_DEFAULT, f"Code folder should have permissions {oct(DIR_CHMOD_DEFAULT)}, got {oct(permissions)}."
+
+    # Step 8: Check that the node is still in the first pipeline
+    nodes_in_pipeline1 = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id1)
+    assert node_id in nodes_in_pipeline1, f"Node {node_id} should still be in the first pipeline {pipeline_id1}."
 
 
 def test_node_is_head_of_subgraph(pg_test_db, dag_dummy_1):
