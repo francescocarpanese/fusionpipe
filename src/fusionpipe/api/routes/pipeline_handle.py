@@ -614,3 +614,27 @@ def unblock_nodes_route(payload: dict, db_conn=Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
     
     return {"message": f"Nodes {node_ids} unblocked successfully"}
+
+
+@router.post("/branch_pipeline_with_parents/{original_pipeline_id}")
+def branch_pipeline_with_parents(original_pipeline_id: str, payload: dict = None, db_conn=Depends(get_db)):
+    """
+    Branch a pipeline and maintain its parent relationships.
+    Payload example: {"withdata": false}
+    """
+    cur = db_conn.cursor()
+    withdata = False
+    if payload:
+        withdata = payload.get("withdata", False)
+    
+    try:
+        new_pipeline_id = pip_utils.branch_pipeline(cur, original_pipeline_id, withdata=withdata)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    return {
+        "message": f"Pipeline {original_pipeline_id} branched into new pipeline {new_pipeline_id} with parent relationships maintained",
+        "new_pipeline_id": new_pipeline_id
+    }

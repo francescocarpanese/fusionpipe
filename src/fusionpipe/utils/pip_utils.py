@@ -1206,3 +1206,40 @@ def update_all_referenced_node_permission(cur):
     nodes = db_utils.get_all_node_ids(cur)
     for node_id in nodes:
         update_referenced_node_permissions(cur, node_id=node_id)
+
+def duplicate_pipeline(cur, pipeline_id,  withdata=False):
+    """
+    Duplicate a pipeline by copying all its nodes and their relations.
+    - pipeline_id: the ID of the pipeline to duplicate
+    - withdata: if True, also copy the data folder of the nodes
+    """
+    # Get the original graph from the database
+    original_graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
+    project_id = db_utils.get_project_id_by_pipeline(cur, pipeline_id=pipeline_id)
+
+    # Generate a new pipeline ID and tag
+    new_pip_id = generate_pip_id()
+
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=new_pip_id, tag=new_pip_id, project_id=project_id)    
+
+    # Get all the nodes in the pipeline
+    node_ids = list(original_graph.nodes)
+
+    # Duplicate all the node sin the new pipeline including their relations, including the referenced logic
+    duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id=pipeline_id, target_pipeline_id=new_pip_id, source_node_ids=node_ids, withdata=withdata)
+
+    return new_pip_id
+
+def branch_pipeline(cur, original_pipeline_id, withdata=False):
+
+    # Duplicate the pipeline 
+    new_pip_id = duplicate_pipeline(cur, pipeline_id=original_pipeline_id, withdata=withdata)
+
+    get_parents_original_pipeline = db_utils.get_pipeline_parents(cur, pipeline_id=original_pipeline_id)
+
+    # If the original pipeline has parents, add the new pipeline as a child of the parents
+    if get_parents_original_pipeline:
+        for parent_id in get_parents_original_pipeline:
+            db_utils.add_pipeline_relation(cur, child_id=new_pip_id, parent_id=parent_id)
+
+    return new_pip_id

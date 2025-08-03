@@ -83,14 +83,19 @@ def dag_dummy_1():
         if node == "A":
             G.nodes[node]['status'] = "ready"
             G.nodes[node]['blocked'] = True  # A is blocked
+            G.nodes[node]['tag'] = 'A'
         elif node == "B":
             G.nodes[node]['status'] = "running"
+            G.nodes[node]['tag'] = 'B'
         elif node == "C":
             G.nodes[node]['status'] = "completed"
+            G.nodes[node]['tag'] = 'C'
         elif node == "D":
             G.nodes[node]['status'] = "staledata"
+            G.nodes[node]['tag'] = 'D'
         elif node == "E":
-            G.nodes[node]['status'] = "ready"            
+            G.nodes[node]['status'] = "ready"
+            G.nodes[node]['tag'] = 'E'            
     return G
 
 
@@ -134,11 +139,11 @@ def dict_dummy_1():
         "project_id": "test_project",
         "blocked": False,
         "nodes": {
-            "A": {"status": "ready", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0], 'folder_path': 'dummy_folder_path_A', 'blocked': True},
-            "B": {"status": "running", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_B', 'blocked': False},
-            "C": {"status": "completed", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_C', 'blocked': False},
-            "D": {"status": "staledata", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': ['C'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_D', 'blocked': False},
-            "E": {"status": "ready", "referenced": False, "tag": 'test_tag', 'notes': 'test notes', 'parents': [], 'position': [0, 0,], 'folder_path': 'dummy_folder_path_E', 'blocked': False}
+            "A": {"status": "ready", "referenced": False, "tag": 'A', 'notes': 'test notes', 'parents': [], 'position': [0, 0], 'folder_path': 'dummy_folder_path_A', 'blocked': True},
+            "B": {"status": "running", "referenced": False, "tag": 'B', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_B', 'blocked': False},
+            "C": {"status": "completed", "referenced": False, "tag": 'C', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_C', 'blocked': False},
+            "D": {"status": "staledata", "referenced": False, "tag": 'D', 'notes': 'test notes', 'parents': ['C'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_D', 'blocked': False},
+            "E": {"status": "ready", "referenced": False, "tag": 'E', 'notes': 'test notes', 'parents': [], 'position': [0, 0,], 'folder_path': 'dummy_folder_path_E', 'blocked': False}
         }
     }
 

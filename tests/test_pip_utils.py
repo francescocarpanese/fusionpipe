@@ -1327,3 +1327,152 @@ def test_node_is_head_of_subgraph(pg_test_db, dag_dummy_1):
         is_head = node_is_head_of_subgraph(cur, pipeline_id, node)
         expected_is_head = node in referenced_nodes
         assert is_head == expected_is_head, f"Node {node} head status mismatch. Expected: {expected_is_head}, Found: {is_head}"
+
+
+def test_duplicate_pipeline(pg_test_db, dag_dummy_1, tmp_base_dir, monkeypatch):
+    """
+    Test that duplicate_pipeline correctly duplicates a pipeline, including its nodes and relations.
+    """
+    from fusionpipe.utils.pip_utils import (
+        duplicate_pipeline,
+        pipeline_graph_to_db,
+        db_to_pipeline_graph_from_pip_id,
+        init_node_folder,
+    )
+    from fusionpipe.utils import db_utils
+    import networkx as nx
+    
+
+    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add the dummy graph to the database
+    pipeline_graph_to_db(dag_dummy_1, cur)
+    conn.commit()
+
+    pipeline_id = dag_dummy_1.graph['pipeline_id']
+
+    # Initialize folders for all nodes in the pipeline
+    for node_id in dag_dummy_1.nodes:
+        folder_path = os.path.join(tmp_base_dir, node_id)
+        init_node_folder(folder_path)
+        db_utils.update_folder_path_node(cur, node_id, folder_path)
+    conn.commit()
+
+    # Duplicate the pipeline
+    new_pipeline_id = duplicate_pipeline(cur, pipeline_id, withdata=True)
+    conn.commit()
+
+    # Load the original and duplicated pipelines
+    original_graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
+    duplicated_graph = db_to_pipeline_graph_from_pip_id(cur, new_pipeline_id)
+
+    # Check that the duplicated pipeline is isomorphic to the original
+    def node_match(n1, n2):
+        for attr in ['status', 'referenced', 'notes']:
+            if n1.get(attr) != n2.get(attr):
+                return False
+        return True
+
+    def edge_match(e1, e2):
+        return True
+
+    assert nx.is_isomorphic(
+        original_graph, duplicated_graph,
+        node_match=node_match,
+        edge_match=edge_match
+    ), "Duplicated pipeline is not isomorphic to the original pipeline."
+
+    # Check that the new pipeline has a different ID
+    assert new_pipeline_id != pipeline_id, "Duplicated pipeline should have a different ID from the original."
+
+    # Check that the node folders were duplicated
+    for node_id in dag_dummy_1.nodes:
+        original_folder = os.path.join(tmp_base_dir, node_id)
+        new_node_id = [n for n in duplicated_graph.nodes if duplicated_graph.nodes[n].get('tag') == dag_dummy_1.nodes[node_id].get('tag')][0]
+        duplicated_folder = os.path.join(tmp_base_dir, new_node_id)
+        assert os.path.exists(duplicated_folder), f"Duplicated folder for node {new_node_id} does not exist."
+        assert os.path.exists(os.path.join(duplicated_folder, "data")), f"Data folder for node {new_node_id} was not duplicated."
+
+
+
+
+def test_branch_pipeline(pg_test_db, dag_dummy_1, tmp_base_dir, monkeypatch):
+    """
+    Test that branch_pipeline correctly duplicates a pipeline and maintains parent-child relationships.
+    """
+    from fusionpipe.utils.pip_utils import (
+        branch_pipeline,
+        pipeline_graph_to_db,
+        db_to_pipeline_graph_from_pip_id,
+        init_node_folder,
+    )
+    from fusionpipe.utils import pip_utils, db_utils
+    import networkx as nx
+
+    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add the dummy graph to the database
+    pipeline_graph_to_db(dag_dummy_1, cur)
+    conn.commit()
+
+    original_pipeline_id = dag_dummy_1.graph['pipeline_id']
+
+    # Initialize folders for all nodes in the pipeline
+    for node_id in dag_dummy_1.nodes:
+        folder_path = os.path.join(tmp_base_dir, node_id)
+        init_node_folder(folder_path)
+        db_utils.update_folder_path_node(cur, node_id, folder_path)
+    conn.commit()
+
+    # Add a parent pipeline to the original pipeline
+    parent_pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=parent_pipeline_id)
+    db_utils.add_pipeline_relation(cur, child_id=original_pipeline_id, parent_id=parent_pipeline_id)
+    conn.commit()
+
+    # Branch the pipeline
+    new_pipeline_id = branch_pipeline(cur, original_pipeline_id, withdata=True)
+    conn.commit()
+
+    # Load the original and branched pipelines
+    original_graph = db_to_pipeline_graph_from_pip_id(cur, original_pipeline_id)
+    branched_graph = db_to_pipeline_graph_from_pip_id(cur, new_pipeline_id)
+
+    # Check that the branched pipeline is isomorphic to the original
+    def node_match(n1, n2):
+        for attr in ['status', 'referenced', 'notes']:
+            if n1.get(attr) != n2.get(attr):
+                return False
+        return True
+
+    def edge_match(e1, e2):
+        return True
+
+    assert nx.is_isomorphic(
+        original_graph, branched_graph,
+        node_match=node_match,
+        edge_match=edge_match
+    ), "Branched pipeline is not isomorphic to the original pipeline."
+
+    # Check that the new pipeline has a different ID
+    assert new_pipeline_id != original_pipeline_id, "Branched pipeline should have a different ID from the original."
+
+    # Check that the parent pipeline is linked to the new pipeline
+    parents_of_new_pipeline = db_utils.get_pipeline_parents(cur, new_pipeline_id)
+    assert parent_pipeline_id in parents_of_new_pipeline, "Parent pipeline should be linked to the new pipeline."
+
+    # Check that the node folders were duplicated
+    for node_id in dag_dummy_1.nodes:
+        original_folder = os.path.join(tmp_base_dir, node_id)
+        new_node_id = [n for n in branched_graph.nodes if branched_graph.nodes[n].get('tag') == dag_dummy_1.nodes[node_id].get('tag')][0]
+        branched_folder = os.path.join(tmp_base_dir, new_node_id)
+        assert os.path.exists(branched_folder), f"Branched folder for node {new_node_id} does not exist."
+        assert os.path.exists(os.path.join(branched_folder, "data")), f"Data folder for node {new_node_id} was not duplicated."

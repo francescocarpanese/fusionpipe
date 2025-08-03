@@ -391,6 +391,68 @@
     }
   }
 
+  async function branchPipelineWithParents(withdata: boolean) {
+
+    const selectedNode = projectNodes.find((node) => node.selected);
+    if (!selectedNode) {
+      console.error("No node selected");
+      return;
+    }
+
+    const projectId =
+      typeof currentProjectId === "string"
+        ? currentProjectId
+        : currentProjectId?.value;
+
+    if (!projectId) {
+      alert("No project selected");
+      return;
+    }
+
+    const selectedCount = projectNodes.filter((node) => node.selected).length;
+    if (selectedCount !== 1) {
+      alert("Please select exactly one pipeline node to load.");
+      return;
+    }
+
+    if (!selectedNode.id) {
+      console.error("Selected node has no ID");
+      return;
+    }
+
+    const pipelineId = selectedNode.id;
+    if (!pipelineId) {
+      console.error("No pipeline selected");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/branch_pipeline_with_parents/${pipelineId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ withdata }),
+        }
+      );
+
+      if (!response.ok) await handleApiError(response);
+
+      const data = await response.json();
+      alert(
+        `Pipeline ${pipelineId} branched into new pipeline ${data.new_pipeline_id} with parent relationships maintained.`
+      );
+
+      await fetchPipelines();
+      await fetchProjects();
+      await loadProject(projectId);
+      await loadPipeline(data.new_pipeline_id);
+    } catch (error) {
+      console.error("Error branching pipeline with parents:", error);
+      alert("Failed to branch pipeline with parents.");
+    }
+  }
+
   async function duplicateSelectedNodesIntoPipeline(withdata: boolean) {
     const pipelineId =
       typeof currentPipelineId === "string"
@@ -1735,17 +1797,6 @@
     });
   });
 
-  // // Effect to clear project and pipeline variables when no project is selected
-  // $effect(() => {
-  //   if (selectedProjectDropdown === null) {
-  //     // Trigger your event or function here
-  //     // For example:
-  //     clearProjectVariables();
-  //     clearPipelineVariables();
-  //     // Or call any other function you need
-  //   }
-  // });
-
   // All effect at refresh
   $effect(fetchPipelines);
   $effect(fetchProjects);
@@ -1862,6 +1913,21 @@
               <Button onclick={moveSelectedPipelinetoProject} class="mt-2"
                 >Move</Button
               >
+            </Dropdown>
+
+            <DropdownItem class="flex items-center justify-between">
+              Duplicate pipeline into this project 
+              <ChevronRightOutline
+                class="text-primary-700 ms-2 h-6 w-6 dark:text-white"
+              />
+            </DropdownItem>
+            <Dropdown simple placement="right-start">
+              <Button onclick={() => branchPipelineWithParents(true)}>
+                Duplicate with data
+              </Button>
+              <Button onclick={() => branchPipelineWithParents(false)}>
+                Duplicate without data
+              </Button>
             </Dropdown>
 
             <DropdownItem class="flex items-center justify-between">
