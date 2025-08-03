@@ -1030,6 +1030,9 @@ def detach_node_from_pipeline(cur, pipeline_id, node_id):
     # Check if the node is referenced
     if not db_utils.get_node_referenced_status(cur, node_id=node_id):
         raise ValueError(f"Node {node_id} is not referenced. You can detach only nodes which are referenced.")
+    # Check if the node is blocked
+    if db_utils.get_node_blocked_status(cur, node_id=node_id):
+        raise ValueError(f"Node {node_id} is blocked and cannot be detached.")
 
     new_node_id = generate_node_id()
 

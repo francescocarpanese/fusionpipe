@@ -1150,6 +1150,86 @@ def test_reference_and_delete_node_logic(monkeypatch, pg_test_db, tmp_base_dir):
 
 
 
+def test_detach_node_from_pipeline_logic(monkeypatch, pg_test_db, tmp_base_dir):
+    """
+    Test the detach_node_from_pipeline function:
+    - Successfully detaches a referenced node.
+    - Fails if the node is not referenced.
+    - Fails if the node is blocked.
+    """
+    from fusionpipe.utils.pip_utils import (
+        generate_node_id,
+        generate_pip_id,
+        init_node_folder,
+        detach_node_from_pipeline,
+        DIR_CHMOD_BLOCKED,
+        DIR_CHMOD_DEFAULT,
+    )
+    from fusionpipe.utils import db_utils
+    import os
+
+    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Step 1: Create a pipeline and a node
+    pipeline_id = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id)
+
+    node_id = generate_node_id()
+    folder_path_node = os.path.join(tmp_base_dir, node_id)
+    init_node_folder(folder_path_node, verbose=True)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=True, folder_path=folder_path_node)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    conn.commit()
+
+    # Step 2: Detach the node
+    new_node_id = detach_node_from_pipeline(cur, pipeline_id, node_id)
+    conn.commit()
+
+    # Check that the original node is removed from the pipeline
+    nodes_in_pipeline = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
+    assert node_id not in nodes_in_pipeline, f"Node {node_id} should be removed from the pipeline."
+
+    # Check that the new node is added to the pipeline
+    assert new_node_id in nodes_in_pipeline, f"New node {new_node_id} should be added to the pipeline."
+
+    # Check that the new node's folder exists
+    new_folder_path_node = os.path.join(tmp_base_dir, new_node_id)
+    assert os.path.exists(new_folder_path_node), f"New node folder {new_folder_path_node} should exist."
+
+    # Check that the new node's permissions are DIR_CHMOD_DEFAULT
+    permissions = os.stat(os.path.join(new_folder_path_node, "code")).st_mode & 0o777
+    assert permissions == DIR_CHMOD_DEFAULT, f"New node's code folder should have permissions {oct(DIR_CHMOD_DEFAULT)}, got {oct(permissions)}."
+
+    # Step 3: Attempt to detach a non-referenced node
+    non_referenced_node_id = generate_node_id()
+    folder_path_non_referenced = os.path.join(tmp_base_dir, non_referenced_node_id)
+    init_node_folder(folder_path_non_referenced, verbose=True)
+    db_utils.add_node_to_nodes(cur, node_id=non_referenced_node_id, status="ready", referenced=False, folder_path=folder_path_non_referenced)
+    db_utils.add_node_to_pipeline(cur, node_id=non_referenced_node_id, pipeline_id=pipeline_id)
+    conn.commit()
+
+    with pytest.raises(ValueError, match=f"Node {non_referenced_node_id} is not referenced. You can detach only nodes which are referenced."):
+        detach_node_from_pipeline(cur, pipeline_id, non_referenced_node_id)
+
+    # Step 4: Attempt to detach a blocked node
+    blocked_node_id = generate_node_id()
+    folder_path_blocked = os.path.join(tmp_base_dir, blocked_node_id)
+    init_node_folder(folder_path_blocked, verbose=True)
+    db_utils.add_node_to_nodes(cur, node_id=blocked_node_id, status="ready", referenced=True, folder_path=folder_path_blocked)
+    db_utils.add_node_to_pipeline(cur, node_id=blocked_node_id, pipeline_id=pipeline_id)
+    db_utils.update_node_blocked_status(cur, node_id=blocked_node_id, blocked=True)
+    conn.commit()
+
+    with pytest.raises(ValueError, match=f"Node {blocked_node_id} is blocked and cannot be detached."):
+        detach_node_from_pipeline(cur, pipeline_id, blocked_node_id)
+
+
+
+
 def test_reference_and_detach_node_logic(monkeypatch, pg_test_db, tmp_base_dir):
     """
     Test the following sequence:
