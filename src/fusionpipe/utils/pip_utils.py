@@ -1136,6 +1136,22 @@ def block_nodes(cur, node_ids):
     for node_id in node_ids:
         block_node(cur, node_id)
 
+def block_all_nodes_in_pipeline(cur, pipeline_id):
+    """
+    Block all nodes in a pipeline by updating their blocked status in the database.
+    """
+    # Get all nodes in the pipeline
+    node_ids = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id=pipeline_id)
+    block_nodes(cur, node_ids)
+
+def unblock_all_nodes_in_pipeline(cur, pipeline_id):
+    """
+    Unblock all nodes in a pipeline by updating their blocked status in the database.
+    """
+    # Get all nodes in the pipeline
+    node_ids = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id=pipeline_id)
+    unblock_nodes(cur, node_ids)
+
 def unblock_nodes(cur, node_ids):
     """
     Unblock multiple nodes by updating their blocked status in the database.

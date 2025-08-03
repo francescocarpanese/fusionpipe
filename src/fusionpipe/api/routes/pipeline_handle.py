@@ -638,3 +638,37 @@ def branch_pipeline_with_parents(original_pipeline_id: str, payload: dict = None
         "message": f"Pipeline {original_pipeline_id} branched into new pipeline {new_pipeline_id} with parent relationships maintained",
         "new_pipeline_id": new_pipeline_id
     }
+
+
+@router.post("/block_all_nodes_in_pipeline/{pipeline_id}")
+def block_all_nodes_in_pipeline_route(pipeline_id: str, db_conn=Depends(get_db)):
+    """
+    Block all nodes in a pipeline by updating their blocked status in the database.
+    """
+    cur = db_conn.cursor()
+    try:
+        node_ids = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id=pipeline_id)
+        pip_utils.block_nodes(cur, node_ids)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    return {"message": f"All nodes in pipeline {pipeline_id} blocked successfully"}
+
+
+@router.post("/unblock_all_nodes_in_pipeline/{pipeline_id}")
+def unblock_all_nodes_in_pipeline_route(pipeline_id: str, db_conn=Depends(get_db)):
+    """
+    Unblock all nodes in a pipeline by updating their blocked status in the database.
+    """
+    cur = db_conn.cursor()
+    try:
+        node_ids = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id=pipeline_id)
+        pip_utils.unblock_nodes(cur, node_ids)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    return {"message": f"All nodes in pipeline {pipeline_id} unblocked successfully"}

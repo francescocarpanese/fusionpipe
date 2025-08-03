@@ -1013,6 +1013,7 @@
     }
   }
 
+  // Load a project
   async function loadProject(project_id: string) {
     try {
       const response = await fetch(`${BACKEND_URL}/get_project/${project_id}`, {
@@ -1049,6 +1050,68 @@
       selectedProjectDropdown = project.project_id;
     } catch (error) {
       console.error("Error loading selected pipeline:", error);
+    }
+  }
+
+  // Block all nodes in the selected pipeline
+  async function blockAllNodesInPipeline() {
+    const pipelineId =
+      typeof currentPipelineId === "string"
+      ? currentPipelineId
+      : currentPipelineId.value;
+
+    if (!pipelineId) {
+      console.error("No pipeline selected");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/block_all_nodes_in_pipeline/${pipelineId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      if (!response.ok) await handleApiError(response);
+
+      alert(`All nodes in pipeline ${pipelineId} blocked successfully.`);
+      await loadPipeline(pipelineId);
+    } catch (error) {
+      console.error("Error blocking all nodes in pipeline:", error);
+      alert("Failed to block all nodes in pipeline.");
+    }
+  }
+
+  // Unblock all nodes in the selected pipeline  
+  async function unblockAllNodesInPipeline() {
+    const pipelineId =
+      typeof currentPipelineId === "string"
+      ? currentPipelineId
+      : currentPipelineId.value;
+
+    if (!pipelineId) {
+      console.error("No pipeline selected");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/unblock_all_nodes_in_pipeline/${pipelineId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      if (!response.ok) await handleApiError(response);
+
+      alert(`All nodes in pipeline ${pipelineId} unblocked successfully.`);
+      await loadPipeline(pipelineId);
+    } catch (error) {
+      console.error("Error unblocking all nodes in pipeline:", error);
+      alert("Failed to unblock all nodes in pipeline.");
     }
   }
 
@@ -1929,7 +1992,6 @@
                 Duplicate without data
               </Button>
             </Dropdown>
-
             <DropdownItem class="flex items-center justify-between">
               Merge pipelines<ChevronRightOutline
                 class="text-primary-700 ms-2 h-6 w-6 dark:text-white"
@@ -2054,7 +2116,13 @@
             >
             <DropdownItem onclick={unblockSelectedNodes}  class="text-yellow-600"
               >Unblock selected nodes</DropdownItem
-            >                        
+            >
+            <DropdownItem class="text-yellow-600" onclick={blockAllNodesInPipeline}
+              >Block all node in current Pipeline</DropdownItem
+            >
+            <DropdownItem class="text-yellow-600" onclick={unblockAllNodesInPipeline}
+              >Unblock block all node in current Pipeline</DropdownItem
+            >              
             <DropdownItem class="text-yellow-600" onclick={setNodeCompleted}
               >Manual set node "completed"</DropdownItem
             >
