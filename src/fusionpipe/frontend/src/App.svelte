@@ -969,6 +969,7 @@
           id: `${parentId}-${id}`,
           source: parentId,
           target: id,
+          blocked: node.blocked || false,
         })),
       );
 
@@ -1030,7 +1031,7 @@
           line2: `ID: ${id}`,
           notes: node.notes || "",
           tag: node.tag || "",
-          referenced: node.referenced,
+          blocked: node.blocked,
         },
       }));
 
@@ -1641,6 +1642,67 @@
     }
   }
 
+
+  async function blockCurrentPipeline() {
+    const pipelineId =
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
+
+    if (!pipelineId) {
+      console.error("No pipeline selected");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/block_pipeline/${pipelineId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        await handleApiError(response);
+      }
+
+      alert(`Pipeline ${pipelineId} and all its nodes blocked successfully.`);
+      await loadPipeline(pipelineId);
+    } catch (error) {
+      console.error("Error blocking pipeline:", error);
+      alert("Failed to block pipeline.");
+    }
+  }
+
+
+  async function unblockCurrentPipeline() {
+    const pipelineId =
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
+
+    if (!pipelineId) {
+      console.error("No pipeline selected");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/unblock_pipeline/${pipelineId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        await handleApiError(response);
+      }
+
+      alert(`Pipeline ${pipelineId} and all its nodes unblocked successfully.`);
+      await loadPipeline(pipelineId);
+    } catch (error) {
+      console.error("Error unblocking pipeline:", error);
+      alert("Failed to unblock pipeline.");
+    }
+  }
+
+
   function getCurrentPipelineIdsMerge(
     selectedMergeDropdown: string[],
   ): string[] {
@@ -1959,6 +2021,10 @@
             >
             <DropdownItem onclick={createPipeline}>Create Pipeline</DropdownItem
             >
+            <DropdownItem onclick={blockCurrentPipeline}>Block active pipeline</DropdownItem
+              >
+            <DropdownItem onclick={unblockCurrentPipeline}>Unblock active pipeline</DropdownItem
+              >              
             <DropdownItem class="flex items-center justify-between">
               Move Pipeline to project<ChevronRightOutline
                 class="text-primary-700 ms-2 h-6 w-6 dark:text-white"

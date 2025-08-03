@@ -450,7 +450,7 @@ def db_to_project_graph_from_project_id(cur, project_id):
     for pipeline_id in db_utils.get_all_pipelines_from_project_id(cur, project_id=project_id):
         G.add_node(pipeline_id)  # Add node with attributes
         G.nodes[pipeline_id]['notes'] = db_utils.get_pipeline_notes(cur, pipeline_id=pipeline_id)
-        G.nodes[pipeline_id]['referenced'] = db_utils.get_pipeline_blocked_status(cur, pipeline_id=pipeline_id)
+        G.nodes[pipeline_id]['blocked'] = db_utils.get_pipeline_blocked_status(cur, pipeline_id=pipeline_id)
 
         # Add edges based on parent relationships
         for parent_id in db_utils.get_pipeline_parents(cur, pipeline_id=pipeline_id):
@@ -618,9 +618,6 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
 
     # Add pipeline-to-project relation for the new pipeline
     db_utils.add_pipeline_relation(cur, child_id=new_pip_id, parent_id=pipeline_id)
-
-    # Lock the original pipeline
-    lock_pipeline(cur, pipeline_id=pipeline_id)
 
     return new_pip_id
 
@@ -1020,9 +1017,12 @@ def merge_pipelines(cur, source_pipeline_ids):
     return target_pipeline_id
 
 
-def lock_pipeline(cur, pipeline_id):
-    blocked = True  # If locking, set blocked to True; if unlocking, set it to True
-    db_utils.update_pipeline_blocked_status(cur, pipeline_id=pipeline_id, blocked=blocked)
+def block_pipeline(cur, pipeline_id):
+    db_utils.update_pipeline_blocked_status(cur, pipeline_id=pipeline_id, blocked=True)
+    block_all_nodes_in_pipeline(cur, pipeline_id=pipeline_id)
+
+def unblock_pipeline(cur, pipeline_id):
+    db_utils.update_pipeline_blocked_status(cur, pipeline_id=pipeline_id, blocked=False)
 
 
 def detach_node_from_pipeline(cur, pipeline_id, node_id):

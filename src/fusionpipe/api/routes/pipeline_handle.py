@@ -672,3 +672,34 @@ def unblock_all_nodes_in_pipeline_route(pipeline_id: str, db_conn=Depends(get_db
         raise HTTPException(status_code=500, detail=str(e))
     
     return {"message": f"All nodes in pipeline {pipeline_id} unblocked successfully"}
+
+
+@router.post("/block_pipeline/{pipeline_id}")
+def block_pipeline_route(pipeline_id: str, db_conn=Depends(get_db)):
+    """
+    Block a pipeline by updating its blocked status and blocking all its nodes.
+    """
+    cur = db_conn.cursor()
+    try:
+        pip_utils.block_pipeline(cur, pipeline_id=pipeline_id)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    return {"message": f"Pipeline {pipeline_id} and all its nodes blocked successfully"}
+
+@router.post("/unblock_pipeline/{pipeline_id}")
+def unblock_pipeline_route(pipeline_id: str, db_conn=Depends(get_db)):
+    """
+    Unblock a pipeline by updating its blocked status and unblocking all its nodes.
+    """
+    cur = db_conn.cursor()
+    try:
+        pip_utils.unblock_pipeline(cur, pipeline_id=pipeline_id)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    return {"message": f"Pipeline {pipeline_id} and all its nodes unblocked successfully"}
