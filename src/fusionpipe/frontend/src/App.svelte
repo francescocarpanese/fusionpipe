@@ -1927,7 +1927,7 @@
             <DropdownItem onclick={branchPipelineFromNode}
               >Branch Pipeline from selected node</DropdownItem
             >
-            <DropdownItem onclick={detachSelectedNodeFromPipeline}>Detach selected node</DropdownItem>            
+            <DropdownItem onclick={detachSelectedNodeFromPipeline}>Detach subtree from selected node</DropdownItem>            
             <DropdownItem class="flex items-center justify-between">
               Duplicate selected nodes into this pipeline 
               <ChevronRightOutline
@@ -1983,7 +1983,7 @@
                 >Reference nodes</Button
               >
             </Dropdown>
-            <DropdownItem onclick={blockSelectedNodes}
+            <DropdownItem onclick={blockSelectedNodes}  class="text-yellow-600"
               >Block selected nodes</DropdownItem
             >
             <DropdownItem onclick={unblockSelectedNodes}  class="text-yellow-600"
