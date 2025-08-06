@@ -26,8 +26,8 @@ function parents_info = get_info_parents(node_id)
     % Loop through parent IDs and fetch their information
     for i = 1:numel(parent_ids)
         parent_id = parent_ids(i);
-        query = 'SELECT node_tag, folder_path FROM nodes WHERE node_id = ?';
-        data = fetch(conn, query, parent_id);
+        query = sprintf("SELECT node_tag, folder_path FROM nodes WHERE node_id = '%s'", string(parent_id));
+        data = fetch(conn, query);
         
         if ~isempty(data)
             parents_info(end+1).node_id = string(parent_id); %#ok<AGROW>
