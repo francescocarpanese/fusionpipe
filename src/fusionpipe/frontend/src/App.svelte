@@ -11,40 +11,36 @@
     Panel,
     type Node,
     type Edge,
-    type OnConnect,
   } from "@xyflow/svelte";
 
-  
+  import ProjectGraph from "./ProjectGraph.svelte";
+
   import { Textarea } from "flowbite-svelte";
   import "@xyflow/svelte/dist/style.css";
   import SvelteSelect from "svelte-select";
-  import Select from 'svelte-select';
-  import TextUpdaterNode from "./TextUpdaterNode.svelte";
   import CustomNode from "./CustomNode.svelte";
   import { Drawer, Button, CloseButton, Label, Input } from "flowbite-svelte";
-  import { InfoCircleSolid, ArrowRightOutline } from "flowbite-svelte-icons";
-  import { sineIn } from "svelte/easing";
-  import {  ChevronRightOutline } from "flowbite-svelte-icons";
+  import { ChevronRightOutline } from "flowbite-svelte-icons";
   import {
     Dropdown,
     DropdownItem,
     DropdownDivider,
     Navbar,
-    NavBrand,
-    NavHamburger,
     Radio,
     NavUl,
     NavLi,
   } from "flowbite-svelte";
   import { ChevronDownOutline } from "flowbite-svelte-icons";
-  import filter from "svelte-select/filter";
   import ContextMenu from "./ContextMenu.svelte";
-  import { MultiSelect } from "flowbite-svelte";
-    import { nonpassive } from "svelte/legacy";
 
   //  --- Variables and state definitions ---
   let nodes = $state<Node[]>([]);
   let edges = $state.raw<Edge[]>([]);
+
+  // --- Nodes used for the project graph ---
+  let projectNodes = $state<Node[]>([]);
+  let projectEdges = $state.raw<Edge[]>([]);
+
   let selectedPipelineDropdown = $state(null);
   let selectedProjectDropdown = $state(null);
   let clientWidth: number = $state();
@@ -53,13 +49,10 @@
   const BACKEND_HOST = import.meta.env.VITE_BACKEND_HOST || "localhost";
   const BACKEND_PORT = import.meta.env.VITE_BACKEND_PORT || "8000";
   const BACKEND_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}`;
-  
+
   let selectedPipelineTarget = $state(null);
   let selectedProjectTarget = $state(null);
   let selectedMergeDropdown = $state<string[]>([]);
-
-
-  let nodeParametersYaml = $state(""); // Holds the YAML content for the selected node
 
   let currentPipelineId = $state("");
   let currentProjectId = $state("");
@@ -102,32 +95,30 @@
   let projects_dropdown = $state<string[]>([]);
 
   let nodeTypes = { custom: CustomNode };
+
   const dagreGraph = new dagre.graphlib.Graph();
 
   let radiostate_pipeline = $state(2); // selector for what to display in pipeline list 1 for ids, 2 for tags
   let radiostate_projects = $state(2); // selector for what to display in projects list 1 for ids, 2 for tags
 
-  let currentPipelineIdsMerge = $state<string[]>([]); // Store current pipeline IDs for merging
-
   // --  Definitions of functions ---
-
   dagreGraph.setDefaultEdgeLabel(() => ({}));
 
   // Define functions
 
-const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
-  event.preventDefault();
+  const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
+    event.preventDefault();
 
-  // Optionally, update clientWidth/clientHeight here if window size can change
-  // clientWidth = window.innerWidth;
-  // clientHeight = window.innerHeight;
+    // Optionally, update clientWidth/clientHeight here if window size can change
+    // clientWidth = window.innerWidth;
+    // clientHeight = window.innerHeight;
 
-  menu = {
-    id: node.id,
-    top: event.clientY < clientHeight - 200 ? event.clientY : undefined,
-    left: event.clientX < clientWidth - 200 ? event.clientX : undefined,
+    menu = {
+      id: node.id,
+      top: event.clientY < clientHeight - 200 ? event.clientY : undefined,
+      left: event.clientX < clientWidth - 200 ? event.clientX : undefined,
+    };
   };
-};
   // Close the context menu if it's open whenever the window is clicked.
   function handlePaneClick() {
     menu = null;
@@ -187,7 +178,6 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
         return "#FFFFFF";
     }
   }
-
 
   async function copySelectedNodeFolderPathToClipboard() {
     const selectedNode = nodes.find((node) => node.selected);
@@ -430,27 +420,67 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
 
     try {
-      const response = await fetch(`${BACKEND_URL}/duplicate_nodes_in_pipeline`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source_pipeline_id: pipelineId,
-          target_pipeline_id: currentTargetPipelineId,
-          node_ids: selectedNodeIds,
-          withdata: withdata, // Pass the withdata flag
-        }),
-      });
+      const response = await fetch(
+        `${BACKEND_URL}/duplicate_nodes_in_pipeline`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source_pipeline_id: pipelineId,
+            target_pipeline_id: currentTargetPipelineId,
+            node_ids: selectedNodeIds,
+            withdata: withdata, // Pass the withdata flag
+          }),
+        },
+      );
       if (!response.ok) await handleApiError(response);
       await loadPipeline(currentTargetPipelineId);
       alert(`Nodes ${selectedNodeIds.join(", ")} duplicated successfully.`);
       selectedPipelineTarget = null;
-
     } catch (error) {
       console.error("Error duplicating nodes:", error);
       alert("Failed to duplicate nodes.");
     }
   }
 
+  async function detachSelectedNodeFromPipeline() {
+    const pipelineId =
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
+
+    if (!pipelineId) {
+      alert("No pipeline selected");
+      return;
+    }
+
+    const selectedNode = nodes.find((node) => node.selected);
+
+    if (!selectedNode) {
+      alert("No node selected");
+      return;
+    }
+
+    const nodeId = selectedNode.id;
+
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/detach_subgraph_from_node/${pipelineId}/${nodeId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+      if (!response.ok) await handleApiError(response);
+      await loadPipeline(pipelineId);
+      alert(
+        `Node ${nodeId} detached from pipeline ${pipelineId} as a new node.`
+      );
+    } catch (error) {
+      console.error("Error detaching node from pipeline:", error);
+      alert("Failed to detach node from pipeline.");
+    }
+  }
 
   async function referenceSelectedNodesIntoPipeline() {
     const pipelineId =
@@ -495,7 +525,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       );
       if (!response.ok) await handleApiError(response);
       await loadPipeline(currentTargetPipelineId);
-      alert(`Nodes ${selectedNodeIds.join(", ")} duplicated successfully.`);
+      alert(`Nodes ${selectedNodeIds.join(", ")} referenced successfully from pipeline ${pipelineId} into pipeline ${currentTargetPipelineId}.`);
       currentTargetPipelineId = "";
     } catch (error) {
       console.error("Error duplicating nodes:", error);
@@ -535,17 +565,14 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
         return;
       }
 
-      const response = await fetch(
-        `${BACKEND_URL}/move_pipeline_to_project`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            project_id: projectId,
-            pipeline_id: pipelineId,
-          }),
-        },
-      );
+      const response = await fetch(`${BACKEND_URL}/move_pipeline_to_project`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id: projectId,
+          pipeline_id: pipelineId,
+        }),
+      });
       if (!response.ok) await handleApiError(response);
       await fetchPipelines();
       currentPipelineId = "";
@@ -642,51 +669,62 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
   }
 
-    async function handleConnect(event) {
-      const source = event.source;
-      const target = event.target;
+  async function handleConnect(event) {
+    const source = event.source;
+    const target = event.target;
 
-      console.log(`Connected nodes: ${source} → ${target}`);
+    console.log(`Connected nodes: ${source} → ${target}`);
 
-      const pipelineId =
-        typeof currentPipelineId === "string"
-          ? currentPipelineId
-          : currentPipelineId.value;
+    const pipelineId =
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
 
-      if (!pipelineId) {
-        console.error("No pipeline selected");
-        return;
-      }
-
-      try {
-        const response = await fetch(`${BACKEND_URL}/connect_nodes`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ source, target, pipelineId }),
-        });
-        if (!response.ok) {
-          await handleApiError(response);
-        }
-        await loadPipeline(pipelineId);
-      }
-      catch (error) {
-        console.error("Error connecting nodes:", error);
-        await loadPipeline(pipelineId);
-        return false; 
-      }
+    if (!pipelineId) {
+      console.error("No pipeline selected");
+      return;
     }
 
+    try {
+      const response = await fetch(`${BACKEND_URL}/connect_nodes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source, target, pipelineId }),
+      });
+      if (!response.ok) {
+        await handleApiError(response);
+      }
+      await loadPipeline(pipelineId);
+    } catch (error) {
+      console.error("Error connecting nodes:", error);
+      await loadPipeline(pipelineId);
+      return false;
+    }
+  }
+
   async function createPipeline() {
+    const projectId =
+      typeof currentProjectId === "string"
+        ? currentProjectId
+        : currentProjectId?.value;
+
+    if (!projectId) {
+      alert("Please select a project before creating a pipeline.");
+      return;
+    }
+
     try {
       const response = await fetch(`${BACKEND_URL}/create_pipeline`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: projectId }),
       });
       if (!response.ok) await handleApiError(response);
       const data = await response.json();
       const newPipelineId = data.pipeline_id || data.id || data.pip_id;
       await fetchPipelines();
       currentPipelineId = newPipelineId;
+      await loadProject(projectId);
       await loadPipeline(newPipelineId);
     } catch (error) {
       console.error("Error creating pipeline:", error);
@@ -703,7 +741,10 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       const data = await response.json();
       const newProjectId = data.project_id;
       currentProjectId = newProjectId;
+      selectedProjectDropdown = newProjectId;
       await fetchProjects();
+      await loadProject(newProjectId);
+      clearPipelineVariables();
     } catch (error) {
       console.error("Error creating project:", error);
     }
@@ -735,9 +776,8 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       );
       if (!response.ok) await handleApiError(response);
       await fetchPipelines();
-      currentPipelineId = "";
-      nodes = [];
-      edges = [];
+      clearPipelineVariables();
+      await loadProject(currentProjectId);
     } catch (error) {
       console.error("Error deleting pipeline:", error);
       alert("Failed to delete pipeline.");
@@ -783,6 +823,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       selectedProjectDropdown = null;
       currentProjectId = "";
       alert("Project deleted successfully.");
+      clearProjectVariables();
     } catch (error) {
       console.error("Error deleting project:", error);
       alert("Failed to delete project.");
@@ -821,7 +862,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       const data = await response.json();
 
       console.log("Pipeline iteration result:", data);
-      await fetchPipelines();
+      await loadProject(currentProjectId);
       await loadPipeline(data.new_pipeline);
       alert(
         `Pipeline iteration completed.\nStart Node: ${startNodeId}\nSource Pipeline: ${pipelineId}\nNew Pipeline ID: ${data.new_pipeline}`,
@@ -847,11 +888,12 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
         data: {
           line1: `TAG: ${node.tag}`,
           line2: `ID: ${id}`,
-          editable: node.editable,
+          referenced: node.referenced,
           notes: node.notes || "",
           folder_path: node.folder_path || "",
           status: node.status || "ready",
           tag: node.tag || "",
+          blocked: node.blocked || false,
         },
         position: {
           x: node.position[0],
@@ -882,14 +924,74 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
       currentPipelineId = pipelineId;
       currentProjectId = pipeline.project_id || "";
-      selectedPipelineDropdown = null;
-
+    
+      // Set status property to "active" for the projectNode that matches the pipeline id,
+      // and set the background color accordingly
+      projectNodes = projectNodes.map((node) => {
+        if (node.id === pipelineId) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+            },
+            style: `background: ${getNodeColor("completed")}`,
+          };
+        } else {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+            },
+            style: `background: ${getNodeColor("")}`,
+          };
+        }
+      });
     } catch (error) {
       console.error("Error loading selected pipeline:", error);
     }
   }
 
-  async function loadSelectedPipeline() {
+  async function loadProject(project_id: string) {
+    try {
+      const response = await fetch(`${BACKEND_URL}/get_project/${project_id}`, {
+        cache: "no-store",
+      });
+      if (!response.ok) await handleApiError(response);
+      const project = await response.json();
+
+      const rawNodes = Object.entries(project.nodes).map(([id, node]) => ({
+        id,
+        type: "custom",
+        data: {
+          line1: `TAG: ${node.tag}`,
+          line2: `ID: ${id}`,
+          notes: node.notes || "",
+          tag: node.tag || "",
+          referenced: node.referenced,
+        },
+      }));
+
+      const rawEdges = Object.entries(project.nodes).flatMap(([id, node]) =>
+        node.parents.map((parentId) => ({
+          id: `${parentId}-${id}`,
+          source: parentId,
+          target: id,
+        })),
+      );
+
+      const layoutedElements = getLayoutedElements(rawNodes, rawEdges);
+      projectNodes = [...layoutedElements.nodes];
+      projectEdges = [...layoutedElements.edges];
+
+      currentProjectId = project.project_id || "";
+      selectedProjectDropdown = project.project_id;
+    } catch (error) {
+      console.error("Error loading selected pipeline:", error);
+    }
+  }
+
+  // Load the selected pipeline when the component mounts or when currentPipelineId changes
+  async function loadSelectedDropdownPipeline() {
     const pipelineId =
       typeof currentPipelineId === "string"
         ? currentPipelineId
@@ -902,6 +1004,49 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
     await loadPipeline(pipelineId);
   }
+
+  // Load the selected pipeline when the component mounts or when currentPipelineId changes
+  async function loadSelectedGraphPipeline() {
+    const selectedNode = projectNodes.find((node) => node.selected);
+    if (!selectedNode) {
+      console.error("No node selected");
+      return;
+    }
+
+    const selectedCount = projectNodes.filter((node) => node.selected).length;
+    if (selectedCount !== 1) {
+      alert("Please select exactly one pipeline node to load.");
+      return;
+    }
+
+    if (!selectedNode.id) {
+      console.error("Selected node has no ID");
+      return;
+    }
+
+    const pipelineId = selectedNode.id;
+
+    await loadPipeline(pipelineId);
+  }
+
+  // Load the selected project when the component mounts or when currentProjectId changes
+  async function loadSelectedProject() {
+    const projectId =
+      typeof currentProjectId === "string"
+        ? currentProjectId
+        : currentProjectId.value;
+
+    if (!currentProjectId) {
+      console.error("No project selected");
+      return;
+    }
+
+    selectedProjectDropdown = null;
+    currentProjectId = projectId;
+    await loadProject(projectId);
+    await clearPipelineVariables();
+  }
+
   // Fetch node_parameters for a node
   async function fetchNodeParametersYaml(nodeId: string) {
     if (!nodeId) {
@@ -909,7 +1054,9 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       return;
     }
     try {
-      const response = await fetch(`${BACKEND_URL}/get_node_parameters_yaml/${nodeId}`);
+      const response = await fetch(
+        `${BACKEND_URL}/get_node_parameters_yaml/${nodeId}`,
+      );
       if (!response.ok) {
         nodeDrawereForm.node_parameters_yaml = "";
         return;
@@ -924,11 +1071,16 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
   // Save node_parameters for a node
   async function saveNodeParametersYaml(nodeId: string) {
     try {
-      const response = await fetch(`${BACKEND_URL}/update_node_parameters_yaml/${nodeId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: nodeDrawereForm.node_parameters_yaml }),
-      });
+      const response = await fetch(
+        `${BACKEND_URL}/update_node_parameters_yaml/${nodeId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: nodeDrawereForm.node_parameters_yaml,
+          }),
+        },
+      );
       if (!response.ok) await handleApiError(response);
       alert("Node parameters saved.");
     } catch (error) {
@@ -955,25 +1107,19 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
     try {
       // Update node tag
-      await fetch(
-        `${BACKEND_URL}/update_node_tag/${pipelineId}/${nodeId}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ node_tag: newTag }),
-        },
-      ).then(async (response) => {
+      await fetch(`${BACKEND_URL}/update_node_tag/${pipelineId}/${nodeId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ node_tag: newTag }),
+      }).then(async (response) => {
         if (!response.ok) await handleApiError(response);
       });
       // Update node notes
-      await fetch(
-        `${BACKEND_URL}/update_node_notes/${pipelineId}/${nodeId}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ notes: newNotes }),
-        },
-      ).then(async (response) => {
+      await fetch(`${BACKEND_URL}/update_node_notes/${pipelineId}/${nodeId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: newNotes }),
+      }).then(async (response) => {
         if (!response.ok) await handleApiError(response);
       });
       await saveNodeParametersYaml(nodeId); // Save YAML content
@@ -1008,10 +1154,9 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
 
   async function loadProjectInfo(projectId: string) {
     try {
-      const response = await fetch(
-        `${BACKEND_URL}/get_project/${projectId}`,
-        { cache: "no-store" },
-      );
+      const response = await fetch(`${BACKEND_URL}/get_project/${projectId}`, {
+        cache: "no-store",
+      });
       if (!response.ok) await handleApiError(response);
       const project = await response.json();
       projectDrawerForm = {
@@ -1285,6 +1430,48 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
   }
 
+  async function blockSelectedNodes() {
+    const selectedNodeIds = nodes.filter((node) => node.selected).map((node) => node.id);
+    if (!selectedNodeIds.length) {
+      alert("Please select at least one node to block.");
+      return;
+    }
+    try {
+      const response = await fetch(`${BACKEND_URL}/block_nodes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ node_ids: selectedNodeIds }),
+      });
+      if (!response.ok) await handleApiError(response);
+      alert(`Nodes ${selectedNodeIds.join(", ")} blocked successfully.`);
+      await loadPipeline(currentPipelineId);
+    } catch (error) {
+      console.error("Error blocking nodes:", error);
+      alert("Failed to block nodes.");
+    }
+  }
+
+  async function unblockSelectedNodes() {
+    const selectedNodeIds = nodes.filter((node) => node.selected).map((node) => node.id);
+    if (!selectedNodeIds.length) {
+      alert("Please select at least one node to unblock.");
+      return;
+    }
+    try {
+      const response = await fetch(`${BACKEND_URL}/unblock_nodes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ node_ids: selectedNodeIds }),
+      });
+      if (!response.ok) await handleApiError(response);
+      alert(`Nodes ${selectedNodeIds.join(", ")} unblocked successfully.`);
+      await loadPipeline(currentPipelineId);
+    } catch (error) {
+      console.error("Error unblocking nodes:", error);
+      alert("Failed to unblock nodes.");
+    }
+  }
+
   // Helper function for API error handling
   async function handleApiError(response: Response) {
     let errorMsg = response.statusText;
@@ -1309,13 +1496,10 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
     const nodeId = selectedNode.id;
     try {
-      const response = await fetch(
-        `${BACKEND_URL}/kill_node/${nodeId}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      const response = await fetch(`${BACKEND_URL}/kill_node/${nodeId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
       if (!response.ok) await handleApiError(response);
       alert(`Kill signal sent to node ${nodeId}.`);
       // Optionally reload pipeline to update node status
@@ -1332,7 +1516,9 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
   }
 
-  function getCurrentPipelineIdsMerge(selectedMergeDropdown: string[]): string[] {
+  function getCurrentPipelineIdsMerge(
+    selectedMergeDropdown: string[],
+  ): string[] {
     if (!selectedMergeDropdown || selectedMergeDropdown.length === 0) {
       return [];
     }
@@ -1343,8 +1529,8 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       return selectedMergeDropdown
         .map((tag) =>
           Object.keys(ids_tags_dict_pipelines).find(
-            (key) => ids_tags_dict_pipelines[key] === tag.value
-          )
+            (key) => ids_tags_dict_pipelines[key] === tag.value,
+          ),
         )
         .filter(Boolean) as string[];
     }
@@ -1353,7 +1539,9 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
   }
 
   async function mergePipeline() {
-    const pipelineIdsToMerge = getCurrentPipelineIdsMerge(selectedMergeDropdown);
+    const pipelineIdsToMerge = getCurrentPipelineIdsMerge(
+      selectedMergeDropdown,
+    );
 
     if (!pipelineIdsToMerge || pipelineIdsToMerge.length < 2) {
       alert("Please select at least two pipelines to merge.");
@@ -1375,14 +1563,13 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       alert(
         `Pipelines ${pipelineIdsToMerge.join(", ")} merged into new pipeline ${
           data.target_pipeline_id
-        }.`
+        }.`,
       );
 
       await fetchPipelines();
       currentPipelineId = data.target_pipeline_id;
       await loadPipeline(data.target_pipeline_id);
       selectedMergeDropdown = [];
-
     } catch (error) {
       console.error("Error merging pipelines:", error);
       alert("Failed to merge pipelines.");
@@ -1390,10 +1577,20 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
   }
 
+  async function clearPipelineVariables() {
+    nodes = [];
+    edges = [];
+    currentPipelineId = "";
+  }
 
-
+  async function clearProjectVariables() {
+    projectNodes = [];
+    projectEdges = [];
+    currentProjectId = "";
+  }
 
   // ------------ Collection of all reactive effects ---------------
+  // Effect to update nodeDrawereForm when a node is selected
   $effect(() => {
     if (!isHiddenNodePanel) {
       const selectedNodes = nodes.filter((node) => node.selected);
@@ -1422,10 +1619,10 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
         notes: "",
         node_parameters_yaml: "",
       };
-      nodeParametersYaml = "";
     }
   });
 
+  // Effect to update currentProjectId when a project is selected
   $effect(() => {
     if (!isHiddenProjectPanel && currentProjectId) {
       let projectId =
@@ -1450,15 +1647,16 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
   });
 
+  // Effect to update pipelineDrawerForm when a pipeline is selected
   $effect(() => {
     if (radiostate_pipeline === 1) {
       pipelines_dropdown = Object.keys(ids_tags_dict_pipelines);
     } else if (radiostate_pipeline === 2) {
       pipelines_dropdown = Object.values(ids_tags_dict_pipelines);
     }
-    selectedPipelineDropdown = null;
   });
 
+  // Effect to update projectDrawerForm when a pipeline is selected
   $effect(() => {
     if (radiostate_projects === 1) {
       projects_dropdown = Object.keys(ids_tags_dict_projects);
@@ -1468,6 +1666,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     selectedProjectDropdown = null;
   });
 
+  // Effect to update currentPipelineId when a pipeline is selected
   $effect(() => {
     if (selectedPipelineDropdown) {
       if (radiostate_pipeline === 1) {
@@ -1482,8 +1681,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
   });
 
-
-
+  // Effect to update currentTargetPipelineId when a target pipeline is selected
   $effect(() => {
     if (selectedPipelineTarget) {
       if (radiostate_pipeline === 1) {
@@ -1498,7 +1696,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
   });
 
-
+  // Effect to update currentProjectId when a project is selected
   $effect(() => {
     if (selectedProjectDropdown) {
       if (radiostate_projects === 1) {
@@ -1513,6 +1711,7 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
   });
 
+  // Filter pipelines by project when a project is selected
   $effect(() => {
     if (selectedProjectDropdown) {
       filterPipelinesByProject();
@@ -1527,9 +1726,6 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     }
   });
 
-  $effect(fetchPipelines);
-  $effect(fetchProjects);
-
   // Use effect to handle node drag end event and save positions
   $effect(() => {
     nodes.forEach((node) => {
@@ -1538,173 +1734,242 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
       }
     });
   });
+
+  // // Effect to clear project and pipeline variables when no project is selected
+  // $effect(() => {
+  //   if (selectedProjectDropdown === null) {
+  //     // Trigger your event or function here
+  //     // For example:
+  //     clearProjectVariables();
+  //     clearPipelineVariables();
+  //     // Or call any other function you need
+  //   }
+  // });
+
+  // All effect at refresh
+  $effect(fetchPipelines);
+  $effect(fetchProjects);
 </script>
 
 <!-- All graphics -->
 <div class="app-layout">
-  <Navbar>
-    <NavUl class="ms-3 pt-1">
-      <NavLi class="cursor-pointer">
-        Project interaction<ChevronDownOutline
-          class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white"
-        />
-      </NavLi>
-      <Dropdown simple>
-        <DropdownItem>
-          <li>
-            <Radio name="radio_state" bind:group={radiostate_projects} value={1}
-              >List ids</Radio
-            >
-          </li>
-          <li>
-            <Radio name="radio_state" bind:group={radiostate_projects} value={2}
-              >List tags</Radio
-            >
-          </li>
-        </DropdownItem>
-        <DropdownItem>
-          <div class="w-64">
-            <SvelteSelect
-              items={projects_dropdown}
-              bind:value={selectedProjectDropdown}
-              placeholder="Select a project..."
-              maxItems={5}
-              on:select={filterPipelinesByProject}
+  <!-- Two Column Container -->
+  <div class="two-column-wrapper">
+    <!-- Left Column -->
+    <div class="left-column">
+      <Navbar>
+        <NavUl class="ms-3 pt-1">
+          <NavLi class="cursor-pointer">
+            Project interaction<ChevronDownOutline
+              class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white"
             />
-          </div>
-        </DropdownItem>
+          </NavLi>
+          <Dropdown simple>
+            <DropdownItem>
+              <li>
+                <Radio
+                  name="radio_state"
+                  bind:group={radiostate_projects}
+                  value={1}>List ids</Radio
+                >
+              </li>
+              <li>
+                <Radio
+                  name="radio_state"
+                  bind:group={radiostate_projects}
+                  value={2}>List tags</Radio
+                >
+              </li>
+            </DropdownItem>
+            <DropdownItem>
+              <div class="w-64">
+                <SvelteSelect
+                  items={projects_dropdown}
+                  bind:value={selectedProjectDropdown}
+                  placeholder="Select a project..."
+                  maxItems={5}
+                  on:select={loadSelectedProject}
+                />
+              </div>
+            </DropdownItem>
 
-        <DropdownDivider />
-        <DropdownItem onclick={() => (isHiddenProjectPanel = false)}
-          >Open selected project panel</DropdownItem
-        >
-        <DropdownItem onclick={createProject}>Create Project</DropdownItem>
-        <DropdownItem class="text-red-600" onclick={deleteSelectedProject}
-          >Delete Project</DropdownItem
-        >
-      </Dropdown>
-      <NavLi class="cursor-pointer">
-        Pipeline Interaction<ChevronDownOutline
-          class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white"
-        />
-      </NavLi>
-      <Dropdown simple>
-        <DropdownItem>
-          <li>
-            <Radio name="radio_state" bind:group={radiostate_pipeline} value={1}
-              >List ids</Radio
+            <DropdownDivider />
+            <DropdownItem onclick={() => (isHiddenProjectPanel = false)}
+              >Open selected project panel</DropdownItem
             >
-          </li>
-          <li>
-            <Radio name="radio_state" bind:group={radiostate_pipeline} value={2}
-              >List tags</Radio
-            >
-          </li>
-        </DropdownItem>
-        <DropdownItem>
-          <div class="w-64">
-            <SvelteSelect
-              items={pipelines_dropdown}
-              bind:value={selectedPipelineDropdown}
-              placeholder="Select a pipeline..."
-              maxItems={5}
-              on:select={loadSelectedPipeline}
-            />
-          </div>
-        </DropdownItem>
-
-        <DropdownDivider />
-        <DropdownItem onclick={() => (isHiddenPipelinePanel = false)}
-          >Open selected pipeline panel</DropdownItem
-        >
-        <DropdownItem onclick={createPipeline}>Create Pipeline</DropdownItem>
-        <DropdownItem onclick={branchPipelineFromNode}
-          >Branch Pipeline from selected node</DropdownItem
-        >
-        <DropdownItem class="flex items-center justify-between">
-          Move Pipeline to project<ChevronRightOutline class="text-primary-700 ms-2 h-6 w-6 dark:text-white" />
-        </DropdownItem>
-          <Dropdown simple placement="right-start">
-            <div class="w-64">
-              <SvelteSelect
-                items={projects_dropdown}
-                bind:value={selectedProjectTarget}
-                placeholder="Select a project..."
-                maxItems={5}
-              />
-            </div>
-            <Button onclick={moveSelectedPipelinetoProject} class="mt-2"
-              >Move</Button
+            <DropdownItem onclick={createProject}>Create Project</DropdownItem>
+            <DropdownItem class="text-red-600" onclick={deleteSelectedProject}
+              >Delete Project</DropdownItem
             >
           </Dropdown>
-
-
-        <DropdownItem class="flex items-center justify-between">
-          Merge pipelines<ChevronRightOutline class="text-primary-700 ms-2 h-6 w-6 dark:text-white" />
-        </DropdownItem>
-        
-        <Dropdown simple placement="right-start">
-          <div class="w-70">
-            <SvelteSelect
-              items={pipelines_dropdown}
-              bind:value={selectedMergeDropdown}
-              placeholder="Select multiple pipelines..."
-              multiple={true}
+          <NavLi class="cursor-pointer">
+            Pipeline Interaction<ChevronDownOutline
+              class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white"
             />
-          </div>
-          <Button class="mt-2" onclick={mergePipeline}> Merge</Button>
-        </Dropdown>        
+          </NavLi>
+          <Dropdown simple>
+            <DropdownItem>
+              <li>
+                <Radio
+                  name="radio_state"
+                  bind:group={radiostate_pipeline}
+                  value={1}>List ids</Radio
+                >
+              </li>
+              <li>
+                <Radio
+                  name="radio_state"
+                  bind:group={radiostate_pipeline}
+                  value={2}>List tags</Radio
+                >
+              </li>
+            </DropdownItem>
+            <DropdownItem>
+              <div class="w-64">
+                <SvelteSelect
+                  items={pipelines_dropdown}
+                  bind:value={selectedPipelineDropdown}
+                  placeholder="Select a pipeline..."
+                  maxItems={5}
+                  on:select={loadSelectedDropdownPipeline}
+                />
+              </div>
+            </DropdownItem>
 
-        <DropdownItem class="text-red-600" onclick={deleteSelectedPipeline}
-          >Delete Pipeline</DropdownItem
-        >
-      </Dropdown>
-      <NavLi class="cursor-pointer">
-        Node interaction<ChevronDownOutline
-          class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white"
-        />
-      </NavLi>
-      <Dropdown simple>
-        <DropdownItem onclick={() => (isHiddenNodePanel = false)}
-          >Open selected node panel</DropdownItem
-        >
-        <DropdownItem onclick={copySelectedNodeFolderPathToClipboard}>
-          Copy selected node path to clipboard
-        </DropdownItem>        
-        <DropdownItem onclick={addNode}>Create node</DropdownItem>
-        <DropdownItem  class="flex items-center justify-between">
-          Duplicate selected nodes into this pipeline <ChevronRightOutline class="text-primary-700 ms-2 h-6 w-6 dark:text-white" />
-        </DropdownItem>
-          <Dropdown simple placement="right-start">
-            <Button  onclick={() => duplicateSelectedNodes(true)}>
-              Duplicate with data
-            </Button>
-            <Button  onclick={() => duplicateSelectedNodes(false)}>
-              Duplicate without data
-            </Button>            
-          </Dropdown>          
-        <DropdownItem class="flex items-center justify-between">
-          Duplicate selected nodes into another pipeline<ChevronRightOutline class="text-primary-700 ms-2 h-6 w-6 dark:text-white" />
-        </DropdownItem>
-          <Dropdown simple placement="right-start">
-            <div class="w-64">
-              <SvelteSelect
-                items={pipelines_dropdown}
-                bind:value={selectedPipelineTarget}
-                placeholder="Select a pipeline..."
-                maxItems={5}
-              />
-            </div>
-            <Button onclick={() => duplicateSelectedNodesIntoPipeline(true)} class="mt-2"
-              >Duplicate with data</Button
+            <DropdownDivider />
+            <DropdownItem onclick={loadSelectedGraphPipeline}
+              >Load selected Pipeline</DropdownItem
             >
-            <Button onclick={() => duplicateSelectedNodesIntoPipeline(false)} class="mt-2"
-              >Duplicate without data</Button
-            >            
+            <DropdownItem onclick={() => (isHiddenPipelinePanel = false)}
+              >Open selected pipeline panel</DropdownItem
+            >
+            <DropdownItem onclick={createPipeline}>Create Pipeline</DropdownItem
+            >
+            <DropdownItem class="flex items-center justify-between">
+              Move Pipeline to project<ChevronRightOutline
+                class="text-primary-700 ms-2 h-6 w-6 dark:text-white"
+              />
+            </DropdownItem>
+            <Dropdown simple placement="right-start">
+              <div class="w-64">
+                <SvelteSelect
+                  items={projects_dropdown}
+                  bind:value={selectedProjectTarget}
+                  placeholder="Select a project..."
+                  maxItems={5}
+                />
+              </div>
+              <Button onclick={moveSelectedPipelinetoProject} class="mt-2"
+                >Move</Button
+              >
+            </Dropdown>
+
+            <DropdownItem class="flex items-center justify-between">
+              Merge pipelines<ChevronRightOutline
+                class="text-primary-700 ms-2 h-6 w-6 dark:text-white"
+              />
+            </DropdownItem>
+
+            <Dropdown simple placement="right-start">
+              <div class="w-70">
+                <SvelteSelect
+                  items={pipelines_dropdown}
+                  bind:value={selectedMergeDropdown}
+                  placeholder="Select multiple pipelines..."
+                  multiple={true}
+                />
+              </div>
+              <Button class="mt-2" onclick={mergePipeline}>Merge</Button>
+            </Dropdown>
+
+            <DropdownItem class="text-red-600" onclick={deleteSelectedPipeline}
+              >Delete Pipeline</DropdownItem
+            >
           </Dropdown>
-          <DropdownItem class="flex items-center justify-between">
-            Reference selected nodes into another pipeline<ChevronRightOutline class="text-primary-700 ms-2 h-6 w-6 dark:text-white" />
-          </DropdownItem>
+        </NavUl>
+      </Navbar>
+
+      <div class="main-content" bind:clientWidth bind:clientHeight>
+
+        <!-- Svelte Flow restric only the varables node and edges to be used with 2 way bind. 
+         In order to make it work for the second flow it was needed to create an independent component -->
+        <ProjectGraph
+          nodes={projectNodes}
+          edges={projectEdges}
+          {currentProjectId}
+          {ids_tags_dict_projects}
+          {nodeTypes}
+          onUpdate={(e) => {
+            projectNodes = e.detail.nodes;
+            projectEdges = e.detail.edges;
+          }}
+        />
+      </div>
+    </div>
+
+    <!-- Right Column - Current Content -->
+    <div class="right-column">
+      <Navbar>
+        <NavUl class="ms-3 pt-1">
+          <NavLi class="cursor-pointer">
+            Node interaction<ChevronDownOutline
+              class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white"
+            />
+          </NavLi>
+          <Dropdown simple>
+            <DropdownItem onclick={() => (isHiddenNodePanel = false)}
+              >Open selected node panel</DropdownItem
+            >
+            <DropdownItem onclick={copySelectedNodeFolderPathToClipboard}>
+              Copy selected node path to clipboard
+            </DropdownItem>
+            <DropdownItem onclick={addNode}>Create node</DropdownItem>
+            <DropdownItem onclick={branchPipelineFromNode}
+              >Branch Pipeline from selected node</DropdownItem
+            >
+            <DropdownItem onclick={detachSelectedNodeFromPipeline}>Detach subtree from selected node</DropdownItem>            
+            <DropdownItem class="flex items-center justify-between">
+              Duplicate selected nodes into this pipeline 
+              <ChevronRightOutline
+                class="text-primary-700 ms-2 h-6 w-6 dark:text-white"
+              />
+            </DropdownItem>
+            <Dropdown simple placement="right-start">
+              <Button onclick={() => duplicateSelectedNodes(true)}>
+                Duplicate with data
+              </Button>
+              <Button onclick={() => duplicateSelectedNodes(false)}>
+                Duplicate without data
+              </Button>
+            </Dropdown>
+            <DropdownItem class="flex items-center justify-between">
+              Duplicate selected nodes into another pipeline<ChevronRightOutline
+                class="text-primary-700 ms-2 h-6 w-6 dark:text-white"
+              />
+            </DropdownItem>
+            <Dropdown simple placement="right-start">
+              <div class="w-64">
+                <SvelteSelect
+                  items={pipelines_dropdown}
+                  bind:value={selectedPipelineTarget}
+                  placeholder="Select a pipeline..."
+                  maxItems={5}
+                />
+              </div>
+              <Button
+                onclick={() => duplicateSelectedNodesIntoPipeline(true)}
+                class="mt-2">Duplicate with data</Button
+              >
+              <Button
+                onclick={() => duplicateSelectedNodesIntoPipeline(false)}
+                class="mt-2">Duplicate without data</Button
+              >
+            </Dropdown>
+            <DropdownItem class="flex items-center justify-between">
+              Reference selected nodes into another pipeline<ChevronRightOutline
+                class="text-primary-700 ms-2 h-6 w-6 dark:text-white"
+              />
+            </DropdownItem>
             <Dropdown simple placement="right-start">
               <div class="w-64">
                 <SvelteSelect
@@ -1717,213 +1982,223 @@ const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
               <Button onclick={referenceSelectedNodesIntoPipeline} class="mt-2"
                 >Reference nodes</Button
               >
-            </Dropdown>          
-        <DropdownItem class="text-yellow-600" onclick={setNodeCompleted}
-          >Manual set node "completed"</DropdownItem
-        >
-        <DropdownItem class="text-yellow-600" onclick={setNodeStaleData}
-          >Manual set node "stale-data"</DropdownItem
-        >
-        <DropdownItem class="text-red-600" onclick={deleteNodeOutputs}
-          >Delete output selected nodes</DropdownItem
-        >
-        <DropdownItem class="text-red-600" onclick={deleteEdge}
-          >Delete selected edge</DropdownItem
-        >
-        <DropdownItem class="text-red-600" onclick={deleteNode}
-          >Delete selected nodes</DropdownItem
-        >        
-      </Dropdown>
-      <NavLi class="cursor-pointer">
-        Actions<ChevronDownOutline
-          class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white"
-        />
-      </NavLi>
-      <Dropdown simple>
-        <DropdownItem onclick={runSelectedNode}>Run selected node</DropdownItem>
-        <DropdownItem onclick={runCurrentPipeline}
-          >Run full pipeline</DropdownItem
-        >
-        <DropdownItem onclick={runPipelineUpToNode}
-          >Run pipeline up to selected node</DropdownItem
-        >
-        <DropdownItem class="text-gray-400 cursor-not-allowed"
-          >Open run panel</DropdownItem
-        >
-        <DropdownItem onclick={killSelectedNode} class="text-red-600">
-          Kill run selected node
-        </DropdownItem>
-      </Dropdown>
-      <NavLi class="cursor-pointer">
-        Layout<ChevronDownOutline
-          class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white"
-        />
-      </NavLi>
-      <Dropdown simple>
-        <DropdownItem onclick={() => loadPipeline(currentPipelineId)}>
-          Refresh pipeline
-        </DropdownItem>
-        <DropdownItem onclick={refreshLayout}>Auto reshape</DropdownItem>
-      </Dropdown>
-    </NavUl>
-  </Navbar>
+            </Dropdown>
+            <DropdownItem onclick={blockSelectedNodes}  class="text-yellow-600"
+              >Block selected nodes</DropdownItem
+            >
+            <DropdownItem onclick={unblockSelectedNodes}  class="text-yellow-600"
+              >Unblock selected nodes</DropdownItem
+            >                        
+            <DropdownItem class="text-yellow-600" onclick={setNodeCompleted}
+              >Manual set node "completed"</DropdownItem
+            >
+            <DropdownItem class="text-yellow-600" onclick={setNodeStaleData}
+              >Manual set node "stale-data"</DropdownItem
+            >
+            <DropdownItem class="text-red-600" onclick={deleteNodeOutputs}
+              >Delete output selected nodes</DropdownItem
+            >
+            <DropdownItem class="text-red-600" onclick={deleteEdge}
+              >Delete selected edge</DropdownItem
+            >
+            <DropdownItem class="text-red-600" onclick={deleteNode}
+              >Delete selected nodes</DropdownItem
+            >
+          </Dropdown>
+          <NavLi class="cursor-pointer">
+            Actions<ChevronDownOutline
+              class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white"
+            />
+          </NavLi>
+          <Dropdown simple>
+            <DropdownItem onclick={runSelectedNode}
+              >Run selected node</DropdownItem
+            >
+            <DropdownItem onclick={runCurrentPipeline}
+              >Run full pipeline</DropdownItem
+            >
+            <DropdownItem onclick={runPipelineUpToNode}
+              >Run pipeline up to selected node</DropdownItem
+            >
+            <DropdownItem class="text-gray-400 cursor-not-allowed"
+              >Open run panel</DropdownItem
+            >
+            <DropdownItem onclick={killSelectedNode} class="text-red-600">
+              Kill run selected node
+            </DropdownItem>
+          </Dropdown>
+          <NavLi class="cursor-pointer">
+            Layout<ChevronDownOutline
+              class="text-primary-800 ms-2 inline h-6 w-6 dark:text-white"
+            />
+          </NavLi>
+          <Dropdown simple>
+            <DropdownItem onclick={() => loadPipeline(currentPipelineId)}>
+              Refresh pipeline
+            </DropdownItem>
+            <DropdownItem onclick={refreshLayout}>Auto reshape</DropdownItem>
+          </Dropdown>
+        </NavUl>
+      </Navbar>
 
-  <Drawer
-    bind:hidden={isHiddenNodePanel}
-    id="nodesidebar"
-    aria-controls="nodesidebar"
-    aria-labelledby="nodesidebar"
-  >
-    <div class="flex items-center justify-between">
-      <CloseButton
-        onclick={() => (isHiddenNodePanel = false)}
-        class="mb-4 dark:text-white"
-      />
+      <Drawer
+        bind:hidden={isHiddenNodePanel}
+        id="nodesidebar"
+        aria-controls="nodesidebar"
+        aria-labelledby="nodesidebar"
+      >
+        <div class="flex items-center justify-between">
+          <CloseButton
+            onclick={() => (isHiddenNodePanel = false)}
+            class="mb-4 dark:text-white"
+          />
+        </div>
+        {#if nodeDrawereForm}
+          <Label for="node_tag" class="mb-2 block">Node id:</Label>
+          <div class="mt-2 text-sm text-gray-500">
+            {nodeDrawereForm.id}
+          </div>
+          <Label for="node_tag" class="mb-2 block">Node tag:</Label>
+          <Input
+            id="node_tag"
+            name="node_tag"
+            required
+            bind:value={nodeDrawereForm.tag}
+          />
+          <Label for="node_notes" class="mb-2 block">Notes:</Label>
+          <Textarea
+            id="node_notes"
+            name="node_notes"
+            bind:value={nodeDrawereForm.notes}
+            rows={4}
+            placeholder="Enter notes here..."
+          />
+
+          <Label for="node_parameters_yaml" class="mb-2 block"
+            >Node Parameters (YAML):</Label
+          >
+          <Textarea
+            id="node_parameters_yaml"
+            name="node_parameters_yaml"
+            bind:value={nodeDrawereForm.node_parameters_yaml}
+            rows={10}
+            placeholder="Enter YAML parameters here..."
+          />
+
+          <Label for="node_tag" class="mb-2 block">Node Folder path:</Label>
+          <div class="mt-2 text-sm text-gray-500">
+            {nodeDrawereForm.folder_path || "No folder path"}
+          </div>
+          <Button onclick={updateNodeInfo} class="mt-4">Save Changes</Button>
+        {/if}
+      </Drawer>
+
+      <Drawer
+        bind:hidden={isHiddenPipelinePanel}
+        id="pipelinesidebar"
+        aria-controls="pipelinesidebar"
+        aria-labelledby="pipelinesidebar"
+      >
+        <div class="flex items-center justify-between">
+          <CloseButton
+            onclick={() => (isHiddenPipelinePanel = false)}
+            class="mb-4 dark:text-white"
+          />
+        </div>
+        {#if pipelineDrawerForm}
+          <Label class="mb-2 block">Project ids:</Label>
+          <div class="mt-2 text-sm text-gray-500">
+            {pipelineDrawerForm.project_id}
+          </div>
+          <Label class="mb-2 block">Pipeline id:</Label>
+          <div class="mt-2 text-sm text-gray-500">
+            {pipelineDrawerForm.id}
+          </div>
+          <Label for="pipeline_tag" class="mb-2 block">Pipeline tag:</Label>
+          <Input
+            id="pipeline_tag"
+            name="pipeline_tag"
+            required
+            bind:value={pipelineDrawerForm.tag}
+          />
+          <Label for="pipeline_notes" class="mb-2 block">Notes:</Label>
+          <Input
+            id="pipeline_notes"
+            name="pipeline_notes"
+            required
+            bind:value={pipelineDrawerForm.notes}
+          />
+          <Button onclick={updatePipelineInfo} class="mt-4">Save Changes</Button
+          >
+        {/if}
+      </Drawer>
+
+      <Drawer
+        bind:hidden={isHiddenProjectPanel}
+        id="projectsidebar"
+        aria-controls="projectsidebar"
+        aria-labelledby="projectsidebar"
+      >
+        <div class="flex items-center justify-between">
+          <CloseButton
+            onclick={() => (isHiddenProjectPanel = false)}
+            class="mb-4 dark:text-white"
+          />
+        </div>
+        {#if projectDrawerForm}
+          <Label class="mb-2 block">Project id:</Label>
+          <div class="mt-2 text-sm text-gray-500">
+            {projectDrawerForm.id}
+          </div>
+          <Label for="project_tag" class="mb-2 block">Project tag:</Label>
+          <Input
+            id="project_tag"
+            name="project_tag"
+            required
+            bind:value={projectDrawerForm.tag}
+          />
+          <Label for="project_notes" class="mb-2 block">Notes:</Label>
+          <Input
+            id="project_notes"
+            name="project_notes"
+            required
+            bind:value={projectDrawerForm.notes}
+          />
+          <Button class="mt-4" onclick={updateProjectInfo}>Save Changes</Button>
+        {/if}
+      </Drawer>
+
+      <div class="main-content" bind:clientWidth bind:clientHeight>
+        <SvelteFlow
+          bind:nodes
+          bind:edges
+          fitView
+          onconnect={handleConnect}
+          onnodecontextmenu={handleContextMenu}
+          onpaneclick={handlePaneClick}
+          onnodedragstop={saveNodePositions}
+          {nodeTypes}
+          style="height: 100%;"
+          disableKeyboardA11y={true}
+        >
+          <Panel position="top-left">
+            Pipeline id: {currentPipelineId || "None"}<br />
+            Pipeline tag: {ids_tags_dict_pipelines[currentPipelineId] || "None"}
+          </Panel>
+          <Controls />
+          <Background />
+          {#if menu}
+            <ContextMenu
+              onclick={handlePaneClick}
+              id={menu.id}
+              top={menu.top}
+              left={menu.left}
+              {copySelectedNodeFolderPathToClipboard}
+            />
+          {/if}
+          <MiniMap />
+        </SvelteFlow>
+      </div>
     </div>
-    {#if nodeDrawereForm}
-      <Label for="node_tag" class="mb-2 block">Node id:</Label>
-      <div class="mt-2 text-sm text-gray-500">
-        {nodeDrawereForm.id}
-      </div>
-      <Label for="node_tag" class="mb-2 block">Node tag:</Label>
-      <Input
-        id="node_tag"
-        name="node_tag"
-        required
-        bind:value={nodeDrawereForm.tag}
-      />
-      <Label for="node_notes" class="mb-2 block">Notes:</Label>
-      <Textarea
-        id="node_notes"
-        name="node_notes"
-        bind:value={nodeDrawereForm.notes}
-        rows={4}
-        placeholder="Enter notes here..."
-      />
-
-      <Label for="node_parameters_yaml" class="mb-2 block">Node Parameters (YAML):</Label>
-      <Textarea
-        id="node_parameters_yaml"
-        name="node_parameters_yaml"
-        bind:value={nodeDrawereForm.node_parameters_yaml}
-        rows={10}
-        placeholder="Enter YAML parameters here..."
-      />
-
-      <Label for="node_tag" class="mb-2 block">Node Folder path:</Label>
-      <div class="mt-2 text-sm text-gray-500">
-        {nodeDrawereForm.folder_path || "No folder path"}
-      </div>
-      <Button onclick={updateNodeInfo} class="mt-4">Save Changes</Button>
-    {/if}
-  </Drawer>
-
-  <Drawer
-    bind:hidden={isHiddenPipelinePanel}
-    id="pipelinesidebar"
-    aria-controls="pipelinesidebar"
-    aria-labelledby="pipelinesidebar"
-  >
-    <div class="flex items-center justify-between">
-      <CloseButton
-        onclick={() => (isHiddenPipelinePanel = false)}
-        class="mb-4 dark:text-white"
-      />
-    </div>
-    {#if pipelineDrawerForm}
-      <Label class="mb-2 block">Project ids:</Label>
-      <div class="mt-2 text-sm text-gray-500">
-        {pipelineDrawerForm.project_id}
-      </div>
-      <Label class="mb-2 block">Pipeline id:</Label>
-      <div class="mt-2 text-sm text-gray-500">
-        {pipelineDrawerForm.id}
-      </div>
-      <Label for="pipeline_tag" class="mb-2 block">Pipeline tag:</Label>
-      <Input
-        id="pipeline_tag"
-        name="pipeline_tag"
-        required
-        bind:value={pipelineDrawerForm.tag}
-      />
-      <Label for="pipeline_notes" class="mb-2 block">Notes:</Label>
-      <Input
-        id="pipeline_notes"
-        name="pipeline_notes"
-        required
-        bind:value={pipelineDrawerForm.notes}
-      />
-      <Button onclick={updatePipelineInfo} class="mt-4">Save Changes</Button>
-    {/if}
-  </Drawer>
-
-  <Drawer
-    bind:hidden={isHiddenProjectPanel}
-    id="projectsidebar"
-    aria-controls="projectsidebar"
-    aria-labelledby="projectsidebar"
-  >
-    <div class="flex items-center justify-between">
-      <CloseButton
-        onclick={() => (isHiddenProjectPanel = false)}
-        class="mb-4 dark:text-white"
-      />
-    </div>
-    {#if projectDrawerForm}
-      <Label class="mb-2 block">Project id:</Label>
-      <div class="mt-2 text-sm text-gray-500">
-        {projectDrawerForm.id}
-      </div>
-      <Label for="project_tag" class="mb-2 block">Project tag:</Label>
-      <Input
-        id="project_tag"
-        name="project_tag"
-        required
-        bind:value={projectDrawerForm.tag}
-      />
-      <Label for="project_notes" class="mb-2 block">Notes:</Label>
-      <Input
-        id="project_notes"
-        name="project_notes"
-        required
-        bind:value={projectDrawerForm.notes}
-      />
-      <Button class="mt-4" onclick={updateProjectInfo}>Save Changes</Button>
-    {/if}
-  </Drawer>
-
-  <div class="main-content" bind:clientWidth bind:clientHeight>
-    <SvelteFlow
-      bind:nodes
-      bind:edges
-      fitView
-      onconnect={handleConnect}
-      onnodecontextmenu={handleContextMenu}
-      onpaneclick={handlePaneClick}
-      onnodedragstop={saveNodePositions}
-      {nodeTypes}
-      style="height: 100%;"
-      disableKeyboardA11y={true}
-    >
-      <Panel position="top-left">
-        Selected project: {currentProjectId || "None"}<br />
-        Selected project tag: {ids_tags_dict_projects[currentProjectId] ||
-          "None"}<br />
-        Pipeline id: {currentPipelineId || "None"}<br />
-        Pipeline tag: {ids_tags_dict_pipelines[currentPipelineId] || "None"}
-      </Panel>
-      <Controls />
-      <Background />
-  {#if menu}
-    <ContextMenu
-      onclick={handlePaneClick}
-      id={menu.id}
-      top={menu.top}
-      left={menu.left}
-      copySelectedNodeFolderPathToClipboard={copySelectedNodeFolderPathToClipboard}
-    />
-  {/if}
-      <MiniMap />
-    </SvelteFlow>
   </div>
 </div>

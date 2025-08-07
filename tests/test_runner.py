@@ -29,7 +29,7 @@ def test_run_pipeline(pg_test_db, tmp_path, last_node, expected_status_a, expect
     conn = pg_test_db
     cur = db_utils.init_db(conn)
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Create three nodes (A -> B -> C)
     node_a = pip_utils.generate_node_id()
@@ -41,7 +41,7 @@ def test_run_pipeline(pg_test_db, tmp_path, last_node, expected_status_a, expect
     folder_c = os.path.join(tmp_path, node_c)
 
     for node_id, folder in zip(node_ids, [folder_a, folder_b, folder_c]):
-        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder)
+        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
         pip_utils.init_node_folder(folder_path_nodes=folder)
 
@@ -158,10 +158,10 @@ def test_create_and_run_node_from_parameter_file(pg_test_db, tmp_base_dir, node_
     cur = db_utils.init_db(conn)
 
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     node_id = pip_utils.generate_node_id()
     folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status=node_init_status)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, referenced=False, folder_path=folder_path_nodes, status=node_init_status)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
     
@@ -212,10 +212,10 @@ def test_node_execution_context_success(pg_test_db, tmp_base_dir, run_mode):
 
     # Setup test node
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     node_id = pip_utils.generate_node_id()
     folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, referenced=False, folder_path=folder_path_nodes, status="ready")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
     conn.commit()
@@ -257,10 +257,10 @@ def test_node_execution_context_node_cannot_run(pg_test_db, tmp_base_dir):
 
     # Setup test node that cannot run
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     node_id = pip_utils.generate_node_id()
     folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, referenced=False, folder_path=folder_path_nodes, status="ready")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     # Don't initialize node folder to make it unrunnable
     conn.commit()
@@ -280,10 +280,10 @@ def test_node_execution_context_exception_cleanup(pg_test_db, tmp_base_dir):
 
     # Setup test node
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     node_id = pip_utils.generate_node_id()
     folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, referenced=False, folder_path=folder_path_nodes, status="ready")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
     conn.commit()
@@ -322,10 +322,10 @@ def test_create_ray_job(pg_test_db, tmp_base_dir):
 
     # Setup test node
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     node_id = pip_utils.generate_node_id()
     folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, referenced=False, folder_path=folder_path_nodes, status="ready")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
     conn.commit()
@@ -373,10 +373,10 @@ def test_create_local_process_file_operations(pg_test_db, tmp_base_dir):
 
     # Setup test node
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     node_id = pip_utils.generate_node_id()
     folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, referenced=False, folder_path=folder_path_nodes, status="ready")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
     conn.commit()
@@ -412,10 +412,10 @@ def test_create_ray_job_submission_id_format(pg_test_db, tmp_base_dir):
 
     # Setup test node
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     node_id = pip_utils.generate_node_id()
     folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, referenced=False, folder_path=folder_path_nodes, status="ready")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
     conn.commit()
@@ -450,10 +450,10 @@ def test_create_ray_job_client_error_handling(pg_test_db, tmp_base_dir):
 
     # Setup test node
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     node_id = pip_utils.generate_node_id()
     folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, referenced=False, folder_path=folder_path_nodes, status="ready")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
     conn.commit()
@@ -499,10 +499,10 @@ def test_submit_node_with_run_mode_local_submission_failure(pg_test_db, tmp_base
 
     # Setup test node
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     node_id = pip_utils.generate_node_id()
     folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, referenced=False, folder_path=folder_path_nodes, status="ready")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
     conn.commit()
@@ -530,10 +530,10 @@ def test_submit_node_with_run_mode_ray_submission_failure(pg_test_db, tmp_base_d
 
     # Setup test node
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     node_id = pip_utils.generate_node_id()
     folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, referenced=False, folder_path=folder_path_nodes, status="ready")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
     conn.commit()
@@ -566,10 +566,10 @@ def test_submit_node_with_run_mode_process_dies_immediately(pg_test_db, tmp_base
 
     # Setup test node
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     node_id = pip_utils.generate_node_id()
     folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, referenced=False, folder_path=folder_path_nodes, status="ready")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
     conn.commit()
@@ -598,10 +598,10 @@ def test_submit_node_with_run_mode_ray_job_not_found(pg_test_db, tmp_base_dir):
 
     # Setup test node
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     node_id = pip_utils.generate_node_id()
     folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, referenced=False, folder_path=folder_path_nodes, status="ready")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
     conn.commit()
@@ -631,10 +631,10 @@ def test_submit_node_with_run_mode_missing_main_py(pg_test_db, tmp_base_dir):
 
     # Setup test node
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     node_id = pip_utils.generate_node_id()
     folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, referenced=False, folder_path=folder_path_nodes, status="ready")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
     
@@ -668,10 +668,10 @@ def test_submit_node_with_run_mode_missing_ray_submit_url(pg_test_db, tmp_base_d
 
     # Setup test node
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     node_id = pip_utils.generate_node_id()
     folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, referenced=False, folder_path=folder_path_nodes, status="ready")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
     conn.commit()
@@ -695,10 +695,10 @@ def test_submit_node_successful_submission_verification(pg_test_db, tmp_base_dir
 
     # Setup test node
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     node_id = pip_utils.generate_node_id()
     folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, editable=True, folder_path=folder_path_nodes, status="ready")
+    db_utils.add_node_to_nodes(cur, node_id=node_id, referenced=False, folder_path=folder_path_nodes, status="ready")
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path_nodes)
     conn.commit()
@@ -733,7 +733,7 @@ def test_run_pipeline_validation_errors(pg_test_db, tmp_path, pipeline_exists, e
     
     if pipeline_exists:
         pipeline_id = pip_utils.generate_pip_id()
-        db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+        db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
         conn.commit()
     else:
         pipeline_id = "non_existent_pipeline"
@@ -764,7 +764,7 @@ def test_run_pipeline_parameter_validation(pg_test_db, tmp_path, max_concurrent,
     conn = pg_test_db
     cur = db_utils.init_db(conn)
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     conn.commit()
 
     if expected_error:
@@ -785,12 +785,12 @@ def test_run_pipeline_timeout_handling(pg_test_db, tmp_path):
     conn = pg_test_db
     cur = db_utils.init_db(conn)
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Create a node that will mock a long-running process
     node_id = pip_utils.generate_node_id()
     folder_path = os.path.join(tmp_path, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path)
     conn.commit()
@@ -820,7 +820,7 @@ def test_run_pipeline_max_concurrent_nodes(pg_test_db, tmp_path):
     conn = pg_test_db
     cur = db_utils.init_db(conn)
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Create 3 independent nodes (no dependencies)
     node_ids = []
@@ -828,7 +828,7 @@ def test_run_pipeline_max_concurrent_nodes(pg_test_db, tmp_path):
         node_id = pip_utils.generate_node_id()
         node_ids.append(node_id)
         folder_path = os.path.join(tmp_path, node_id)
-        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path)
+        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
         pip_utils.init_node_folder(folder_path_nodes=folder_path)
     
@@ -864,7 +864,7 @@ def test_run_pipeline_progress_callback(pg_test_db, tmp_path):
     conn = pg_test_db
     cur = db_utils.init_db(conn)
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Create chain of 2 nodes (A -> B)
     node_a = pip_utils.generate_node_id()
@@ -872,7 +872,7 @@ def test_run_pipeline_progress_callback(pg_test_db, tmp_path):
     
     for node_id in [node_a, node_b]:
         folder_path = os.path.join(tmp_path, node_id)
-        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path)
+        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
         pip_utils.init_node_folder(folder_path_nodes=folder_path)
     
@@ -920,7 +920,7 @@ def test_run_pipeline_execution_summary(pg_test_db, tmp_path):
     conn = pg_test_db
     cur = db_utils.init_db(conn)
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Create 2 nodes
     node_ids = []
@@ -928,7 +928,7 @@ def test_run_pipeline_execution_summary(pg_test_db, tmp_path):
         node_id = pip_utils.generate_node_id()
         node_ids.append(node_id)
         folder_path = os.path.join(tmp_path, node_id)
-        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path)
+        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
         pip_utils.init_node_folder(folder_path_nodes=folder_path)
     
@@ -969,7 +969,7 @@ def test_run_pipeline_with_failed_nodes(pg_test_db, tmp_path):
     conn = pg_test_db
     cur = db_utils.init_db(conn)
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Create chain of 3 nodes (A -> B -> C)
     node_ids = []
@@ -977,7 +977,7 @@ def test_run_pipeline_with_failed_nodes(pg_test_db, tmp_path):
         node_id = pip_utils.generate_node_id()
         node_ids.append(node_id)
         folder_path = os.path.join(tmp_path, node_id)
-        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path)
+        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
         pip_utils.init_node_folder(folder_path_nodes=folder_path)
     
@@ -1025,7 +1025,7 @@ def test_run_pipeline_empty_pipeline(pg_test_db):
     conn = pg_test_db
     cur = db_utils.init_db(conn)
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="empty_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="empty_pipeline")
     conn.commit()
 
     summary = runner_utils.run_pipeline(conn, pipeline_id, debug=True)
@@ -1048,12 +1048,12 @@ def test_run_pipeline_keyboard_interrupt_cleanup(pg_test_db, tmp_path):
     conn = pg_test_db
     cur = db_utils.init_db(conn)
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Create a node 
     node_id = pip_utils.generate_node_id()
     folder_path = os.path.join(tmp_path, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path)
     conn.commit()
@@ -1092,12 +1092,12 @@ def test_run_pipeline_last_node_exclusion(pg_test_db, tmp_path):
     conn = pg_test_db
     cur = db_utils.init_db(conn)
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Create a valid node
     node_id = pip_utils.generate_node_id()
     folder_path = os.path.join(tmp_path, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path)
     conn.commit()
@@ -1118,12 +1118,12 @@ def test_run_pipeline_execution_error_recovery(pg_test_db, tmp_path):
     conn = pg_test_db
     cur = db_utils.init_db(conn)
     pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline(cur, pipeline_id=pipeline_id, tag="test_pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
 
     # Create a node
     node_id = pip_utils.generate_node_id()
     folder_path = os.path.join(tmp_path, node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", editable=True, folder_path=folder_path)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     pip_utils.init_node_folder(folder_path_nodes=folder_path)
     conn.commit()
