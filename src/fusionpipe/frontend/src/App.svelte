@@ -108,15 +108,10 @@
 
   const handleContextMenu: NodeEventWithPointer = ({ event, node }) => {
     event.preventDefault();
-
-    // Optionally, update clientWidth/clientHeight here if window size can change
-    // clientWidth = window.innerWidth;
-    // clientHeight = window.innerHeight;
-
     menu = {
       id: node.id,
-      top: event.clientY < clientHeight - 200 ? event.clientY : undefined,
-      left: event.clientX < clientWidth - 200 ? event.clientX : undefined,
+      top: event.clientY < clientHeight - 20 ? event.clientY : undefined,
+      left: event.clientX < clientWidth - 20 ? event.clientX : undefined,
     };
   };
   // Close the context menu if it's open whenever the window is clicked.
@@ -2116,6 +2111,7 @@
             projectNodes = e.detail.nodes;
             projectEdges = e.detail.edges;
           }}
+          onLoadPipeline={loadPipeline}
         />
       </div>
     </div>
@@ -2401,8 +2397,8 @@
           disableKeyboardA11y={true}
         >
           <Panel position="top-left">
-            Pipeline id: {currentPipelineId || "None"}<br />
-            Pipeline tag: {ids_tags_dict_pipelines[currentPipelineId] || "None"}
+            Active Pipeline TAG: {ids_tags_dict_pipelines[currentPipelineId] || "None"} <br />
+            Active Pipeline ID: {currentPipelineId || "None"}
           </Panel>
           <Controls />
           <Background />
