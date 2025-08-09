@@ -803,7 +803,6 @@
       const data = await response.json();
       const newProjectId = data.project_id;
       currentProjectId = newProjectId;
-      selectedProjectDropdown = newProjectId;
       await fetchProjects();
       await loadProject(newProjectId);
       clearPipelineVariables();
@@ -845,44 +844,38 @@
       alert("Failed to delete pipeline.");
     }
   }
-
-  async function deleteSelectedProject() {
-    if (!selectedProjectDropdown) {
+  async function deleteCurrentProject() {
+    if (!currentProjectId) {
       alert("No project selected");
       return;
     }
 
-    let projectId;
-    if (radiostate_projects === 1) {
-      projectId = selectedProjectDropdown.value;
-    } else if (radiostate_projects === 2) {
-      // Dropdown contains tags, so find the project ID for the selected tag
-      projectId = Object.keys(ids_tags_dict_projects).find(
-        (key) => ids_tags_dict_projects[key] === selectedProjectDropdown.value,
-      );
-    }
+    // Ask the user to type the project id to confirm deletion
+    const userInput = prompt(
+      `To confirm deletion, please type the project id exactly:\n${currentProjectId}`
+    );
+    if (userInput === null) return; // User cancelled
 
-    if (!projectId) {
-      alert("Could not determine project ID to delete.");
+    if (userInput !== currentProjectId) {
+      alert("Project id does not match. Deletion cancelled.");
       return;
     }
 
     const confirmed = confirm(
-      `Are you sure you want to delete project "${projectId}"? This action cannot be undone.`,
+      `Are you sure you want to delete project "${currentProjectId}"? This action cannot be undone.`
     );
     if (!confirmed) return;
 
     try {
       const response = await fetch(
-        `${BACKEND_URL}/delete_project/${projectId}`,
+        `${BACKEND_URL}/delete_project/${currentProjectId}`,
         {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-        },
+        }
       );
       if (!response.ok) await handleApiError(response);
       await fetchProjects();
-      selectedProjectDropdown = null;
       currentProjectId = "";
       alert("Project deleted successfully.");
       clearProjectVariables();
@@ -1048,7 +1041,6 @@
       projectEdges = [...layoutedElements.edges];
 
       currentProjectId = project.project_id || "";
-      selectedProjectDropdown = project.project_id;
     } catch (error) {
       console.error("Error loading selected pipeline:", error);
     }
@@ -1151,6 +1143,7 @@
     }
 
     const pipelineId = selectedNode.id;
+    selectedProjectDropdown = null;
 
     await loadPipeline(pipelineId);
   }
@@ -1974,11 +1967,11 @@
 
             <DropdownDivider />
             <DropdownItem onclick={() => (isHiddenProjectPanel = false)}
-              >Open selected project panel</DropdownItem
+              >Open Active Project Panel</DropdownItem
             >
-            <DropdownItem onclick={createProject}>Create Project</DropdownItem>
-            <DropdownItem class="text-red-600" onclick={deleteSelectedProject}
-              >Delete Project</DropdownItem
+            <DropdownItem onclick={createProject}>Create New Project</DropdownItem>
+            <DropdownItem class="text-red-600" onclick={deleteCurrentProject}
+              >Delete Active Project</DropdownItem
             >
           </Dropdown>
           <NavLi class="cursor-pointer">
