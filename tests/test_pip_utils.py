@@ -1476,3 +1476,57 @@ def test_branch_pipeline(pg_test_db, dag_dummy_1, tmp_base_dir, monkeypatch):
         branched_folder = os.path.join(tmp_base_dir, new_node_id)
         assert os.path.exists(branched_folder), f"Branched folder for node {new_node_id} does not exist."
         assert os.path.exists(os.path.join(branched_folder, "data")), f"Data folder for node {new_node_id} was not duplicated."
+
+
+def test_create_node_in_pipeline(monkeypatch, pg_test_db, tmp_base_dir):
+    """
+    Test that create_node_in_pipeline creates a new node, adds it to the database and pipeline,
+    initializes its folder, and returns the correct node_id.
+    """
+    from fusionpipe.utils import db_utils
+    from fusionpipe.utils.pip_utils import (
+        create_node_in_pipeline,
+        init_node_folder,
+    )
+
+    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Create a pipeline
+    pipeline_id = "p_testpipeline"
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id)
+    conn.commit()
+
+    # Call create_node_in_pipeline
+    node_id = create_node_in_pipeline(cur, pipeline_id)
+    conn.commit()
+
+    # Check that the node exists in the nodes table
+    all_nodes = db_utils.get_all_node_ids(cur)
+    assert node_id in all_nodes, f"Node {node_id} should exist in the nodes table."
+
+    # Check that the node is in the pipeline
+    nodes_in_pipeline = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
+    assert node_id in nodes_in_pipeline, f"Node {node_id} should be in pipeline {pipeline_id}."
+
+    # Check that the node's folder exists
+    folder_path = os.path.join(tmp_base_dir, node_id)
+    assert os.path.exists(folder_path), f"Node folder {folder_path} should exist."
+
+    # Check that the code, data, and reports subfolders exist
+    for subfolder in ["code", "data", "reports"]:
+        subfolder_path = os.path.join(folder_path, subfolder)
+        assert os.path.isdir(subfolder_path), f"Subfolder {subfolder_path} should exist."
+
+    # Check that the node's folder_path in the database matches
+    db_folder_path = db_utils.get_node_folder_path(cur, node_id)
+    assert db_folder_path == folder_path, "Node folder_path in DB does not match expected path."
+
+    # Check that the node's status and referenced fields are correct
+    status = db_utils.get_node_status(cur, node_id)
+    referenced = db_utils.get_node_referenced_status(cur, node_id)
+    assert status == "ready", "Node status should be 'ready'."
+    assert referenced is False, "Node referenced should be False."

@@ -1259,3 +1259,13 @@ def branch_pipeline(cur, original_pipeline_id, withdata=False):
             db_utils.add_pipeline_relation(cur, child_id=new_pip_id, parent_id=parent_id)
 
     return new_pip_id
+
+def create_node_in_pipeline(cur, pipeline_id):
+    node_id = generate_node_id()
+    folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"),node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path_nodes)
+    position_x = random.randint(-10, 10)
+    position_y = random.randint(-10, 10)
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, position_x=position_x, position_y=position_y)
+    init_node_folder(folder_path_nodes=folder_path_nodes)
+    return node_id
