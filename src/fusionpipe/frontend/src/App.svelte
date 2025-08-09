@@ -91,7 +91,7 @@
   let isHiddenProjectPanel = $state(true);
   let ids_tags_dict_pipelines = $state<Record<string, string>>({});
   let ids_tags_dict_projects = $state<Record<string, string>>({});
-  let pipelines_dropdown = $state<string[]>([]);
+  let PipelineDropdownList = $state<string[]>([]);
   let projects_dropdown = $state<string[]>([]);
 
   let nodeTypes = { custom: CustomNode };
@@ -445,7 +445,6 @@
 
       await fetchPipelines();
       await fetchProjects();
-      await loadProject(projectId);
       await loadPipeline(data.new_pipeline_id);
     } catch (error) {
       console.error("Error branching pipeline with parents:", error);
@@ -786,7 +785,6 @@
       const newPipelineId = data.pipeline_id || data.id || data.pip_id;
       await fetchPipelines();
       currentPipelineId = newPipelineId;
-      await loadProject(projectId);
       await loadPipeline(newPipelineId);
     } catch (error) {
       console.error("Error creating pipeline:", error);
@@ -917,7 +915,6 @@
       const data = await response.json();
 
       console.log("Pipeline iteration result:", data);
-      await loadProject(currentProjectId);
       await loadPipeline(data.new_pipeline);
       alert(
         `Pipeline iteration completed.\nStart Node: ${startNodeId}\nSource Pipeline: ${pipelineId}\nNew Pipeline ID: ${data.new_pipeline}`,
@@ -936,6 +933,8 @@
       );
       if (!response.ok) await handleApiError(response);
       const pipeline = await response.json();
+
+      await loadProject(currentProjectId);
 
       const rawNodes = Object.entries(pipeline.nodes).map(([id, node]) => ({
         id,
@@ -1002,6 +1001,10 @@
           };
         }
       });
+
+      selectedPipelineDropdown = null;
+
+
     } catch (error) {
       console.error("Error loading selected pipeline:", error);
     }
@@ -1289,41 +1292,44 @@
     }
   }
 
-  async function filterPipelinesByProject() {
-    let projectId;
-    if (radiostate_projects === 1) {
-      projectId = selectedProjectDropdown.value;
-    } else if (radiostate_projects === 2) {
-      // Dropdown contains tags, so find the project ID for the selected tag
-      projectId = Object.keys(ids_tags_dict_projects).find(
-        (key) => ids_tags_dict_projects[key] === selectedProjectDropdown.value,
-      );
-    }
-    if (!projectId) {
-      pipelines_dropdown = [];
+  async function setPipelineDropdownList() {
+    if (!currentProjectId) {
+      PipelineDropdownList = [];
       return;
     }
     try {
       const response = await fetch(
-        `${BACKEND_URL}/get_pipelines_in_project/${projectId}`,
+        `${BACKEND_URL}/get_pipelines_in_project/${currentProjectId}`,
       );
       if (!response.ok) await handleApiError(response);
       const data = await response.json();
       if (data.pipelines) {
-        // Filter ids_tags_dict_pipelines to only include these pipeline ids
-        pipelines_dropdown = data.pipelines
+
+        if (radiostate_pipeline === 1) {
+        // Filter ids_tags_dict_pipelines to include only pipeline in this project
+        // If radio state 1 include only pipeline id
+        PipelineDropdownList = data.pipelines
           .map((id) =>
             radiostate_pipeline === 1 ? id : ids_tags_dict_pipelines[id],
           )
           .filter(Boolean);
+
+        } else if (radiostate_pipeline === 2) {
+          // If radio state 2 include only pipeline tags
+          PipelineDropdownList = data.pipelines
+            .map((id) => ids_tags_dict_pipelines[id])
+            .filter(Boolean);
+        }
+
       } else {
-        pipelines_dropdown = [];
+        PipelineDropdownList = [];
       }
     } catch (error) {
       console.error("Error filtering pipelines by project:", error);
-      pipelines_dropdown = [];
+      PipelineDropdownList = [];
     }
   }
+
 
   // Add a function to update pipeline info
   async function updatePipelineInfo() {
@@ -1658,7 +1664,6 @@
       }
 
       alert(`Pipeline ${pipelineId} and all its nodes blocked successfully.`);
-      await loadProject(currentProjectId);
       await loadPipeline(pipelineId);
 
     } catch (error) {
@@ -1690,7 +1695,6 @@
       }
 
       alert(`Pipeline ${pipelineId} and all its nodes unblocked successfully.`);
-      await loadProject(currentProjectId);
       await loadPipeline(pipelineId);
     } catch (error) {
       console.error("Error unblocking pipeline:", error);
@@ -1772,6 +1776,24 @@
     currentProjectId = "";
   }
 
+
+  async function ConditionalOpenPipelinePanel(){
+      let isHidden = false;
+      if (!currentPipelineId) {
+        alert("No Active Pipeline");
+        isHidden = true;
+      }
+      const selectedNode = projectNodes.find((node) => node.selected);
+      if (selectedNode && currentPipelineId && selectedNode.id !== currentPipelineId) {
+        alert("The Active pipeline is different the Selected one. Activate the desired pipeline.");
+        isHidden = true;
+      }
+
+      isHiddenPipelinePanel = isHidden;
+
+  }
+
+
   // ------------ Collection of all reactive effects ---------------
   // Effect to update nodeDrawereForm when a node is selected
   $effect(() => {
@@ -1818,24 +1840,26 @@
 
   // Effect to load pipeline info when the panel is opened
   $effect(() => {
-    if (!isHiddenPipelinePanel && currentPipelineId) {
+    if (!isHiddenPipelinePanel) {
+      if (!currentPipelineId) {
+        alert("No Active selected");
+      }
+      else {
       const pipelineId =
         typeof currentPipelineId === "string"
           ? currentPipelineId
           : currentPipelineId.value;
       loadPipelineInfo(pipelineId);
-    }
-    if (isHiddenPipelinePanel) {
-      pipelineDrawerForm = { id: "", tag: "", notes: "", project_id: "" };
+      }
     }
   });
 
-  // Effect to update pipelineDrawerForm when a pipeline is selected
+  // Effect to update pipeline dr
   $effect(() => {
     if (radiostate_pipeline === 1) {
-      pipelines_dropdown = Object.keys(ids_tags_dict_pipelines);
-    } else if (radiostate_pipeline === 2) {
-      pipelines_dropdown = Object.values(ids_tags_dict_pipelines);
+        setPipelineDropdownList();
+        } else if (radiostate_pipeline === 2) {
+        setPipelineDropdownList();
     }
   });
 
@@ -1894,18 +1918,10 @@
     }
   });
 
-  // Filter pipelines by project when a project is selected
+  // Filter pipelines by project when a project is activated
   $effect(() => {
-    if (selectedProjectDropdown) {
-      filterPipelinesByProject();
-    } else {
-      // No project selected: show all pipelines
-      if (radiostate_pipeline === 1) {
-        pipelines_dropdown = Object.keys(ids_tags_dict_pipelines);
-      } else if (radiostate_pipeline === 2) {
-        pipelines_dropdown = Object.values(ids_tags_dict_pipelines);
-      }
-      currentProjectId = "";
+    if (currentProjectId) {
+      setPipelineDropdownList();
     }
   });
 
@@ -1999,7 +2015,7 @@
             <DropdownItem>
               <div class="w-64">
                 <SvelteSelect
-                  items={pipelines_dropdown}
+                  items={PipelineDropdownList}
                   bind:value={selectedPipelineDropdown}
                   placeholder="Select a pipeline..."
                   maxItems={5}
@@ -2010,17 +2026,13 @@
 
             <DropdownDivider />
             <DropdownItem onclick={loadSelectedGraphPipeline}
-              >Load selected Pipeline</DropdownItem
+              >Activate Selected Pipeline</DropdownItem
             >
-            <DropdownItem onclick={() => (isHiddenPipelinePanel = false)}
-              >Open selected pipeline panel</DropdownItem
+            <DropdownItem onclick={ConditionalOpenPipelinePanel}
+              >Open Active pipeline panel</DropdownItem
             >
-            <DropdownItem onclick={createPipeline}>Create new pipeline</DropdownItem
+            <DropdownItem onclick={createPipeline}>Create New pipeline</DropdownItem
             >
-            <DropdownItem onclick={blockCurrentPipeline}>Block active pipeline</DropdownItem
-              >
-            <DropdownItem onclick={unblockCurrentPipeline}>Unblock active pipeline</DropdownItem
-              >              
             <DropdownItem class="flex items-center justify-between">
               Move Pipeline to project<ChevronRightOutline
                 class="text-primary-700 ms-2 h-6 w-6 dark:text-white"
@@ -2055,15 +2067,14 @@
               </Button>
             </Dropdown>
             <DropdownItem class="flex items-center justify-between">
-              Merge pipelines<ChevronRightOutline
+              Merge Pipelines<ChevronRightOutline
                 class="text-primary-700 ms-2 h-6 w-6 dark:text-white"
               />
             </DropdownItem>
-
             <Dropdown simple placement="right-start">
               <div class="w-70">
                 <SvelteSelect
-                  items={pipelines_dropdown}
+                  items={PipelineDropdownList}
                   bind:value={selectedMergeDropdown}
                   placeholder="Select multiple pipelines..."
                   multiple={true}
@@ -2071,7 +2082,10 @@
               </div>
               <Button class="mt-2" onclick={mergePipeline}>Merge</Button>
             </Dropdown>
-
+            <DropdownItem  class="text-yellow-600" onclick={blockCurrentPipeline}>Block Active pipeline</DropdownItem
+              >
+            <DropdownItem   class="text-yellow-600" onclick={unblockCurrentPipeline}>Unblock Active pipeline</DropdownItem
+              >              
             <DropdownItem class="text-red-600" onclick={deleteSelectedPipeline}
               >Delete Pipeline</DropdownItem
             >
@@ -2108,18 +2122,18 @@
           </NavLi>
           <Dropdown simple>
             <DropdownItem onclick={() => (isHiddenNodePanel = false)}
-              >Open selected node panel</DropdownItem
+              >Open Selected Node Panel</DropdownItem
             >
             <DropdownItem onclick={copySelectedNodeFolderPathToClipboard}>
-              Copy selected node path to clipboard
+              Copy Selected Node path to clipboard
             </DropdownItem>
             <DropdownItem onclick={addNode}>Create new node</DropdownItem>
             <DropdownItem onclick={branchPipelineFromNode}
-              >Branch Pipeline from selected node</DropdownItem
+              >Branch Pipeline from Selected Node</DropdownItem
             >
             <DropdownItem onclick={detachSelectedNodeFromPipeline}>Detach subtree from selected node</DropdownItem>            
             <DropdownItem class="flex items-center justify-between">
-              Duplicate selected nodes into this pipeline 
+              Duplicate Selected Nodes into this Pipeline 
               <ChevronRightOutline
                 class="text-primary-700 ms-2 h-6 w-6 dark:text-white"
               />
@@ -2140,7 +2154,7 @@
             <Dropdown simple placement="right-start">
               <div class="w-64">
                 <SvelteSelect
-                  items={pipelines_dropdown}
+                  items={PipelineDropdownList}
                   bind:value={selectedPipelineTarget}
                   placeholder="Select a pipeline..."
                   maxItems={5}
@@ -2163,27 +2177,27 @@
             <Dropdown simple placement="right-start">
               <div class="w-64">
                 <SvelteSelect
-                  items={pipelines_dropdown}
+                  items={PipelineDropdownList}
                   bind:value={selectedPipelineTarget}
                   placeholder="Select a pipeline..."
                   maxItems={5}
                 />
               </div>
               <Button onclick={referenceSelectedNodesIntoPipeline} class="mt-2"
-                >Reference nodes</Button
+                >Reference Nodes</Button
               >
             </Dropdown>
             <DropdownItem onclick={blockSelectedNodes}  class="text-yellow-600"
-              >Block selected nodes</DropdownItem
+              >Block Selected Nodes</DropdownItem
             >
             <DropdownItem onclick={unblockSelectedNodes}  class="text-yellow-600"
-              >Unblock selected nodes</DropdownItem
+              >Unblock Selected Nodes</DropdownItem
             >
             <DropdownItem class="text-yellow-600" onclick={blockAllNodesInPipeline}
-              >Block all node in current Pipeline</DropdownItem
+              >Block all Nodes in Current Pipeline</DropdownItem
             >
             <DropdownItem class="text-yellow-600" onclick={unblockAllNodesInPipeline}
-              >Unblock block all node in current Pipeline</DropdownItem
+              >Unblock all Nodes in current Pipeline</DropdownItem
             >              
             <DropdownItem class="text-yellow-600" onclick={setNodeCompleted}
               >Manual set node "completed"</DropdownItem
@@ -2302,7 +2316,7 @@
           />
         </div>
         {#if pipelineDrawerForm}
-          <Label class="mb-2 block">Project ids:</Label>
+          <Label class="mb-2 block">Project id:</Label>
           <div class="mt-2 text-sm text-gray-500">
             {pipelineDrawerForm.project_id}
           </div>

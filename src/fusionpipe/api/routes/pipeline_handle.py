@@ -100,7 +100,7 @@ def get_project(project_id: str, db_conn=Depends(get_db)):
 def add_node_to_pipeline(pipeline_id: str, db_conn=Depends(get_db)):
     cur = db_conn.cursor()
     try:
-        pip_utils.create_node_in_pipeline(cur, pipeline_id=pipeline_id)
+        node_id = pip_utils.create_node_in_pipeline(cur, pipeline_id=pipeline_id)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
