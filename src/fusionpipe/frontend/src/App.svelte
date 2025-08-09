@@ -607,7 +607,7 @@
         : currentPipelineId.value;
 
     if (!pipelineId) {
-      console.error("No pipeline selected");
+      alert("No Active pipeline found");
       return;
     }
     try {
@@ -636,12 +636,10 @@
       });
       if (!response.ok) await handleApiError(response);
       await fetchPipelines();
-      currentPipelineId = "";
-      nodes = [];
-      edges = [];
       alert(
         `Pipeline ${pipelineId} moved to project ${projectId} successfully.`,
       );
+      loadPipeline(pipelineId);      
       selectedProjectTarget = null;
     } catch (error) {
       console.error("Error moving pipeline to project:", error);
@@ -934,7 +932,8 @@
       if (!response.ok) await handleApiError(response);
       const pipeline = await response.json();
 
-      await loadProject(currentProjectId);
+
+      await loadProject(pipeline.project_id);
 
       const rawNodes = Object.entries(pipeline.nodes).map(([id, node]) => ({
         id,
@@ -2034,7 +2033,7 @@
             <DropdownItem onclick={createPipeline}>Create New pipeline</DropdownItem
             >
             <DropdownItem class="flex items-center justify-between">
-              Move Pipeline to project<ChevronRightOutline
+              Move Active Pipeline to Project<ChevronRightOutline
                 class="text-primary-700 ms-2 h-6 w-6 dark:text-white"
               />
             </DropdownItem>

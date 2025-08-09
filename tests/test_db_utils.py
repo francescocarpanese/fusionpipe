@@ -1761,3 +1761,50 @@ def test_update_node_blocked_status(pg_test_db):
         assert str(e) == "blocked status must be a boolean value.", f"Unexpected error message: {str(e)}"
     else:
         assert False, "Expected ValueError for invalid blocked status, but no exception was raised."
+
+def test_remove_all_pipeline_relation_of_pipeline_id(pg_test_db):
+    from fusionpipe.utils.pip_utils import generate_pip_id
+    import fusionpipe.utils.db_utils as db_utils
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add pipelines
+    pipeline_id = generate_pip_id()
+    parent_id1 = generate_pip_id()
+    parent_id2 = generate_pip_id()
+    child_id1 = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="main")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=parent_id1, tag="parent1")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=parent_id2, tag="parent2")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=child_id1, tag="child1")
+    conn.commit()
+
+    # Add relations where pipeline_id is both parent and child
+    db_utils.add_pipeline_relation(cur, child_id=pipeline_id, parent_id=parent_id1)
+    db_utils.add_pipeline_relation(cur, child_id=child_id1, parent_id=pipeline_id)
+    db_utils.add_pipeline_relation(cur, child_id=pipeline_id, parent_id=parent_id2)
+    conn.commit()
+
+    # There should be 3 relations involving pipeline_id
+    cur.execute("SELECT COUNT(*) FROM pipeline_relation WHERE child_id=%s OR parent_id=%s", (pipeline_id, pipeline_id))
+    count_before = cur.fetchone()[0]
+    assert count_before == 3, f"Expected 3 relations before removal, got {count_before}"
+
+    # Remove all relations for pipeline_id
+    rows_deleted = db_utils.remove_all_pipeline_relation_of_pipeline_id(cur, pipeline_id)
+    conn.commit()
+    assert rows_deleted == 3, f"Expected 3 rows deleted, got {rows_deleted}"
+
+    # Verify all relations involving pipeline_id are removed
+    cur.execute("SELECT * FROM pipeline_relation WHERE child_id=%s OR parent_id=%s", (pipeline_id, pipeline_id))
+    assert cur.fetchone() is None, "Relations involving pipeline_id were not fully removed."
+
+    # Other relations should remain unaffected (add one unrelated and check)
+    unrelated_child = generate_pip_id()
+    unrelated_parent = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=unrelated_child, tag="unrelated_child")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=unrelated_parent, tag="unrelated_parent")
+    db_utils.add_pipeline_relation(cur, child_id=unrelated_child, parent_id=unrelated_parent)
+    conn.commit()
+    cur.execute("SELECT * FROM pipeline_relation WHERE child_id=%s AND parent_id=%s", (unrelated_child, unrelated_parent))
+    assert cur.fetchone() is not None, "Unrelated pipeline relation was incorrectly removed."

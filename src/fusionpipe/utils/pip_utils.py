@@ -1298,3 +1298,24 @@ def create_node_in_pipeline(cur, pipeline_id):
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, position_x=position_x, position_y=position_y)
     init_node_folder(folder_path_nodes=folder_path_nodes)
     return node_id
+
+
+def move_pipeline_to_project(cur, pipeline_id, project_id):
+    """
+    Move a pipeline to a different project by updating its project ID in the database.
+    :param cur: Database cursor
+    :param pipeline_id: ID of the pipeline to move
+    :param project_id: ID of the new project
+    """
+    # Check if the pipeline exists
+    if not db_utils.check_if_pipeline_exists(cur, pipeline_id=pipeline_id):
+        raise ValueError(f"Pipeline {pipeline_id} does not exist.")
+    
+    if db_utils.get_pipeline_blocked_status(cur, pipeline_id=pipeline_id):
+        raise ValueError(f"Pipeline {pipeline_id} is blocked. Cannot move it to a different project.")
+    
+    # Set different project for the pipeline
+    db_utils.add_project_to_pipeline(cur, project_id, pipeline_id)
+
+    # Remove the relations of that pipeline
+    db_utils.remove_all_pipeline_relation_of_pipeline_id(cur, pipeline_id=pipeline_id)

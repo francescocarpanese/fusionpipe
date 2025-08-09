@@ -1533,3 +1533,49 @@ def test_create_node_in_pipeline(monkeypatch, pg_test_db, tmp_base_dir):
     referenced = db_utils.get_node_referenced_status(cur, node_id)
     assert status == "ready", "Node status should be 'ready'."
     assert referenced is False, "Node referenced should be False."
+
+def test_move_pipeline_to_project(pg_test_db):
+    """
+    Test that move_pipeline_to_project moves a pipeline to a new project,
+    updates the project_id, and removes all pipeline relations.
+    """
+    from fusionpipe.utils import db_utils
+    from fusionpipe.utils.pip_utils import generate_pip_id, move_pipeline_to_project
+
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Create two projects and a pipeline
+    project_id1 = "pr_project1"
+    project_id2 = "pr_project2"
+    pipeline_id = generate_pip_id()
+    db_utils.add_project(cur, project_id=project_id1)
+    db_utils.add_project(cur, project_id=project_id2)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, project_id=project_id1)
+    # Add a parent pipeline relation
+    parent_pipeline_id = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=parent_pipeline_id, project_id=project_id1)
+    db_utils.add_pipeline_relation(cur, child_id=pipeline_id, parent_id=parent_pipeline_id)
+    conn.commit()
+
+    # Move pipeline to new project
+    move_pipeline_to_project(cur, pipeline_id, project_id2)
+    conn.commit()
+
+    # Check that the pipeline's project_id is updated
+    new_project_id = db_utils.get_project_id_by_pipeline(cur, pipeline_id=pipeline_id)
+    assert new_project_id == project_id2, "Pipeline project_id was not updated."
+
+    # Check that all pipeline relations are removed
+    parents = db_utils.get_pipeline_parents(cur, pipeline_id)
+    assert not parents, "Pipeline parent relations were not removed."
+
+    # Check error if pipeline does not exist
+    with pytest.raises(ValueError, match="does not exist"):
+        move_pipeline_to_project(cur, "nonexistent_pipeline", project_id2)
+
+    # Check error if pipeline is blocked
+    db_utils.update_pipeline_blocked_status(cur, pipeline_id=pipeline_id, blocked=True)
+    with pytest.raises(ValueError, match="is blocked"):
+        move_pipeline_to_project(cur, pipeline_id, project_id1)

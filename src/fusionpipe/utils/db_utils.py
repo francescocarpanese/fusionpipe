@@ -801,6 +801,15 @@ def remove_pipeline_relation(cur, child_id, parent_id=None):
         cur.execute('DELETE FROM pipeline_relation WHERE child_id = %s', (child_id,))
     return cur.rowcount
 
+def remove_all_pipeline_relation_of_pipeline_id(cur, pipeline_id):
+    """
+    Remove all relations of a pipeline by its ID.
+    :param cur: Database cursor
+    :param pipeline_id: ID of the pipeline to remove relations for
+    :return: Number of rows affected
+    """
+    cur.execute('DELETE FROM pipeline_relation WHERE child_id = %s OR parent_id = %s', (pipeline_id, pipeline_id))
+    return cur.rowcount
 
 def get_pipeline_parents(cur, pipeline_id):
     """
