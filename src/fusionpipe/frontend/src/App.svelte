@@ -2112,6 +2112,13 @@
             projectEdges = e.detail.edges;
           }}
           onLoadPipeline={loadPipeline}
+          onOpenPipelinePanel={(pipelineId) => {
+            // Set currentPipelineId and open the panel
+            currentPipelineId = pipelineId;
+            isHiddenPipelinePanel = false;
+          }}
+          onBlockPipeline={blockCurrentPipeline}
+          onUnblockPipeline={unblockCurrentPipeline}
         />
       </div>
     </div>

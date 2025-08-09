@@ -7,6 +7,9 @@
   export let nodeTypes;
   export let onUpdate: ((event: { detail: { nodes: Node[]; edges: Edge[] } }) => void) | undefined;
   export let onLoadPipeline: (pipelineId: string) => void = () => {};
+  export let onOpenPipelinePanel: (pipelineId: string) => void = () => {};
+  export let onBlockPipeline: (pipelineId: string) => void = () => {};
+  export let onUnblockPipeline: (pipelineId: string) => void = () => {};
 
   let menu: { id: string; top: number; left: number } | null = null;
 
@@ -33,14 +36,18 @@
 
   // Example: handle menu option
   function handleMenuOption(option) {
-    if (option === 'loadPipeline') {
-      if (menu && menu.id) {
+    if (menu && menu.id) {
+      if (option === 'loadPipeline') {
         onLoadPipeline(menu.id);
+      } else if (option === 'openPipelinePanel') {
+        onOpenPipelinePanel(menu.id);
+      } else if (option === 'blockPipeline') {
+        onBlockPipeline(menu.id);
+      } else if (option === 'unblockPipeline') {
+        onUnblockPipeline(menu.id);
       }
-      menu = null;
-    } else {
-      menu = null;
     }
+    menu = null;
   }
 
   // Emit changes to parent
@@ -74,13 +81,19 @@
   {#if menu}
     <div
       class="absolute bg-white border rounded shadow z-50"
-      style="top: {menu.top}px; left: {menu.left}px; min-width: 160px;"
+      style="top: {menu.top}px; left: {menu.left}px; min-width: 180px;"
     >
       <button
         class="block px-4 py-2 hover:bg-gray-100 w-full text-left"
         on:click={() => handleMenuOption('loadPipeline')}
       >
         Activate Selected Pipeline
+      </button>
+      <button
+        class="block px-4 py-2 hover:bg-gray-100 w-full text-left"
+        on:click={() => handleMenuOption('openPipelinePanel')}
+      >
+        Open Active Pipeline Panel
       </button>
     </div>
   {/if}
