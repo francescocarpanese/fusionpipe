@@ -476,14 +476,13 @@ def add_pipeline_to_project_route(payload: dict, db_conn=Depends(get_db)):
         raise HTTPException(status_code=400, detail="Missing project_id or pipeline_id")
     cur = db_conn.cursor()
     try:
-        rows_affected = db_utils.add_project_to_pipeline(cur, project_id, pipeline_id)
+        pip_utils.move_pipeline_to_project(cur, pipeline_id, project_id)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     return {
         "message": f"Pipeline {pipeline_id} added to project {project_id}",
-        "rows_affected": rows_affected
     }
 
 @router.get("/get_pipelines_in_project/{project_id}")

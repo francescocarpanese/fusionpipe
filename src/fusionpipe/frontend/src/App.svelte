@@ -601,6 +601,8 @@
       return;
     }
 
+    const selectedPipelineId = projectNodes.find((node) => node.selected);
+
     const pipelineId =
       typeof currentPipelineId === "string"
         ? currentPipelineId
@@ -610,6 +612,14 @@
       alert("No Active pipeline found");
       return;
     }
+
+    // Check if selected pipeline is different from active pipeline
+    const selectedPipeline = projectNodes.find((node) => node.selected);
+    if (selectedPipeline && selectedPipeline.id !== pipelineId) {
+      alert("Selected pipeline is different from the active pipeline. Please activate the desired pipeline before moving.");
+      return;
+    }
+
     try {
       let projectId;
       if (radiostate_projects === 1) {
