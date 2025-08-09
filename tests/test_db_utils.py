@@ -1681,7 +1681,8 @@ def test_is_pipeline_blocked(pg_test_db):
     is_blocked = db_utils.is_pipeline_blocked(cur, pipeline_id)
     assert is_blocked is False, f"Expected pipeline {pipeline_id} to be non-blocked when it has at least one referenced node."
 
-    raise RuntimeError("This is a remainder error to make the test fail intentionally. The logic for the blocking needs to be updated")
+    raise RuntimeError("This is a remainder error to make the test fail intentionally." \
+    "The logic for the blocking needs to be updated. Need to check that some operation are forbidden when node is blocked")
 
 def test_get_node_blocked_status(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id

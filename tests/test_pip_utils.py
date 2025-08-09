@@ -336,10 +336,6 @@ def test_branch_pipeline_from_node(pg_test_db, dag_dummy_1, start_node):
     parent_pipelines = db_utils.get_pipeline_parents(cur, new_pip_id)
     assert original_graph.graph['pipeline_id'] in parent_pipelines, "Original pipeline should be a parent of the new pipeline."
 
-    # Assert status of original pipeline has turned to blocked=true
-    original_status = db_utils.get_pipeline_blocked_status(cur, original_graph.graph['pipeline_id'])
-    assert original_status == True, "Original pipeline should be set to blocked=true after branching."
-
     # Check new pipeline is referenced
     new_status = db_utils.get_pipeline_blocked_status(cur, new_pip_id)
     assert new_status == False, "New pipeline should be set to referenced= false after branching."

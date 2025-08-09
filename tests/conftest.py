@@ -217,7 +217,7 @@ def dag_detach_2():
     return G
 
 
-def rm_folder(folder_path):
+def rm_subfolders(folder_path):
     if os.path.exists(folder_path):
         # Remove all contents but keep the folder itself
         for filename in os.listdir(folder_path):
@@ -253,14 +253,14 @@ def remove_folder_starting_with(folder_path, prefix):
                     pass  # Ignore errors
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope='session')
 def cleanup_pytest_carpanes():
     yield
     folder = "/tmp/pytest-of-carpanes"
-    rm_folder(folder)
+    rm_subfolders(folder)
 
     folder = "/tmp/ray"
-    rm_folder(folder)
+    rm_subfolders(folder)
 
     remove_files_starting_with('/tmp', "uv-")
     remove_folder_starting_with('/tmp', "tmp")
