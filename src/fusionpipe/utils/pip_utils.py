@@ -574,7 +574,6 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
     - All nodes are preserved, except the specified node and all its descendants,
       for which new nodes are created (with new IDs).
     """
-    from fusionpipe.utils import db_utils
 
     # Get the original graph from the database
     original_graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
@@ -622,6 +621,9 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
     return new_pip_id
 
 def delete_node_from_pipeline_with_referenced_logic(cur,pipeline_id, node_id):
+    if db_utils.get_pipeline_blocked_status(cur, pipeline_id=pipeline_id):
+        raise ValueError(f"Pipeline {pipeline_id} is blocked and cannot delete node {node_id}.")
+
     if db_utils.get_node_blocked_status(cur, node_id=node_id):
         raise ValueError(f"Node {node_id} is blocked and cannot be deleted.")
 
@@ -836,6 +838,9 @@ def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_p
 
     id_map: a dictionary mapping old node ids to new node ids
     """
+    if (source_pipeline_id == target_pipeline_id) and (db_utils.get_pipeline_blocked_status(cur, pipeline_id=source_pipeline_id)):
+        raise ValueError(f"Pipeline {source_pipeline_id} is blocked. Duplicate the node into this pipeline.")
+
     if isinstance(source_node_ids, str):
         source_node_ids = [source_node_ids]
     # Get the pipeline graph
@@ -942,6 +947,9 @@ def update_stale_status_for_pipeline_nodes(cur, pipeline_id):
                     G.nodes[node_id]["status"] = NodeState.STALEDATA.value
 
 def delete_edge_and_update_status(cur, pipeline_id, parent_id, child_id):
+    if db_utils.get_pipeline_blocked_status(cur, pipeline_id=pipeline_id):
+        raise ValueError(f"Pipeline {pipeline_id} is blocked. Cannot delete edge.")
+
     # Check if the child node is referenced
     if db_utils.get_node_referenced_status(cur, node_id=child_id):
         raise ValueError(f"Child node {child_id} is referenced. You cannot delete edges from it. Consider duplicating the node if you want to branch the pipeline.")
@@ -1062,6 +1070,8 @@ def detach_subgraph_from_node(cur, pipeline_id, node_id):
 
     Return map of detached nodes
     """
+    if db_utils.get_node_blocked_status(cur, node_id=node_id):
+        raise ValueError(f"Node {node_id} is blocked and cannot be detached.")
 
     # Get the pipeline graph
     graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
@@ -1261,6 +1271,10 @@ def branch_pipeline(cur, original_pipeline_id, withdata=False):
     return new_pip_id
 
 def create_node_in_pipeline(cur, pipeline_id):
+    if db_utils.get_pipeline_blocked_status(cur, pipeline_id=pipeline_id):
+        # If the pipeline is blocked, we cannot create a new node
+        raise ValueError(f"Pipeline {pipeline_id} is blocked. Cannot create a new node.")
+
     node_id = generate_node_id()
     folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"),node_id)
     db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path_nodes)

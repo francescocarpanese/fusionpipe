@@ -2022,7 +2022,7 @@
             <DropdownItem onclick={() => (isHiddenPipelinePanel = false)}
               >Open selected pipeline panel</DropdownItem
             >
-            <DropdownItem onclick={createPipeline}>Create Pipeline</DropdownItem
+            <DropdownItem onclick={createPipeline}>Create new pipeline</DropdownItem
             >
             <DropdownItem onclick={blockCurrentPipeline}>Block active pipeline</DropdownItem
               >
@@ -2120,7 +2120,7 @@
             <DropdownItem onclick={copySelectedNodeFolderPathToClipboard}>
               Copy selected node path to clipboard
             </DropdownItem>
-            <DropdownItem onclick={addNode}>Create node</DropdownItem>
+            <DropdownItem onclick={addNode}>Create new node</DropdownItem>
             <DropdownItem onclick={branchPipelineFromNode}
               >Branch Pipeline from selected node</DropdownItem
             >

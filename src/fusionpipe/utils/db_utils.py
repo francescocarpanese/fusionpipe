@@ -412,6 +412,8 @@ def remove_pipeline_from_pipeline(cur, pipeline_id):
     cur.execute('DELETE FROM pipelines WHERE pipeline_id = %s', (pipeline_id,))
 
 def remove_pipeline_from_everywhere(cur, pipeline_id):
+    if get_pipeline_blocked_status(cur, pipeline_id=pipeline_id):
+        raise ValueError(f"Pipeline {pipeline_id} is blocked. Cannot remove pipeline.")
     # Remove the pipeline from all tables
     cur.execute('DELETE FROM node_pipeline_relation WHERE pipeline_id = %s', (pipeline_id,))
     cur.execute('DELETE FROM pipeline_relation WHERE child_id = %s OR parent_id = %s', (pipeline_id, pipeline_id))
