@@ -1665,7 +1665,9 @@
       }
 
       alert(`Pipeline ${pipelineId} and all its nodes blocked successfully.`);
+      await loadProject(currentProjectId);
       await loadPipeline(pipelineId);
+
     } catch (error) {
       console.error("Error blocking pipeline:", error);
       alert("Failed to block pipeline.");
@@ -1695,6 +1697,7 @@
       }
 
       alert(`Pipeline ${pipelineId} and all its nodes unblocked successfully.`);
+      await loadProject(currentProjectId);
       await loadPipeline(pipelineId);
     } catch (error) {
       console.error("Error unblocking pipeline:", error);
