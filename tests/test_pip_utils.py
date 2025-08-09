@@ -871,9 +871,10 @@ def test_merge_pipelines(pg_test_db):
     pipeline_id2 = generate_pip_id()
     node_ids1 = [generate_node_id() for _ in range(2)]
     node_ids2 = [generate_node_id() for _ in range(2)]
+    db_utils.add_project(cur, project_id="p1")
 
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1)
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1, project_id="p1")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2, project_id="p1")
     for node_id in node_ids1:
         db_utils.add_node_to_nodes(cur, node_id=node_id)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id1)
@@ -896,6 +897,11 @@ def test_merge_pipelines(pg_test_db):
     # The merged pipeline should be a new pipeline
     assert merged_pipeline_id not in [pipeline_id1, pipeline_id2]
 
+    # Check that the merged pipeline is a child of the original pipelines
+    parent_pipelines = db_utils.get_pipeline_parents(cur, merged_pipeline_id)
+    assert pipeline_id1 in parent_pipelines, "Merged pipeline should have pipeline_id1 as a parent."
+    assert pipeline_id2 in parent_pipelines, "Merged pipeline should have pipeline_id2 as a parent."
+
 
 def test_merge_pipelines_with_duplicate_nodes(pg_test_db):
     """
@@ -915,9 +921,10 @@ def test_merge_pipelines_with_duplicate_nodes(pg_test_db):
     common_node_id = generate_node_id()
     unique_node_id1 = generate_node_id()
     unique_node_id2 = generate_node_id()
+    db_utils.add_project(cur, project_id="p1")
 
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1)
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1, project_id="p1")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2, project_id="p1")
 
     # Add nodes to the first pipeline
     db_utils.add_node_to_nodes(cur, node_id=common_node_id)

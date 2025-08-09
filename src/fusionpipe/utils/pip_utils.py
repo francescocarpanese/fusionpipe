@@ -1006,8 +1006,20 @@ def merge_pipelines(cur, source_pipeline_ids):
     """
     # Generate a new pipeline ID
     target_pipeline_id = generate_pip_id()
+
+    # Get project of original pipelines
+    original_projects = set()
+    for source_pipeline_id in source_pipeline_ids:
+        project_id = db_utils.get_project_id_by_pipeline(cur, pipeline_id=source_pipeline_id)
+        if project_id:
+            original_projects.add(project_id)
+
+    # Check that the project ids are all the same
+    if len(original_projects) != 1:
+        raise ValueError(f"Cannot merge pipelines from different projects: {original_projects}")
+
     # Create the new pipeline in the database
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=target_pipeline_id, tag=target_pipeline_id)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=target_pipeline_id, tag=target_pipeline_id, project_id=original_projects.pop())
 
     # Keep track of already duplicated nodes
     duplicated_nodes = set()
@@ -1021,6 +1033,9 @@ def merge_pipelines(cur, source_pipeline_ids):
                 db_utils.duplicate_node_pipeline_relation(cur, source_pipeline_id, node_id, target_pipeline_id)
         duplicated_nodes.update(node_ids)
 
+    # Add pipeline relation for the new pipeline
+    for source_pipeline_id in source_pipeline_ids:
+        db_utils.add_pipeline_relation(cur, child_id=target_pipeline_id, parent_id=source_pipeline_id)
 
     return target_pipeline_id
 
