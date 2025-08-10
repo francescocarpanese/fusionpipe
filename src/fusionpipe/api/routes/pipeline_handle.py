@@ -219,6 +219,8 @@ def update_pipeline_tag(pipeline_id: str, payload: dict, db_conn=Depends(get_db)
     tag = payload.get("tag")
     if tag is None:
         raise HTTPException(status_code=400, detail="Missing tag")
+    if db_utils.get_pipeline_blocked_status(cur, pipeline_id=pipeline_id):
+        raise HTTPException(status_code=403, detail="Pipeline is blocked")
     try:
         db_utils.update_pipeline_tag(cur, pipeline_id=pipeline_id, tag=tag)
         db_conn.commit()
@@ -262,6 +264,8 @@ def update_pipeline_notes(pipeline_id: str, payload: dict, db_conn=Depends(get_d
     notes = payload.get("notes")
     if notes is None:
         raise HTTPException(status_code=400, detail="Missing notes")
+    if db_utils.get_pipeline_blocked_status(cur, pipeline_id=pipeline_id):
+        raise HTTPException(status_code=403, detail="Pipeline is blocked")
     try:
         db_utils.update_pipeline_notes(cur, pipeline_id=pipeline_id, notes=notes)
         db_conn.commit()
