@@ -41,8 +41,11 @@ def print_node_parents():
  
 
 def save_dummy_output():
-
-    data_folder_path = get_current_node_folder_path()
+    """
+    Example retrieving the folder path of the current node and saving a dummy output file.
+    This is an example on how you can save output data of your node.
+    """
+    node_folder_path = get_current_node_folder_path()
     output_path = os.path.join(get_current_node_folder_path_data(), 'dummy.txt') # Get the data folder path for the current node
     with open(output_path, "w") as f:
         f.write("This is a dummy output file for the fusionpipe template.\n")
