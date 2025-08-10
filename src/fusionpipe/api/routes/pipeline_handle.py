@@ -187,6 +187,8 @@ def update_node_tag(pipeline_id: str, node_id: str, payload: dict, db_conn=Depen
     node_tag = payload.get("node_tag")
     if node_tag is None:
         raise HTTPException(status_code=400, detail="Missing node_tag")
+    if db_utils.get_node_blocked_status(cur, node_id=node_id):
+        raise HTTPException(status_code=403, detail="Node is blocked")
     try:
         db_utils.update_node_tag(cur, node_id=node_id, node_tag=node_tag)
         db_conn.commit()
@@ -201,6 +203,8 @@ def update_node_notes(pipeline_id: str, node_id: str, payload: dict, db_conn=Dep
     notes = payload.get("notes")
     if notes is None:
         raise HTTPException(status_code=400, detail="Missing notes")
+    if db_utils.get_node_blocked_status(cur, node_id=node_id):
+        raise HTTPException(status_code=403, detail="Node is blocked")    
     try:
         db_utils.update_node_notes(cur, node_id=node_id, notes=notes)
         db_conn.commit()
@@ -298,6 +302,8 @@ def update_node_status(node_id: str, payload: dict, db_conn=Depends(get_db)):
     status = payload.get("status")
     if status is None:
         raise HTTPException(status_code=400, detail="Missing status")
+    if db_utils.get_node_blocked_status(cur, node_id=node_id):
+        raise HTTPException(status_code=403, detail="Node is blocked")    
     try:
         db_utils.update_node_status(cur, node_id=node_id, status=status)
         db_conn.commit()
@@ -541,6 +547,8 @@ def update_node_parameters_yaml(node_id: str, payload: dict, db_conn=Depends(get
     cur = db_conn.cursor()
     folder_path = None
     try:
+        if db_utils.get_node_blocked_status(cur, node_id=node_id):
+            raise HTTPException(status_code=403, detail="Node is blocked")
         folder_path = db_utils.get_node_folder_path(cur, node_id=node_id)
         if not folder_path:
             raise HTTPException(status_code=404, detail="Node folder path not found")
