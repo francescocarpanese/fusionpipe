@@ -818,6 +818,19 @@
       return;
     }
 
+    const selectedPipelineNodes = projectNodes.filter((node) => node.selected);
+    if (selectedPipelineNodes.length > 1) {
+      alert("Please select only one pipeline to delete.");
+      return;
+    }
+    if (
+      selectedPipelineNodes.length === 1 &&
+      selectedPipelineNodes[0].id !== currentPipelineId
+    ) {
+      alert("Selected pipeline does not match the active pipeline. Please activate the desired pipeline before deleting.");
+      return;
+    }
+
     const pipelineId =
       typeof currentPipelineId === "string"
         ? currentPipelineId
@@ -2108,7 +2121,7 @@
             <DropdownItem   class="text-yellow-600" onclick={unblockCurrentPipeline}>Unblock Active pipeline</DropdownItem
               >              
             <DropdownItem class="text-red-600" onclick={deleteSelectedPipeline}
-              >Delete Pipeline</DropdownItem
+              >Delete Active Pipeline</DropdownItem
             >
           </Dropdown>
         </NavUl>
