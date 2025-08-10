@@ -62,6 +62,7 @@
   fitView
   {nodeTypes}
   style="height: 100%;"
+  nodesConnectable={false}
   onnodeclick={(e) => {
     nodes = nodes.map(node =>
       node.id === e.node.id
