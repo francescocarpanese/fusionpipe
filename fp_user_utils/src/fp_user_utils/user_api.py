@@ -14,7 +14,7 @@ def connect_to_db(db_url=os.environ.get("DATABASE_URL")):
     conn = psycopg2.connect(db_url)
     return conn
 
-def get_node_parents_db(cur, node_id):
+def get_node_parents_and_edge_ids(cur, node_id):
     """
     Retrieve the parent node IDs for a given node from the database.
 
@@ -25,8 +25,8 @@ def get_node_parents_db(cur, node_id):
     Returns:
         list: A list of parent node IDs.
     """
-    cur.execute('SELECT parent_id FROM node_relation WHERE child_id = %s', (node_id,))
-    return [row[0] for row in cur.fetchall()]
+    cur.execute('SELECT parent_id, edge_id FROM node_relation WHERE child_id = %s', (node_id,))
+    return {row[0]: row[1] for row in cur.fetchall()}
 
 def get_node_folder_path_db(cur, node_id):
     """
@@ -144,7 +144,6 @@ def get_current_node_folder_path_reports():
     
     return reports_folder_path
 
-
 def get_info_parents(node_id):
     """
     Get the parents' information for a given node ID.
@@ -153,26 +152,58 @@ def get_info_parents(node_id):
         node_id (str): The node ID whose parents' information is to be fetched.
 
     Returns:
-        list: A list of dictionaries containing parent node information with keys:
-                'node_id', 'node_tag', 'folder_path'.
+        list: A list of dictionaries containing parent node information with keys
+        {
+            'node_id': identifier of the parent node.
+            'node_tag': tag of the parent node.
+            'folder_path': the path of the parent node
+            'edge_id': the identified of edge which connect the parent with the node_id.
+        }
     """
     conn = connect_to_db()
     cur = conn.cursor()
 
     parents_info = []
-    parent_ids = get_node_parents_db(cur, node_id)
+    parent_dict = get_node_parents_and_edge_ids(cur, node_id)
 
-    for parent_id in parent_ids:
+    for parent_id, edge_id in parent_dict.items():
         cur.execute('SELECT node_tag, folder_path FROM nodes WHERE node_id = %s', (parent_id,))
         row = cur.fetchone()
         if row:
             parents_info.append({
                 'node_id': parent_id,
                 'node_tag': row[0],
-                'folder_path': row[1]
+                'folder_path': row[1],
+                'edge_id': edge_id
             })
 
     cur.close()
     conn.close()
 
     return parents_info
+
+def get_parent_info_from_edge_id(edge_id):
+    """
+    Return a dictionary containing the info of the parent connected with the current node by the edge with edge_id.
+    The dictionary contains the following structure:
+    {
+        'node_id': <parent_node_id>,
+        'node_tag': <parent_node_tag>,
+        'folder_path': <parent_folder_path>,
+        'edge_id': <edge_id>
+    }
+    """
+    node_id = get_current_node_id()
+    info_parent = get_info_parents(node_id)
+    for parent in info_parent:
+        if parent['edge_id'] == edge_id:
+            return parent
+
+def get_parent_folder_path_from_edge_id(edge_id):
+    """
+    Return the folder path of the parent connected with the current node by the edge with edge_id.
+    """
+    parent_info = get_parent_info_from_edge_id(edge_id)
+    if parent_info:
+        return parent_info['folder_path']
+   
