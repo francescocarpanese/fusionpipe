@@ -545,13 +545,12 @@
         : currentPipelineId.value;
 
     if (!pipelineId) {
-      console.error("No pipeline selected");
+       alert("No active pipeline");
       return;
     }
 
     if (!currentTargetPipelineId) {
-      console.error("No target pipeline selected");
-      alert("Please select a target pipeline to duplicate nodes into.");
+      alert("No target pipeline selected");
       return;
     }
 
@@ -787,6 +786,7 @@
       const data = await response.json();
       const newPipelineId = data.pipeline_id || data.id || data.pip_id;
       await fetchPipelines();
+      await setPipelineDropdownList();
       currentPipelineId = newPipelineId;
       await loadPipeline(newPipelineId);
     } catch (error) {
