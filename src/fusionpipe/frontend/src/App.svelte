@@ -836,14 +836,15 @@
         ? currentPipelineId
         : currentPipelineId.value;
 
-      // Ask the user to type the pipeline id to confirm deletion
+      // Ask the user to type the last 4 characters of the pipeline id to confirm deletion
+      const last4 = pipelineId.slice(-4);
       const userInput = prompt(
-        `To confirm deletion, please type the pipeline id exactly:\n${pipelineId}`
+        `You want to delete pipeline "${pipelineId}". To confirm deletion, please type the last 4 characters of the pipeline id:\n${last4}`
       );
       if (userInput === null) return; // User cancelled
 
-      if (userInput !== pipelineId) {
-        alert("Pipeline id does not match. Deletion cancelled.");
+      if (userInput !== last4) {
+        alert("Input does not match the last 4 characters. Deletion cancelled.");
         return;
       }
 
