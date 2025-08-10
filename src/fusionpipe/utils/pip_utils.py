@@ -1272,17 +1272,9 @@ def duplicate_pipeline(cur, pipeline_id,  withdata=False):
     return new_pip_id
 
 def branch_pipeline(cur, original_pipeline_id, withdata=False):
-
     # Duplicate the pipeline 
     new_pip_id = duplicate_pipeline(cur, pipeline_id=original_pipeline_id, withdata=withdata)
-
-    get_parents_original_pipeline = db_utils.get_pipeline_parents(cur, pipeline_id=original_pipeline_id)
-
-    # If the original pipeline has parents, add the new pipeline as a child of the parents
-    if get_parents_original_pipeline:
-        for parent_id in get_parents_original_pipeline:
-            db_utils.add_pipeline_relation(cur, child_id=new_pip_id, parent_id=parent_id)
-
+    db_utils.add_pipeline_relation(cur, child_id=new_pip_id, parent_id=original_pipeline_id)
     return new_pip_id
 
 def create_node_in_pipeline(cur, pipeline_id):
