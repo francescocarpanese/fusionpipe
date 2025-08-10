@@ -244,6 +244,7 @@ def pipeline_graph_to_dict(graph):
         parents = list(graph.predecessors(node))
         pipeline_data['nodes'][node] = {
             'parents': parents,
+            'parent_edge_ids': {parent: graph.edges[parent, node].get('edge_id') for parent in parents},  # Edge IDs for each parent
             'status': graph.nodes[node].get('status', 'null'),  # Default status is 'null'
             'referenced': graph.nodes[node].get('referenced', False),  # Default referenced is True
             'tag': graph.nodes[node].get('tag', None),  # Optional tag for the node
@@ -344,7 +345,7 @@ def pipeline_graph_to_db(Gnx, cur):
     for node in Gnx.nodes:
         for parent in Gnx.predecessors(node):
             if not db_utils.check_node_relation_exists(cur, child_id=node, parent_id=parent):
-                db_utils.add_node_relation(cur, child_id=node, parent_id=parent)
+                connect_node(cur, child_id=node, parent_id=parent)
 
 
 def project_graph_to_db(Gnx, cur):
@@ -422,7 +423,8 @@ def db_to_pipeline_graph_from_pip_id(cur, pip_id):
 
         # Add edges based on parent relationships
         for parent_id in db_utils.get_node_parents(cur, node_id=node_id):
-            G.add_edge(parent_id, node_id)
+            edge_id = db_utils.get_node_relation_edge_id(cur, child_id=node_id, parent_id=parent_id)
+            G.add_edge(parent_id, node_id, edge_id=edge_id)  # Add edge with edge_id as an attribute
     
         # Add node tag if it exists
         tag = db_utils.get_node_tag(cur, node_id=node_id)
@@ -861,7 +863,7 @@ def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_p
             cur, source_pipeline_id,target_pipeline_id, old_id, new_id, parents=False, childrens=False, withdata=withdata)
     # Set parent-child relations in the duplicated subtree
     for old_parent, old_child in subtree.edges:
-        db_utils.add_node_relation(
+        connect_node(
             cur,
             child_id=id_map[old_child],
             parent_id=id_map[old_parent]
@@ -875,7 +877,7 @@ def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_p
         for parent in graph.predecessors(old_head):
             if parent not in subtree_nodes:
                 # Attach the new head node to the parent in the target pipeline
-                db_utils.add_node_relation(
+                connect_node(
                     cur,
                     child_id=new_head,
                     parent_id=parent
@@ -989,7 +991,7 @@ def add_node_relation_safe(cur, pipeline_id, parent_id, child_id):
         db_utils.update_node_status(cur, node_id=child_id, status=NodeState.STALEDATA.value)
 
     # Add the relation
-    db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
+    connect_node(cur, child_id=child_id, parent_id=parent_id)
 
     # Refresh the status of the child node in the pipeline after adding the relation
     update_stale_status_for_pipeline_nodes(cur, pipeline_id)
@@ -1124,7 +1126,7 @@ def detach_subgraph_from_node(cur, pipeline_id, node_id):
         new_parents = [id_map[parent] for parent in parents]
         for new_parent in new_parents:
             # Add the relation to the new node
-            db_utils.add_node_relation(cur, child_id=node, parent_id=new_parent)
+            connect_node(cur, child_id=node, parent_id=new_parent)
     
     return id_map
 
@@ -1311,3 +1313,23 @@ def move_pipeline_to_project(cur, pipeline_id, project_id):
 
     # Remove the relations of that pipeline
     db_utils.remove_all_pipeline_relation_of_pipeline_id(cur, pipeline_id=pipeline_id)
+
+def generate_edge_id(cur, child_node_id):
+    """
+    Generate a new 2-digit integer edge ID for a given child node.
+    Finds the maximum existing edge ID for the child and returns max + 1.
+    """
+    existing_edge_ids = db_utils.get_edge_id_of_all_node_parents(cur, child_id=child_node_id)
+    # Filter out None and ensure integer conversion
+    edge_ids = [int(eid) for eid in existing_edge_ids if eid is not None]
+    if edge_ids:
+        new_edge_id = max(edge_ids) + 1
+    else:
+        new_edge_id = 1
+    # Ensure it's a 2-digit integer (01, 02, ..., 99)
+    return f"{new_edge_id:02d}"
+
+def connect_node(cur, child_id, parent_id):
+    edge_id = generate_edge_id(cur, child_node_id=child_id)
+    db_utils.add_node_relation(cur, child_id, parent_id, edge_id)
+    return edge_id

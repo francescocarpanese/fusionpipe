@@ -145,15 +145,16 @@ def test_add_node_relation(pg_test_db):
     db_utils.add_node_to_nodes(cur, node_id=parent_id)
 
     # Add relation
-    db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
+    db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id, edge_id=f"000")
     conn.commit()
 
     # Check that only one relation exists and it matches the inserted values
-    cur.execute("SELECT child_id, parent_id FROM node_relation")
+    cur.execute("SELECT child_id, parent_id, edge_id FROM node_relation")
     results = cur.fetchall()
     assert len(results) == 1, f"Expected only one relation, found {len(results)}"
     assert results[0][0] == child_id, "Child ID in node relation does not match."
     assert results[0][1] == parent_id, "Parent ID in node relation does not match."
+    assert results[0][2] == "000", "Edge ID in node relation does not match."
 
 def test_get_node_parents(pg_test_db):
     from fusionpipe.utils.pip_utils import generate_node_id
@@ -171,7 +172,7 @@ def test_get_node_parents(pg_test_db):
     db_utils.add_node_to_nodes(cur, node_id=node3)
 
     # Add relation: node1 is parent of node2
-    db_utils.add_node_relation(cur, child_id=node2, parent_id=node1)
+    db_utils.add_node_relation(cur, child_id=node2, parent_id=node1, edge_id="000")
     conn.commit()
 
     # node2 should have node1 as parent
@@ -312,7 +313,7 @@ def test_remove_node_from_relations(pg_test_db):
     db_utils.add_node_to_nodes(cur, node_id=child_id)
 
     # Add relation
-    db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
+    db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id, edge_id="000")
     conn.commit()
 
     # Remove the relation
@@ -344,7 +345,7 @@ def test_remove_node_from_everywhere(pg_test_db):
     # Add a relation involving the node
     parent_id = generate_node_id()
     db_utils.add_node_to_nodes(cur, node_id=parent_id)
-    db_utils.add_node_relation(cur, child_id=node_id, parent_id=parent_id)
+    db_utils.add_node_relation(cur, child_id=node_id, parent_id=parent_id, edge_id="000")
     conn.commit()
 
     # Remove the node from everywhere
@@ -440,7 +441,7 @@ def test_get_rows_with_node_id_relations(pg_test_db):
     child_id = generate_node_id()
     db_utils.add_node_to_nodes(cur, node_id=parent_id)
     db_utils.add_node_to_nodes(cur, node_id=child_id)
-    db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id)
+    db_utils.add_node_relation(cur, child_id=child_id, parent_id=parent_id, edge_id="000")
     conn.commit()
 
     # Get rows with the child node ID in relations
@@ -593,7 +594,7 @@ def test_dupicate_node_in_pipeline_full_coverage(pg_test_db):
     db_utils.add_node_to_nodes(cur, node_id=other_node_id)
 
     # Add a relation: original_node_id is child, other_node_id is parent
-    db_utils.add_node_relation(cur, child_id=original_node_id, parent_id=other_node_id)
+    db_utils.add_node_relation(cur, child_id=original_node_id, parent_id=other_node_id, edge_id="01")
 
     # Create a pipeline and add an entry connecting the pipeline to the node
     pipeline_id = generate_pip_id()
@@ -644,12 +645,12 @@ def test_copy_node_relations(pg_test_db, parents, childrens):
         db_utils.add_node_to_nodes(cur, node_id=node_id)
 
     # Add parent relations (source_node_id is child of parent1 and parent2)
-    db_utils.add_node_relation(cur, child_id=source_node_id, parent_id=parent1_id)
-    db_utils.add_node_relation(cur, child_id=source_node_id, parent_id=parent2_id)
+    db_utils.add_node_relation(cur, child_id=source_node_id, parent_id=parent1_id, edge_id='01')
+    db_utils.add_node_relation(cur, child_id=source_node_id, parent_id=parent2_id, edge_id='02')
 
     # Add child relations (child1 and child2 are children of source_node_id)
-    db_utils.add_node_relation(cur, child_id=child1_id, parent_id=source_node_id)
-    db_utils.add_node_relation(cur, child_id=child2_id, parent_id=source_node_id)
+    db_utils.add_node_relation(cur, child_id=child1_id, parent_id=source_node_id, edge_id='01')
+    db_utils.add_node_relation(cur, child_id=child2_id, parent_id=source_node_id, edge_id='02')
     conn.commit()
 
     # Copy relations from source_node_id to new_node_id
@@ -658,20 +659,28 @@ def test_copy_node_relations(pg_test_db, parents, childrens):
 
     if parents:
         # Check parent relations for new_node_id (should match source_node_id's parents)
-        cur.execute("SELECT parent_id FROM node_relation WHERE child_id=%s", (new_node_id,))
+        cur.execute("SELECT parent_id, edge_id FROM node_relation WHERE child_id=%s", (new_node_id,))
         parent_rows = cur.fetchall()
         parent_ids = {row[0] for row in parent_rows}
+        edge_ids = {row[1] for row in parent_rows}
         assert parent1_id in parent_ids and parent2_id in parent_ids, \
             f"Parent relations not copied correctly: {parent_ids}"
-        
+        # Check edge_ids match expected
+        expected_edge_ids = {'01', '02'}
+        assert edge_ids == expected_edge_ids, f"Parent edge_ids not copied correctly: {edge_ids}"
+
     if childrens:
         # Check child relations for new_node_id (should match source_node_id's children)
-        cur.execute("SELECT child_id FROM node_relation WHERE parent_id=%s", (new_node_id,))
+        cur.execute("SELECT child_id, edge_id FROM node_relation WHERE parent_id=%s", (new_node_id,))
         child_rows = cur.fetchall()
         child_ids = {row[0] for row in child_rows}
+        edge_ids = {row[1] for row in child_rows}
         assert child1_id in child_ids and child2_id in child_ids, \
             f"Child relations not copied correctly: {child_ids}"
-
+        # Check edge_ids match expected
+        expected_edge_ids = {'01', '02'}
+        assert edge_ids == expected_edge_ids, f"Child edge_ids not copied correctly: {edge_ids}"
+   
 
 
 def test_duplicate_node_in_pipeline_with_relations(pg_test_db):
@@ -692,8 +701,8 @@ def test_duplicate_node_in_pipeline_with_relations(pg_test_db):
         db_utils.add_node_to_nodes(cur, node_id=node_id)
 
     # Add parent and child relations for the source node
-    db_utils.add_node_relation(cur, child_id=source_node_id, parent_id=parent_id)
-    db_utils.add_node_relation(cur, child_id=child_id, parent_id=source_node_id)
+    db_utils.add_node_relation(cur, child_id=source_node_id, parent_id=parent_id, edge_id='01')
+    db_utils.add_node_relation(cur, child_id=child_id, parent_id=source_node_id, edge_id='01')
     conn.commit()
 
     # Create a pipeline and add an entry connecting the pipeline to the source node
@@ -1007,13 +1016,13 @@ def test_sanitize_node_relation(pg_test_db):
 
     # Add relations:
     # node1 -> node2 (both in pipeline, should remain)
-    db_utils.add_node_relation(cur, child_id=node2, parent_id=node1)
+    db_utils.add_node_relation(cur, child_id=node2, parent_id=node1, edge_id="01")
     # node3 -> node4 (neither in pipeline, should remain untouched)
-    db_utils.add_node_relation(cur, child_id=node4, parent_id=node3)
+    db_utils.add_node_relation(cur, child_id=node4, parent_id=node3, edge_id="01")
     # node5 -> node6 (not in pipeline,  referenced, should be remain)
-    db_utils.add_node_relation(cur, child_id=node6, parent_id=node5)
+    db_utils.add_node_relation(cur, child_id=node6, parent_id=node5, edge_id="01")
     # node5 -> node7 (parents are  referenced and not in pipeline)
-    db_utils.add_node_relation(cur, child_id=node7, parent_id=node5)
+    db_utils.add_node_relation(cur, child_id=node7, parent_id=node5, edge_id="01")
 
     conn.commit()
 
@@ -1212,7 +1221,7 @@ def test_clear_all_tables(pg_test_db):
     db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline")
     db_utils.add_node_to_nodes(cur, node_id=node_id)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
-    db_utils.add_node_relation(cur, child_id=node_id, parent_id=node_id)
+    db_utils.add_node_relation(cur, child_id=node_id, parent_id=node_id, edge_id="01")
     conn.commit()
 
     # Call clear_all_tables
@@ -1808,3 +1817,61 @@ def test_remove_all_pipeline_relation_of_pipeline_id(pg_test_db):
     conn.commit()
     cur.execute("SELECT * FROM pipeline_relation WHERE child_id=%s AND parent_id=%s", (unrelated_child, unrelated_parent))
     assert cur.fetchone() is not None, "Unrelated pipeline relation was incorrectly removed."
+
+def test_get_node_relation_edge_id(pg_test_db):
+    from fusionpipe.utils.pip_utils import generate_node_id
+    import fusionpipe.utils.db_utils as db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Create parent and child nodes
+    parent_id = generate_node_id()
+    child_id = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=parent_id)
+    db_utils.add_node_to_nodes(cur, node_id=child_id)
+
+    # Add a node relation with a specific edge_id
+    edge_id = "edge_123"
+    db_utils.add_node_relation(cur, child_id, parent_id, edge_id)
+    conn.commit()
+
+    # Test: get_node_relation_edge_id returns the correct edge_id
+    result = db_utils.get_node_relation_edge_id(cur, child_id, parent_id)
+    assert result == edge_id, f"Expected edge_id '{edge_id}', got '{result}'"
+
+    # Test: get_node_relation_edge_id returns None for non-existent relation
+    non_existent_child = generate_node_id()
+    non_existent_parent = generate_node_id()
+    result_none = db_utils.get_node_relation_edge_id(cur, non_existent_child, non_existent_parent)
+    assert result_none is None, "Expected None for non-existent node relation"
+
+def test_get_edge_id_of_all_node_parents(pg_test_db):
+    import fusionpipe.utils.db_utils as db_utils
+    from fusionpipe.utils.pip_utils import generate_node_id
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Create child node and multiple parent nodes
+    child_id = generate_node_id()
+    parent_ids = [generate_node_id() for _ in range(3)]
+    edge_ids = [f"edge_{i}" for i in range(3)]
+    db_utils.add_node_to_nodes(cur, node_id=child_id)
+    for pid in parent_ids:
+        db_utils.add_node_to_nodes(cur, node_id=pid)
+    # Add relations with specific edge_ids
+    for pid, eid in zip(parent_ids, edge_ids):
+        db_utils.add_node_relation(cur, child_id, pid, eid)
+    conn.commit()
+
+    # Test: get_edge_id_of_all_node_parents returns all edge_ids for the child
+    result = db_utils.get_edge_id_of_all_node_parents(cur, child_id)
+    assert set(result) == set(edge_ids), f"Expected edge_ids {edge_ids}, got {result}"
+
+    # Test: returns empty list for node with no parents
+    orphan_id = generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=orphan_id)
+    conn.commit()
+    result_empty = db_utils.get_edge_id_of_all_node_parents(cur, orphan_id)
+    assert result_empty == [], f"Expected empty list for node with no parents, got {result_empty}"

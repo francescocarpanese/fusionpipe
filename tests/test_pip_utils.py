@@ -140,7 +140,7 @@ def test_pipeline_graph_to_db_and_db_to_pipeline_graph_roundtrip(pg_test_db, dag
     # Use networkx's is_isomorphic to compare structure and attributes
     def node_match(n1, n2):
         # Compare relevant node attributes
-        for attr in ['status', 'referenced', 'tag', 'notes', 'folder_path', 'blocked']:
+        for attr in ['status', 'referenced', 'tag', 'notes', 'folder_path', 'blocked', 'edge_id']:
             if n1.get(attr) != n2.get(attr):
                 return False
         return True
@@ -635,7 +635,7 @@ def test_delete_node_from_pipeline_with_referenced_logic(monkeypatch, pg_test_db
     db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", referenced=True, notes="child", folder_path=None, node_tag="child")
     db_utils.add_node_to_pipeline(cur, node_id=to_be_deleted_id, pipeline_id=pipeline_id, position_x=2, position_y=2)
     db_utils.add_node_to_pipeline(cur, node_id=child_id, pipeline_id=pipeline_id, position_x=3, position_y=3)
-    db_utils.add_node_relation(cur, child_id=child_id, parent_id=to_be_deleted_id)
+    db_utils.add_node_relation(cur, child_id=child_id, parent_id=to_be_deleted_id, edge_id='01')
     conn.commit()
     # Should raise ValueError because to_be_deleted_id is not a leaf
     import pytest
@@ -1080,7 +1080,7 @@ def test_reference_node_into_pipeline(tmp_base_dir, pg_test_db):
     second_node_id = generate_node_id()
     db_utils.add_node_to_nodes(cur, node_id=second_node_id, status="ready", referenced=False)
     db_utils.add_node_to_pipeline(cur, node_id=second_node_id, pipeline_id=source_pipeline_id)
-    db_utils.add_node_relation(cur, parent_id=node_id, child_id=second_node_id)
+    db_utils.add_node_relation(cur, parent_id=node_id, child_id=second_node_id, edge_id='01')
     conn.commit()
     # Attempt to reference the second, which is not a head of the subgraph
     with pytest.raises(ValueError, match=f"Node {second_node_id} cannot be referenced from pipeline {source_pipeline_id}. It is not a head of a subgraph. Consider duplicating the node with data first."):
@@ -1470,7 +1470,7 @@ def test_branch_pipeline(pg_test_db, dag_dummy_1, tmp_base_dir, monkeypatch):
 
     # Check that the parent pipeline is linked to the new pipeline
     parents_of_new_pipeline = db_utils.get_pipeline_parents(cur, new_pipeline_id)
-    assert parent_pipeline_id in parents_of_new_pipeline, "Parent pipeline should be linked to the new pipeline."
+    assert original_pipeline_id in parents_of_new_pipeline, "Pipeline should be children of the pipeline from which it was branched."
 
     # Check that the node folders were duplicated
     for node_id in dag_dummy_1.nodes:

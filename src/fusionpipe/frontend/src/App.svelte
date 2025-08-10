@@ -11,6 +11,7 @@
     Panel,
     type Node,
     type Edge,
+    type EdgeTypes,    
   } from "@xyflow/svelte";
 
   import ProjectGraph from "./ProjectGraph.svelte";
@@ -19,6 +20,7 @@
   import "@xyflow/svelte/dist/style.css";
   import SvelteSelect from "svelte-select";
   import CustomNode from "./CustomNode.svelte";
+  import CustomNodeProject from "./CustomNodeProject.svelte";
   import { Drawer, Button, CloseButton, Label, Input } from "flowbite-svelte";
   import { ChevronRightOutline } from "flowbite-svelte-icons";
   import {
@@ -32,6 +34,7 @@
   } from "flowbite-svelte";
   import { ChevronDownOutline } from "flowbite-svelte-icons";
   import ContextMenu from "./ContextMenu.svelte";
+  import CustomEdge from './CustomEdge.svelte';
 
   //  --- Variables and state definitions ---
   let nodes = $state<Node[]>([]);
@@ -94,15 +97,18 @@
   let PipelineDropdownList = $state<string[]>([]);
   let projects_dropdown = $state<string[]>([]);
 
-  let nodeTypes = { custom: CustomNode };
+  let nodeTypes = { custom: CustomNode, customProject: CustomNodeProject };
 
   const dagreGraph = new dagre.graphlib.Graph();
 
   let radiostate_pipeline = $state(2); // selector for what to display in pipeline list 1 for ids, 2 for tags
   let radiostate_projects = $state(2); // selector for what to display in projects list 1 for ids, 2 for tags
 
-  // --  Definitions of functions ---
   dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+  const edgeTypes: EdgeTypes = {
+    custom: CustomEdge,
+  };
 
   // Define functions
 
@@ -168,6 +174,9 @@
 
       case "staledata":
         return "#FFFF00";
+
+      case "active":
+        return "#b6dedb";
 
       default:
         return "#FFFFFF";
@@ -996,7 +1005,10 @@
           id: `${parentId}-${id}`,
           source: parentId,
           target: id,
-          blocked: node.blocked || false,
+          data: {
+            label: node.parent_edge_ids?.[parentId] ?? "",
+          },
+          type: "custom",
         })),
       );
 
@@ -1024,7 +1036,7 @@
             data: {
               ...node.data,
             },
-            style: `background: ${getNodeColor("completed")}`,
+            style: `background: ${getNodeColor("active")}`,
           };
         } else {
           return {
@@ -1056,7 +1068,7 @@
 
       const rawNodes = Object.entries(project.nodes).map(([id, node]) => ({
         id,
-        type: "custom",
+        type: "customProject",
         data: {
           line1: `TAG: ${node.tag}`,
           line2: `ID: ${id}`,
@@ -2424,7 +2436,8 @@
       <div class="main-content" bind:clientWidth bind:clientHeight>
         <SvelteFlow
           bind:nodes
-          bind:edges
+          bind:edges 
+          {edgeTypes}
           fitView
           onconnect={handleConnect}
           onnodecontextmenu={handleContextMenu}

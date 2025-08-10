@@ -58,12 +58,25 @@ def dag_dummy_1():
     from fusionpipe.utils.pip_utils import NodeState 
     # Create a simple directed acyclic graph (DAG) for testing
     G = nx.DiGraph()
-    G.add_edges_from([
-        ("A", "B"),
-        ("A", "C"),
-        ("C", "D"),
-    ])
+    G.add_node("A") 
+    G.add_node("B")  
+    G.add_node("C") 
+    G.add_node("D")  
     G.add_node("E")  # Add a node with no edges
+
+    G.add_node("F")  
+    G.add_node("G")  
+    G.add_node("H")  # This node has 2 parents 
+
+    # Graph with 1 edge for each node
+    G.add_edge("A", "B", edge_id="01")
+    G.add_edge("A", "C", edge_id="01")
+    G.add_edge("C", "D", edge_id="01")
+
+    # Graph with 1 edge for each node
+    G.add_edge("F", "H", edge_id="01")
+    G.add_edge("G", "H", edge_id="02")
+
     G.name = "12345"
     G.graph['pipeline_id'] = G.name
     G.graph['project_id'] = "test_project"
@@ -95,9 +108,41 @@ def dag_dummy_1():
             G.nodes[node]['tag'] = 'D'
         elif node == "E":
             G.nodes[node]['status'] = "ready"
-            G.nodes[node]['tag'] = 'E'            
+            G.nodes[node]['tag'] = 'E'
+        elif node == "F":
+            G.nodes[node]['status'] = "ready"
+            G.nodes[node]['tag'] = 'F'
+        elif node == "G":
+            G.nodes[node]['status'] = "ready"
+            G.nodes[node]['tag'] = 'G'
+        elif node == "H":
+            G.nodes[node]['status'] = "ready"
+            G.nodes[node]['tag'] = 'H'                                    
+
     return G
 
+
+@pytest.fixture
+def dict_dummy_1():
+    # Create a simple dictionary for testing identical to dag_dummy_1
+    return {
+        "pipeline_id": "12345",
+        "notes": "A simple test DAG",
+        "tag": "test_tag",
+        "owner": "test_group",
+        "project_id": "test_project",
+        "blocked": False,
+        "nodes": {
+            "A": {"status": "ready", "referenced": False, "tag": 'A', 'notes': 'test notes', 'parents': [], 'parent_edge_ids': {}, 'position': [0, 0], 'folder_path': 'dummy_folder_path_A', 'blocked': True},
+            "B": {"status": "running", "referenced": False, "tag": 'B', 'notes': 'test notes', 'parents': ['A'], 'parent_edge_ids': {'A':'01'}, 'position': [0, 0], 'folder_path': 'dummy_folder_path_B', 'blocked': False},
+            "C": {"status": "completed", "referenced": False, "tag": 'C', 'notes': 'test notes', 'parents': ['A'], 'parent_edge_ids': {'A':'01'}, 'position': [0, 0], 'folder_path': 'dummy_folder_path_C', 'blocked': False},
+            "D": {"status": "staledata", "referenced": False, "tag": 'D', 'notes': 'test notes', 'parents': ['C'], 'parent_edge_ids': {'C':'01'}, 'position': [0, 0], 'folder_path': 'dummy_folder_path_D', 'blocked': False},
+            "E": {"status": "ready", "referenced": False, "tag": 'E', 'notes': 'test notes', 'parents': [], 'parent_edge_ids': {}, 'position': [0, 0,], 'folder_path': 'dummy_folder_path_E', 'blocked': False},
+            "F": {"status": "ready", "referenced": False, "tag": 'F', 'notes': 'test notes', 'parents': [], 'parent_edge_ids': {}, 'position': [0, 0,], 'folder_path': 'dummy_folder_path_F', 'blocked': False},
+            "G": {"status": "ready", "referenced": False, "tag": 'G', 'notes': 'test notes', 'parents': [], 'parent_edge_ids': {}, 'position': [0, 0,], 'folder_path': 'dummy_folder_path_G', 'blocked': False},
+            "H": {"status": "ready", "referenced": False, "tag": 'H', 'notes': 'test notes', 'parents': ['F','G'], 'parent_edge_ids':{'F':'01', 'G':'02'}, 'position': [0, 0,], 'folder_path': 'dummy_folder_path_H', 'blocked': False}
+        }
+    }
 
 @pytest.fixture
 def dag_dummy_project():
@@ -127,25 +172,6 @@ def dag_dummy_project():
 
     return G
 
-
-@pytest.fixture
-def dict_dummy_1():
-    # Create a simple dictionary for testing identical to dag_dummy_1
-    return {
-        "pipeline_id": "12345",
-        "notes": "A simple test DAG",
-        "tag": "test_tag",
-        "owner": "test_group",
-        "project_id": "test_project",
-        "blocked": False,
-        "nodes": {
-            "A": {"status": "ready", "referenced": False, "tag": 'A', 'notes': 'test notes', 'parents': [], 'position': [0, 0], 'folder_path': 'dummy_folder_path_A', 'blocked': True},
-            "B": {"status": "running", "referenced": False, "tag": 'B', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_B', 'blocked': False},
-            "C": {"status": "completed", "referenced": False, "tag": 'C', 'notes': 'test notes', 'parents': ['A'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_C', 'blocked': False},
-            "D": {"status": "staledata", "referenced": False, "tag": 'D', 'notes': 'test notes', 'parents': ['C'], 'position': [0, 0], 'folder_path': 'dummy_folder_path_D', 'blocked': False},
-            "E": {"status": "ready", "referenced": False, "tag": 'E', 'notes': 'test notes', 'parents': [], 'position': [0, 0,], 'folder_path': 'dummy_folder_path_E', 'blocked': False}
-        }
-    }
 
 @pytest.fixture
 def dict_dummy_project():

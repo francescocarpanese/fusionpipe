@@ -111,6 +111,7 @@ def init_db(conn):
             id SERIAL PRIMARY KEY,
             child_id TEXT,
             parent_id TEXT,
+            edge_id TEXT,
             FOREIGN KEY (child_id) REFERENCES nodes(node_id),
             FOREIGN KEY (parent_id) REFERENCES nodes(node_id)
         )
@@ -199,8 +200,8 @@ def add_node_to_pipeline(cur, node_id, pipeline_id, position_x=0., position_y=0.
     
     return node_id
 
-def add_node_relation(cur, child_id, parent_id):
-    cur.execute('INSERT INTO node_relation (child_id, parent_id) VALUES (%s, %s)', (child_id, parent_id))
+def add_node_relation(cur, child_id, parent_id, edge_id):
+    cur.execute('INSERT INTO node_relation (child_id, parent_id, edge_id) VALUES (%s, %s, %s)', (child_id, parent_id, edge_id))
     return
 
 def get_node_parents(cur, node_id):
@@ -388,8 +389,8 @@ def copy_node_relations(cur, source_node_id, new_node_id, childrens = False, par
     if parents:
         # Copy child relations
         cur.execute('''
-            INSERT INTO node_relation (child_id, parent_id)
-            SELECT %s, parent_id
+            INSERT INTO node_relation (child_id, parent_id, edge_id)
+            SELECT %s, parent_id, edge_id
             FROM node_relation
             WHERE child_id = %s
         ''', (new_node_id, source_node_id))
@@ -397,8 +398,8 @@ def copy_node_relations(cur, source_node_id, new_node_id, childrens = False, par
     if childrens:
         # Copy parent relations
         cur.execute('''
-            INSERT INTO node_relation (child_id, parent_id)
-            SELECT child_id, %s
+            INSERT INTO node_relation (child_id, parent_id, edge_id)
+            SELECT child_id, %s, edge_id
             FROM node_relation
             WHERE parent_id = %s
         ''', (new_node_id, source_node_id))
@@ -929,3 +930,26 @@ def get_all_node_ids(cur):
     """
     cur.execute('SELECT node_id FROM nodes')
     return [row[0] for row in cur.fetchall()]
+
+def get_node_relation_edge_id(cur, child_id, parent_id):
+    """
+    Get the edge ID of a specific node relation.
+    :param cur: Database cursor
+    :param child_id: ID of the child node
+    :param parent_id: ID of the parent node
+    :return: Edge ID of the relation, or None if not found
+    """
+    cur.execute('SELECT edge_id FROM node_relation WHERE child_id = %s AND parent_id = %s', (child_id, parent_id))
+    row = cur.fetchone()
+    return row[0] if row else None
+
+def get_edge_id_of_all_node_parents(cur, child_id):
+    """
+    Get the edge IDs of all parents of a specific child node.
+    :param cur: Database cursor
+    :param child_id: ID of the child node
+    :return: List of edge IDs of all parent nodes
+    """
+    cur.execute('SELECT edge_id FROM node_relation WHERE child_id = %s', (child_id,))
+    rows = cur.fetchall()
+    return [row[0] for row in rows]
