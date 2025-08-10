@@ -55,8 +55,8 @@ def test_run_pipeline(pg_test_db, tmp_path, last_node, expected_status_a, expect
             with open(param_file, "w") as f:
                 yaml.safe_dump(params, f)
 
-    db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_a)
-    db_utils.add_node_relation(cur, child_id=node_c, parent_id=node_b)
+    db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_a, edge_id='01')
+    db_utils.add_node_relation(cur, child_id=node_c, parent_id=node_b, edge_id='02')
     conn.commit()
 
     # Run pipeline from specified node or from the beginning
