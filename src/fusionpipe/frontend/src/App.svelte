@@ -814,7 +814,7 @@
 
   async function deleteSelectedPipeline() {
     if (!currentPipelineId) {
-      alert("No pipeline selected");
+      alert("No Active Pipeline");
       return;
     }
 
@@ -822,11 +822,25 @@
       typeof currentPipelineId === "string"
         ? currentPipelineId
         : currentPipelineId.value;
+
+      // Ask the user to type the pipeline id to confirm deletion
+      const userInput = prompt(
+        `To confirm deletion, please type the pipeline id exactly:\n${pipelineId}`
+      );
+      if (userInput === null) return; // User cancelled
+
+      if (userInput !== pipelineId) {
+        alert("Pipeline id does not match. Deletion cancelled.");
+        return;
+      }
+
     const confirmed = confirm(
       `Are you sure you want to delete pipeline "${pipelineId}"? This action cannot be undone.`,
     );
 
     if (!confirmed) return;
+
+
 
     try {
       const response = await fetch(
@@ -845,6 +859,9 @@
       alert("Failed to delete pipeline.");
     }
   }
+
+
+
   async function deleteCurrentProject() {
     if (!currentProjectId) {
       alert("No project selected");
