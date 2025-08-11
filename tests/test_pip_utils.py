@@ -1579,3 +1579,74 @@ def test_move_pipeline_to_project(pg_test_db):
     db_utils.update_pipeline_blocked_status(cur, pipeline_id=pipeline_id, blocked=True)
     with pytest.raises(ValueError, match="is blocked"):
         move_pipeline_to_project(cur, pipeline_id, project_id1)
+
+def test_delete_edge_and_update_status(pg_test_db, dag_dummy_1):
+    """
+    Test delete_edge_and_update_status:
+    - Removes the edge and sets descendants to 'staledata'.
+    - Fails if pipeline is blocked.
+    - Fails if child node is referenced.
+    """
+    from fusionpipe.utils.pip_utils import (
+        pipeline_graph_to_db,
+        delete_edge_and_update_status,
+        db_to_pipeline_graph_from_pip_id,
+        set_children_stale,
+    )
+    from fusionpipe.utils import db_utils
+    import networkx as nx
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add the dummy graph to the database
+    pipeline_graph_to_db(dag_dummy_1, cur)
+    conn.commit()
+    pipeline_id = dag_dummy_1.graph['pipeline_id']
+
+    # Pick a parent-child edge
+    edges = list(dag_dummy_1.edges)
+    if not edges:
+        pytest.skip("No edges in dummy graph.")
+    parent_id, child_id = edges[0]
+
+    # --- Test: normal case ---
+    # Ensure child is not referenced and pipeline is not blocked
+    db_utils.update_referenced_status(cur, node_id=child_id, referenced=False)
+    db_utils.update_pipeline_blocked_status(cur, pipeline_id=pipeline_id, blocked=False)
+    conn.commit()
+
+    # Set a descendant of child to 'ready' so we can check staledata propagation
+    descendants = list(nx.descendants(dag_dummy_1, child_id))
+    if descendants:
+        db_utils.update_node_status(cur, descendants[0], "ready")
+        conn.commit()
+
+    # Remove the edge
+    delete_edge_and_update_status(cur, pipeline_id, parent_id, child_id)
+    conn.commit()
+
+    # Edge should be removed
+    G = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
+    assert (parent_id, child_id) not in G.edges, "Edge should be removed from the graph."
+
+    # All descendants of child should be 'staledata'
+    for desc in descendants:
+        status = db_utils.get_node_status(cur, desc)
+        assert status == "staledata", f"Descendant node {desc} should be set to 'staledata'."
+
+    # --- Test: pipeline is blocked ---
+    # Re-add the edge for this test
+    db_utils.add_node_relation(cur, parent_id=parent_id, child_id=child_id, edge_id="e1")
+    db_utils.update_pipeline_blocked_status(cur, pipeline_id=pipeline_id, blocked=True)
+    conn.commit()
+    with pytest.raises(ValueError, match="blocked"):
+        delete_edge_and_update_status(cur, pipeline_id, parent_id, child_id)
+    db_utils.update_pipeline_blocked_status(cur, pipeline_id=pipeline_id, blocked=False)
+    conn.commit()
+
+    # --- Test: child node is referenced ---
+    db_utils.update_referenced_status(cur, node_id=child_id, referenced=True)
+    conn.commit()
+    with pytest.raises(ValueError, match="referenced"):
+        delete_edge_and_update_status(cur, pipeline_id, parent_id, child_id)

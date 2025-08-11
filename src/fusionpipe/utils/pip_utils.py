@@ -957,7 +957,7 @@ def delete_edge_and_update_status(cur, pipeline_id, parent_id, child_id):
         raise ValueError(f"Child node {child_id} is referenced. You cannot delete edges from it. Consider duplicating the node if you want to branch the pipeline.")
 
     # Set all descendants of the child node to 'staledata'
-    set_children_stale(cur, pipeline_id, parent_id)
+    set_children_stale(cur, pipeline_id, child_id)
 
     # Remove the edge and update the pipeline using referenced logic
     db_utils.remove_node_relation_with_referenced_logic(cur, parent_id=parent_id, child_id=child_id)
