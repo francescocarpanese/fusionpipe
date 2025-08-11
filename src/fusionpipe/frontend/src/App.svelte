@@ -397,6 +397,8 @@
 
   async function branchPipelineWithParents(withdata: boolean) {
 
+    alert('This operation can take long time if many nodes needs to be copied. Wait till completed.');
+
     const selectedNode = projectNodes.find((node) => node.selected);
     if (!selectedNode) {
       console.error("No node selected");
@@ -936,6 +938,8 @@
       console.error("No pipeline selected");
       return;
     }
+
+    alert('This operation can take long time if many nodes needs to be copied. Wait for the complete alert')
 
     const selectedNode = nodes.find((node) => node.selected);
 
