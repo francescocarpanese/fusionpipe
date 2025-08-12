@@ -575,3 +575,9 @@ pip install docker-compose
 ```
 
 Docker can load many images, that can occopy space in your disk. You might want to consider to set the location where docker images are saved.
+
+
+# Migration of database
+- Use the migration script based on your version
+- Remember to update the .bash_fusionpipeenv
+- Sometimes jypternotebook does not update the env variable. Delete the folder `.vscode_server` to force reinstalling the server

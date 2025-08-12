@@ -13,7 +13,7 @@ import stat
 
 
 FILE_CHMOD_DEFAULT = 0o664  # Read and write for owner and group, read for others
-DIR_CHMOD_DEFAULT = 0o775  # Read, write, and execute for owner and group, read and execute for others
+DIR_CHMOD_DEFAULT = 0o2770  # Read, write, and execute for owner and group, read and execute for others
 FILE_CHMOD_BLOCKED = 0o444  # Read-only for owner, group, and others
 DIR_CHMOD_BLOCKED = 0o555  # Read and execute for owner, group, and others, no write permission
 
