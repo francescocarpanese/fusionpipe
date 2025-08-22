@@ -603,6 +603,8 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
         if n in nodes_to_replace:
             new_id = id_map[n]
             attrs = original_graph.nodes[n].copy()
+            folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"),new_id)
+            attrs['folder_path'] = folder_path_nodes
             new_graph.add_node(new_id, **attrs)
         else:
             attrs = original_graph.nodes[n].copy()

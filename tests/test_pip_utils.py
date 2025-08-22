@@ -1019,6 +1019,18 @@ def test_detach_pipeline_from_node(
                 expected_parents[i] = id_map[parent]
         assert set(new_parents_dict_not_detached_nodes[node]) == set(expected_parents), f"Parents of node {node} do not match expected parents. Expected: {expected_parents}, Found: {new_parents_dict_not_detached_nodes[node]}"
 
+    # # Check that the folder paths for the detached nodes have been set correctly
+    for old_id, new_id in id_map.items():
+        folder_path_old = os.path.join(tmp_base_dir, old_id)
+        folder_path_new = os.path.join(tmp_base_dir, new_id)
+        assert os.path.exists(folder_path_new), f"Folder for new node {new_id} does not exist."
+        assert os.path.exists(folder_path_old), f"Folder for old node {old_id} does not exist."
+
+    # Check that the folder_path entry in the database for the new nodes is different from the old nodes
+    for old_id, new_id in id_map.items():
+        old_folder_path = db_utils.get_node_folder_path(cur, old_id)
+        new_folder_path = db_utils.get_node_folder_path(cur, new_id)
+        assert old_folder_path != new_folder_path, f"folder_path for new node {new_id} should be different from old node {old_id}"
 
 def test_reference_node_into_pipeline(tmp_base_dir, pg_test_db):
     """
