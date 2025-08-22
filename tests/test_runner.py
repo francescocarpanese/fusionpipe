@@ -876,7 +876,7 @@ def test_run_pipeline_progress_callback(pg_test_db, tmp_path):
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
         pip_utils.init_node_folder(folder_path_nodes=folder_path)
     
-    db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_a)
+    db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_a, edge_id='01')
     conn.commit()
 
     # Track progress updates
@@ -982,8 +982,8 @@ def test_run_pipeline_with_failed_nodes(pg_test_db, tmp_path):
         pip_utils.init_node_folder(folder_path_nodes=folder_path)
     
     # Create chain: A -> B -> C
-    db_utils.add_node_relation(cur, child_id=node_ids[1], parent_id=node_ids[0])
-    db_utils.add_node_relation(cur, child_id=node_ids[2], parent_id=node_ids[1])
+    db_utils.add_node_relation(cur, child_id=node_ids[1], parent_id=node_ids[0], edge_id="01")
+    db_utils.add_node_relation(cur, child_id=node_ids[2], parent_id=node_ids[1], edge_id="02")
     conn.commit()
 
     # Mock first node to complete, second to fail, third should not run

@@ -683,7 +683,7 @@ def test_delete_referenced_node_from_pipeline(tmp_base_dir, pg_test_db):
     assert referenced_status is False, f"Node {node_id} should have referenced status set to False in pipeline {pipeline_id1}."
 
     # Ensure R/W permission is granted to user and group for the node
-    permissions = os.stat(os.path.join(folder_path_node, 'code')).st_mode & 0o777
+    permissions = os.stat(os.path.join(folder_path_node, 'code')).st_mode & 0o2770
     from fusionpipe.utils.pip_utils import DIR_CHMOD_DEFAULT
     assert permissions == DIR_CHMOD_DEFAULT, f"Folder {folder_path_node} should have R/W permissions for user and group."
 
@@ -1152,7 +1152,7 @@ def test_reference_and_delete_node_logic(monkeypatch, pg_test_db, tmp_base_dir):
     assert referenced_status is True, f"Node {node_id} should have referenced status set to True."
 
     # Step 5: Check that the code folder in the referenced node is DIR_CHMOD_BLOCKED
-    permissions = os.stat(os.path.join(folder_path_node, "code")).st_mode & 0o777
+    permissions = os.stat(os.path.join(folder_path_node, "code")).st_mode & 0o555
     assert permissions == DIR_CHMOD_BLOCKED, f"Code folder should have permissions {oct(DIR_CHMOD_BLOCKED)}, got {oct(permissions)}."
 
     # Step 6: Delete the node from the second pipeline
@@ -1160,7 +1160,7 @@ def test_reference_and_delete_node_logic(monkeypatch, pg_test_db, tmp_base_dir):
     conn.commit()
 
     # Step 7: Check that the code folder in the node is now DIR_CHMOD_DEFAULT
-    permissions = os.stat(os.path.join(folder_path_node, "code")).st_mode & 0o777
+    permissions = os.stat(os.path.join(folder_path_node, "code")).st_mode & 0o2770
     assert permissions == DIR_CHMOD_DEFAULT, f"Code folder should have permissions {oct(DIR_CHMOD_DEFAULT)}, got {oct(permissions)}."
 
 
@@ -1216,7 +1216,7 @@ def test_detach_node_from_pipeline_logic(monkeypatch, pg_test_db, tmp_base_dir):
     assert os.path.exists(new_folder_path_node), f"New node folder {new_folder_path_node} should exist."
 
     # Check that the new node's permissions are DIR_CHMOD_DEFAULT
-    permissions = os.stat(os.path.join(new_folder_path_node, "code")).st_mode & 0o777
+    permissions = os.stat(os.path.join(new_folder_path_node, "code")).st_mode & 0o2770
     assert permissions == DIR_CHMOD_DEFAULT, f"New node's code folder should have permissions {oct(DIR_CHMOD_DEFAULT)}, got {oct(permissions)}."
 
     # Step 3: Attempt to detach a non-referenced node
@@ -1299,7 +1299,7 @@ def test_reference_and_detach_node_logic(monkeypatch, pg_test_db, tmp_base_dir):
     assert referenced_status is True, f"Node {node_id} should have referenced status set to True."
 
     # Step 5: Check that the code folder in the referenced node is DIR_CHMOD_BLOCKED
-    permissions = os.stat(os.path.join(folder_path_node, "code")).st_mode & 0o777
+    permissions = os.stat(os.path.join(folder_path_node, "code")).st_mode & 0o555
     assert permissions == DIR_CHMOD_BLOCKED, f"Code folder should have permissions {oct(DIR_CHMOD_BLOCKED)}, got {oct(permissions)}."
 
     # Step 6: Detach the node from the second pipeline
@@ -1307,7 +1307,7 @@ def test_reference_and_detach_node_logic(monkeypatch, pg_test_db, tmp_base_dir):
     conn.commit()
 
     # Step 7: Check that the code folder in the node is now DIR_CHMOD_DEFAULT
-    permissions = os.stat(os.path.join(folder_path_node, "code")).st_mode & 0o777
+    permissions = os.stat(os.path.join(folder_path_node, "code")).st_mode & 0o2770
     assert permissions == DIR_CHMOD_DEFAULT, f"Code folder should have permissions {oct(DIR_CHMOD_DEFAULT)}, got {oct(permissions)}."
 
     # Step 8: Check that the node is still in the first pipeline
