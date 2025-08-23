@@ -17,6 +17,8 @@ DIR_CHMOD_DEFAULT = 0o2770  # Read, write, and execute for owner and group, read
 FILE_CHMOD_BLOCKED = 0o444  # Read-only for owner, group, and others
 DIR_CHMOD_BLOCKED = 0o555  # Read and execute for owner, group, and others, no write permission
 
+excluded_dir = {'.venv', '__pycache__', '*.pyc', '*.pyo', '*.pyd', '*.ipynb_checkpoints', '.node_id'}
+
 def change_permissions_recursive(path, file_mode=FILE_CHMOD_DEFAULT, dir_mode=DIR_CHMOD_DEFAULT):
     """Recursively change permissions of a directory and its contents."""
     
@@ -25,17 +27,23 @@ def change_permissions_recursive(path, file_mode=FILE_CHMOD_DEFAULT, dir_mode=DI
         return    
     if not os.path.exists(path):
         return
-
-    # Avoid links, or it will change permission for python executable too.
-    for root, dirs, files in os.walk(path):
-        for d in dirs:
-            dir_path = os.path.join(root, d)
-            if not os.path.islink(dir_path):
-                os.chmod(dir_path, dir_mode)
-        for f in files:
-            file_path = os.path.join(root, f)
-            if os.path.isfile(file_path) and not os.path.islink(file_path):
-                os.chmod(file_path, file_mode)
+        # Avoid links, or it will change permission for python executable too.
+        for root, dirs, files in os.walk(path):
+            # Remove excluded directories from traversal
+            dirs[:] = [d for d in dirs if d not in excluded_dir and not any(
+                fnmatch.fnmatch(d, pattern) for pattern in excluded_dir if '*' in pattern
+            )]
+            for d in dirs:
+                dir_path = os.path.join(root, d)
+                if not os.path.islink(dir_path):
+                    os.chmod(dir_path, dir_mode)
+            for f in files:
+                # Skip excluded file patterns
+                if f in excluded_dir or any(fnmatch.fnmatch(f, pattern) for pattern in excluded_dir if '*' in pattern):
+                    continue
+                file_path = os.path.join(root, f)
+                if os.path.isfile(file_path) and not os.path.islink(file_path):
+                    os.chmod(file_path, file_mode)
 
 class NodeState(Enum):
     READY = "ready"       # Node is created but not yet processed
@@ -792,9 +800,6 @@ def duplicate_node_code_and_data(cur, source_node_id, new_node_id, withdata=True
         else:
             os.makedirs(os.path.join(new_folder_path_nodes, "data"), exist_ok=True)
 
-    # Update read and write permission for the new node
-    update_referenced_node_permissions(cur, node_id=new_node_id)
-
     # Load and update the project.toml file
     project_toml_path = os.path.join(new_folder_path_nodes, "code", "pyproject.toml")
     if os.path.exists(project_toml_path):
@@ -820,6 +825,10 @@ def duplicate_node_code_and_data(cur, source_node_id, new_node_id, withdata=True
 
     finally:
         os.chdir(current_dir)
+
+    # Update read and write permission for the new node
+    update_referenced_node_permissions(cur, node_id=new_node_id)
+    
 
 def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_pipeline_id, source_node_id, new_node_id, parents=False, childrens=False, withdata=False):
     """
