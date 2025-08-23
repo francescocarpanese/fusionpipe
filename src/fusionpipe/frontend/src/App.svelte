@@ -268,7 +268,6 @@
       console.error("Error adding node:", error);
     }
   }
-
   async function deleteNode() {
     const pipelineId =
       typeof currentPipelineId === "string"
@@ -286,6 +285,23 @@
 
     if (!selectedNodeIds.length) {
       alert("Please select at least one node to delete.");
+      return;
+    }
+
+    // Generate a random 4-digit integer between 1000 and 9999
+    const randomInt = Math.floor(Math.random() * 9000) + 1000;
+
+    // Ask user to enter the generated 4-digit integer
+    const userInput = prompt(
+      `You are about to delete selected NODES. To confirm deletion, please enter the following 4-digit integer:\n${randomInt}`
+    );
+    if (userInput === null) return; // User cancelled
+
+    // Validate input: must match the generated 4-digit integer exactly
+    const isValid = /^\d{4}$/.test(userInput.trim()) && Number(userInput.trim()) === randomInt;
+
+    if (!isValid) {
+      alert("Invalid input. Please enter the exact 4-digit integer shown.");
       return;
     }
 
@@ -2186,11 +2202,11 @@
             <DropdownItem onclick={copySelectedNodeFolderPathToClipboard}>
               Copy Selected Node path to clipboard
             </DropdownItem>
-            <DropdownItem onclick={addNode}>Create new node</DropdownItem>
+            <DropdownItem onclick={addNode}>Create New Node</DropdownItem>
             <DropdownItem onclick={branchPipelineFromNode}
               >Branch Pipeline from Selected Node</DropdownItem
             >
-            <DropdownItem onclick={detachSelectedNodeFromPipeline}>Detach subtree from selected node</DropdownItem>            
+            <DropdownItem onclick={detachSelectedNodeFromPipeline}>Detach Subtree from Selected Node</DropdownItem>            
             <DropdownItem class="flex items-center justify-between">
               Duplicate Selected Nodes into this Pipeline 
               <ChevronRightOutline
@@ -2265,13 +2281,13 @@
               >Manual set node "stale-data"</DropdownItem
             >
             <DropdownItem class="text-red-600" onclick={deleteNodeOutputs}
-              >Delete output selected nodes</DropdownItem
+              >Delete OUTPUTS Selected Nodes</DropdownItem
             >
             <DropdownItem class="text-red-600" onclick={deleteEdge}
-              >Delete selected edge</DropdownItem
+              >Delete Selected Edge</DropdownItem
             >
             <DropdownItem class="text-red-600" onclick={deleteNode}
-              >Delete selected nodes</DropdownItem
+              >Delete Selected NODES</DropdownItem
             >
           </Dropdown>
           <NavLi class="cursor-pointer">
