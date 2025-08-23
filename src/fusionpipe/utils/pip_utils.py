@@ -23,12 +23,16 @@ excluded_dir = {'.venv', '__pycache__', '*.pyc', '*.pyo', '*.pyd', '*.ipynb_chec
 def change_permissions_recursive(path, file_mode=FILE_CHMOD_DEFAULT, dir_mode=DIR_CHMOD_DEFAULT, excluded_dir=excluded_dir):
     """Recursively change permissions of a directory and its contents."""
 
+    if not path:
+        # Skip if not path provided
+        return
+
+    if not os.path.exists(path):
+        return
+
     # Before changing the R/W permission, take ownership of the files by copy them
     take_ownership_of_files(path, excluded_patterns=excluded_dir)
 
-    if not path:
-        # Skip if not path provided
-        return    
     if os.path.exists(path):
         # Avoid links, or it will change permission for python executable too.
         for root, dirs, files in os.walk(path):
