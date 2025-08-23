@@ -953,3 +953,4 @@ def get_edge_id_of_all_node_parents(cur, child_id):
     cur.execute('SELECT edge_id FROM node_relation WHERE child_id = %s', (child_id,))
     rows = cur.fetchall()
     return [row[0] for row in rows]
+

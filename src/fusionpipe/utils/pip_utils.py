@@ -881,10 +881,12 @@ def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_p
             cur, source_pipeline_id,target_pipeline_id, old_id, new_id, parents=False, childrens=False, withdata=withdata)
     # Set parent-child relations in the duplicated subtree
     for old_parent, old_child in subtree.edges:
-        connect_node(
+        # Copy relation but preserve the edge id
+        db_utils.add_node_relation(
             cur,
             child_id=id_map[old_child],
-            parent_id=id_map[old_parent]
+            parent_id=id_map[old_parent], 
+            edge_id=db_utils.get_node_relation_edge_id(cur, child_id=old_child, parent_id=old_parent)
         )
 
     # Find head nodes of the duplicated subtree (nodes with no incoming edges in the subtree)
@@ -894,12 +896,13 @@ def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_p
         # Find parents of the original head node in the full graph (outside the subtree)
         for parent in graph.predecessors(old_head):
             if parent not in subtree_nodes:
-                # Attach the new head node to the parent in the target pipeline
-                connect_node(
+                # Copy relation but preserve the edge id
+                db_utils.add_node_relation(
                     cur,
                     child_id=new_head,
-                    parent_id=parent
-                )
+                    parent_id=parent, 
+                    edge_id=db_utils.get_node_relation_edge_id(cur, child_id=old_head, parent_id=parent)
+                )                
     
     # Optionally shift the positions of the duplicated nodes to avoid overlap
     shift_x, shift_y = 40, 40  # You can adjust the shift values as needed
