@@ -10,6 +10,7 @@ from enum import Enum
 import shutil
 import toml
 import stat
+import fnmatch
 
 
 FILE_CHMOD_DEFAULT = 0o660  # Read and write for owner and group, read for others
@@ -17,33 +18,183 @@ DIR_CHMOD_DEFAULT = 0o2770  # Read, write, and execute for owner and group, read
 FILE_CHMOD_BLOCKED = 0o444  # Read-only for owner, group, and others
 DIR_CHMOD_BLOCKED = 0o555  # Read and execute for owner, group, and others, no write permission
 
-excluded_dir = {'.venv', '__pycache__', '*.pyc', '*.pyo', '*.pyd', '*.ipynb_checkpoints', '.node_id'}
+excluded_dir = {'.venv', '__pycache__', '*.pyc', '*.pyo', '*.pyd', '*.ipynb_checkpoints', '.node_id', '.git'}
 
-def change_permissions_recursive(path, file_mode=FILE_CHMOD_DEFAULT, dir_mode=DIR_CHMOD_DEFAULT):
+def change_permissions_recursive(path, file_mode=FILE_CHMOD_DEFAULT, dir_mode=DIR_CHMOD_DEFAULT, excluded_dir=excluded_dir):
     """Recursively change permissions of a directory and its contents."""
-    
+
+    # Before changing the R/W permission, take ownership of the files by copy them
+    take_ownership_of_files(path, excluded_patterns=excluded_dir)
+
     if not path:
         # Skip if not path provided
         return    
-    if not os.path.exists(path):
-        return
+    if os.path.exists(path):
         # Avoid links, or it will change permission for python executable too.
         for root, dirs, files in os.walk(path):
             # Remove excluded directories from traversal
-            dirs[:] = [d for d in dirs if d not in excluded_dir and not any(
-                fnmatch.fnmatch(d, pattern) for pattern in excluded_dir if '*' in pattern
-            )]
+            dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, pattern) for pattern in excluded_dir) ]
             for d in dirs:
                 dir_path = os.path.join(root, d)
                 if not os.path.islink(dir_path):
                     os.chmod(dir_path, dir_mode)
             for f in files:
                 # Skip excluded file patterns
-                if f in excluded_dir or any(fnmatch.fnmatch(f, pattern) for pattern in excluded_dir if '*' in pattern):
+                if any(fnmatch.fnmatch(f, pattern) for pattern in excluded_dir):
                     continue
                 file_path = os.path.join(root, f)
                 if os.path.isfile(file_path) and not os.path.islink(file_path):
                     os.chmod(file_path, file_mode)
+
+def take_ownership_of_files(folder_path, excluded_patterns=None, current_user=None):
+    """
+    Take ownership of all files and folders in a directory by copying and replacing them.
+    Skips files/folders matching the excluded patterns.
+    
+    Args:
+        folder_path (str): Path to the folder to process
+        excluded_patterns (set): Set of patterns to exclude (uses fnmatch)
+        current_user (str): Current user name. If None, uses os.getlogin()
+    
+    Returns:
+        dict: Summary of processed files and any errors
+    """
+    import os
+    import pwd
+    import shutil
+    import tempfile
+    import fnmatch
+    
+    if excluded_patterns is None:
+        excluded_patterns = excluded_dir
+    
+    if current_user is None:
+        current_user = os.getlogin()
+    
+    if not os.path.exists(folder_path):
+        raise ValueError(f"Folder {folder_path} does not exist")
+    
+    processed_files = []
+    processed_dirs = []
+    errors = []
+    
+    def should_exclude(item_name, patterns):
+        """Check if an item should be excluded based on patterns"""
+        return any(fnmatch.fnmatch(item_name, pattern) for pattern in patterns)
+    
+    # Process files first, then directories (bottom-up approach)
+    for root, dirs, files in os.walk(folder_path, topdown=False):
+        # Filter out excluded directories from traversal
+        dirs[:] = [d for d in dirs if not should_exclude(d, excluded_patterns)]
+        
+        # Process files
+        for file_name in files:
+            # Skip excluded file patterns
+            if should_exclude(file_name, excluded_patterns):
+                continue
+                
+            file_path = os.path.join(root, file_name)
+            
+            try:
+                # Skip symbolic links
+                if os.path.islink(file_path):
+                    continue
+                
+                # Get file owner
+                file_stat = os.stat(file_path)
+                file_owner = pwd.getpwuid(file_stat.st_uid).pw_name
+                
+                # Skip if already owned by current user
+                if file_owner == current_user:
+                    continue
+                
+                # Check if we have read access
+                if not os.access(file_path, os.R_OK):
+                    errors.append(f"No read access to {file_path}")
+                    continue
+                
+                # Check if we have write access to the parent directory
+                parent_dir = os.path.dirname(file_path)
+                if not os.access(parent_dir, os.W_OK):
+                    errors.append(f"No write access to parent directory of {file_path}")
+                    continue
+                
+                # Create temporary file name
+                temp_file = file_path + ".tmp_ownership"
+                
+                # Copy the file (preserves metadata)
+                shutil.copy2(file_path, temp_file)
+                
+                # Remove original file
+                os.remove(file_path)
+                
+                # Rename temp file to original name
+                os.rename(temp_file, file_path)
+                
+                processed_files.append(file_path)
+                
+            except Exception as e:
+                errors.append(f"Error processing file {file_path}: {str(e)}")
+        
+        # Process directories
+        for dir_name in dirs:
+            # Skip excluded directory patterns (already filtered above, but double-check)
+            if should_exclude(dir_name, excluded_patterns):
+                continue
+                
+            dir_path = os.path.join(root, dir_name)
+            
+            try:
+                # Skip symbolic links
+                if os.path.islink(dir_path):
+                    continue
+                
+                # Get directory owner
+                dir_stat = os.stat(dir_path)
+                dir_owner = pwd.getpwuid(dir_stat.st_uid).pw_name
+                
+                # Skip if already owned by current user
+                if dir_owner == current_user:
+                    continue
+                
+                # Check if we have write access to the parent directory
+                parent_dir = os.path.dirname(dir_path)
+                if not os.access(parent_dir, os.W_OK):
+                    errors.append(f"No write access to parent directory of {dir_path}")
+                    continue
+                
+                # Get original permissions
+                original_stat = os.stat(dir_path)
+                original_mode = original_stat.st_mode
+                
+                # Create temporary directory name
+                temp_dir = dir_path + ".tmp_ownership"
+                
+                # Create new directory with same permissions
+                os.makedirs(temp_dir, mode=original_mode & 0o777, exist_ok=False)
+                
+                # Copy directory metadata
+                shutil.copystat(dir_path, temp_dir)
+                
+                # Remove original directory (should be empty at this point)
+                os.rmdir(dir_path)
+                
+                # Rename temp directory to original name
+                os.rename(temp_dir, dir_path)
+                
+                processed_dirs.append(dir_path)
+                
+            except Exception as e:
+                errors.append(f"Error processing directory {dir_path}: {str(e)}")
+    
+    return {
+        "processed_files": processed_files,
+        "processed_directories": processed_dirs,
+        "errors": errors,
+        "total_processed": len(processed_files) + len(processed_dirs)
+    }
+
+
 
 class NodeState(Enum):
     READY = "ready"       # Node is created but not yet processed
@@ -658,9 +809,6 @@ def delete_node_from_pipeline_with_referenced_logic(cur,pipeline_id, node_id):
         # Delete the node from the pipeline
         db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node_id)
 
-    # Update R/W permission for nodes
-    update_referenced_node_permissions(cur, node_id)
-
 def node_is_leaf_of_referenced_subgraph(cur, pipeline_id, node_id):
     # Get the pipeline graph from the database
     graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
@@ -1001,6 +1149,7 @@ def add_node_relation_safe(cur, pipeline_id, parent_id, child_id):
     """
     from fusionpipe.utils import db_utils
     import networkx as nx
+
 
     # Get the current pipeline graph
     graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
