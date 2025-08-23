@@ -573,7 +573,7 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
     """
     Branch a pipeline from a node means:
     - Copy the pipeline.
-    - All nodes are preserved, except the specified node and all its descendants,
+    - All nodes are preserved, except the starting node and all its descendants,
       for which new nodes are created (with new IDs).
     """
 
@@ -603,8 +603,8 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
         if n in nodes_to_replace:
             new_id = id_map[n]
             attrs = original_graph.nodes[n].copy()
-            folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"),new_id)
-            attrs['folder_path'] = folder_path_nodes
+            #folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"),new_id)
+            #attrs['folder_path'] = folder_path_nodes
             new_graph.add_node(new_id, **attrs)
         else:
             attrs = original_graph.nodes[n].copy()
@@ -618,6 +618,10 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
 
     # Add the new graph to the database
     pipeline_graph_to_db(new_graph, cur)
+
+    # Copy code and data and initialise new nodes
+    for old_node, new_node in id_map.items():
+        duplicate_node_code_and_data(cur, old_node, new_node, withdata=False)
 
     # Add pipeline-to-project relation for the new pipeline
     db_utils.add_pipeline_relation(cur, child_id=new_pip_id, parent_id=pipeline_id)
@@ -730,30 +734,20 @@ def copy_with_permissions(src, dst, *, follow_symlinks=True):
     return dst
 
 
-def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_pipeline_id, source_node_id, new_node_id, parents=False, childrens=False, withdata=False):
+def duplicate_node_code_and_data(cur, source_node_id, new_node_id, withdata=True):
     """
-    Duplicate a node in the pipeline, including its code and data.
+    Duplicate the code and data of from source_node_id  to new_node_id and initialise the python env
     """
-    # Duplicate node in the database
-    db_utils.duplicate_node_in_pipeline_with_relations(
-        cur,
-        source_node_id, 
-        new_node_id,
-        source_pipeline_id,
-        target_pipeline_id,
-        parents=parents,
-        childrens=childrens,
-        )
-
-    # New node is not referenced, even if original was
-    db_utils.update_referenced_status(cur, node_id=new_node_id, referenced=False)
-
     # Copy the folder into the new node folder
     new_folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"), new_node_id)
     # Update database
     db_utils.update_folder_path_node(cur, new_node_id, new_folder_path_nodes)
     source_node_tag = db_utils.get_node_tag(cur, node_id=source_node_id)
     db_utils.update_node_tag(cur, node_id=new_node_id, node_tag=source_node_tag)
+
+    # If duplicating the node without data, new node should become in status ready
+    if not withdata:
+        db_utils.update_node_status(cur, node_id=new_node_id, status=NodeState.READY.value)
 
     old_folder_path_nodes = db_utils.get_node_folder_path(cur, node_id=source_node_id)
 
@@ -799,7 +793,6 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
 
     # Update read and write permission for the new node
     update_referenced_node_permissions(cur, node_id=new_node_id)
-    
 
     # Load and update the project.toml file
     project_toml_path = os.path.join(new_folder_path_nodes, "code", "pyproject.toml")
@@ -826,6 +819,28 @@ def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_p
 
     finally:
         os.chdir(current_dir)
+
+def duplicate_node_in_pipeline_w_code_and_data(cur, source_pipeline_id, target_pipeline_id, source_node_id, new_node_id, parents=False, childrens=False, withdata=False):
+    """
+    Duplicate a node in the pipeline, including its code and data.
+    """
+    # Duplicate node in the database
+    db_utils.duplicate_node_in_pipeline_with_relations(
+        cur,
+        source_node_id, 
+        new_node_id,
+        source_pipeline_id,
+        target_pipeline_id,
+        parents=parents,
+        childrens=childrens,
+        )
+
+    # New node is not referenced, even if original was
+    db_utils.update_referenced_status(cur, node_id=new_node_id, referenced=False)
+
+    # Duplicate the code/data, and initialise folder
+    duplicate_node_code_and_data(cur, source_node_id, new_node_id, withdata=withdata)
+
 
 def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_pipeline_id, source_node_ids, withdata=False):
     """

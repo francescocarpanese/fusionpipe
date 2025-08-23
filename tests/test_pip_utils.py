@@ -271,7 +271,8 @@ def test_get_all_children_nodes(pg_test_db, dag_dummy_1):
 
 from conftest import PARENT_NODE_LIST
 @pytest.mark.parametrize("start_node", PARENT_NODE_LIST)
-def test_branch_pipeline_from_node(pg_test_db, dag_dummy_1, start_node):
+def test_branch_pipeline_from_node(monkeypatch, pg_test_db, dag_dummy_1, start_node, tmp_base_dir):
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
     """
     Test that branch_pipeline_from_node creates a new pipeline where all nodes are preserved,
     except the provided node and all its descendants, which are replaced with new IDs.
@@ -332,6 +333,11 @@ def test_branch_pipeline_from_node(pg_test_db, dag_dummy_1, start_node):
     # The set of replaced nodes should be the same size as nodes_to_replace
     assert len(replaced_nodes) == len(nodes_to_replace), "Each replaced node should have a new node ID in the new pipeline."
 
+    # The nodes_to_replace should have updated node_folder_path properties
+    for new_node in new_nodes:
+        new_folder = db_utils.get_node_folder_path(cur, new_node)
+        assert new_folder.endswith(new_node), f"Node {new_node} folder path should be updated."
+
     # Test that the old pipeline is a parent of the new pipeline
     parent_pipelines = db_utils.get_pipeline_parents(cur, new_pip_id)
     assert original_graph.graph['pipeline_id'] in parent_pipelines, "Original pipeline should be a parent of the new pipeline."
@@ -339,6 +345,65 @@ def test_branch_pipeline_from_node(pg_test_db, dag_dummy_1, start_node):
     # Check new pipeline is referenced
     new_status = db_utils.get_pipeline_blocked_status(cur, new_pip_id)
     assert new_status == False, "New pipeline should be set to referenced= false after branching."
+
+
+
+from conftest import PARENT_NODE_LIST
+@pytest.mark.parametrize("start_node", PARENT_NODE_LIST)
+def test_branch_pipeline_from_node_code_data(monkeypatch, pg_test_db, dag_dummy_1, start_node, tmp_base_dir):
+    """
+    Test that branch_pipeline_from_node creates a new pipeline where all nodes are preserved,
+    except the provided node and all its descendants, which are replaced with new IDs.
+    """
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
+
+    from fusionpipe.utils.pip_utils import branch_pipeline_from_node, db_to_pipeline_graph_from_pip_id
+    from fusionpipe.utils import db_utils
+    import networkx as nx
+    from fusionpipe.utils.pip_utils import pipeline_graph_to_db    
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add the original graph to the database
+    original_graph = dag_dummy_1
+
+    pipeline_graph_to_db(original_graph, cur)
+    conn.commit()
+
+    # Get all pipeline IDs before
+    pipeline_ids_before = set(db_utils.get_all_pipeline_ids(cur))
+
+    # Run branch_pipeline_from_node
+    branch_pipeline_from_node(cur, original_graph.graph['pipeline_id'], start_node)
+    conn.commit()
+
+    # Get all pipeline IDs after
+    pipeline_ids_after = set(db_utils.get_all_pipeline_ids(cur))
+    new_pipeline_ids = pipeline_ids_after - pipeline_ids_before
+    assert len(new_pipeline_ids) == 1, "A new pipeline should be created."
+    new_pip_id = next(iter(new_pipeline_ids))
+
+    # Load the new pipeline as a graph
+    new_graph = db_to_pipeline_graph_from_pip_id(cur, new_pip_id)
+    conn.commit()
+
+    # Get descendants of the start_node in the original graph
+    descendants = set(nx.descendants(original_graph, start_node))
+    nodes_to_replace = descendants | {start_node}
+    original_nodes = set(original_graph.nodes)
+    new_nodes = set(new_graph.nodes)
+    replaced_nodes = new_nodes - (original_nodes - nodes_to_replace)
+
+    # Folder path for the new node must exist
+    for new_node in replaced_nodes:
+        new_folder = db_utils.get_node_folder_path(cur, new_node)
+        assert os.path.exists(new_folder), f"Folder path for new node {new_node} must exist."
+
+    # .venv must be present in folder of new node
+    for new_node in replaced_nodes:
+        new_venv = os.path.join(db_utils.get_node_folder_path(cur, new_node), "code/.venv")
+        assert os.path.exists(new_venv), f".venv folder for new node {new_node} must exist."
 
 def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp_base_dir):
     """
