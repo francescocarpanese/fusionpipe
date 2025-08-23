@@ -360,7 +360,9 @@ def test_branch_pipeline_from_node_code_data(monkeypatch, pg_test_db, dag_dummy_
     from fusionpipe.utils.pip_utils import branch_pipeline_from_node, db_to_pipeline_graph_from_pip_id
     from fusionpipe.utils import db_utils
     import networkx as nx
-    from fusionpipe.utils.pip_utils import pipeline_graph_to_db    
+    from fusionpipe.utils.pip_utils import pipeline_graph_to_db
+    from fusionpipe.utils.pip_utils import init_node_folder
+    
 
     conn = pg_test_db
     cur = db_utils.init_db(conn)
@@ -393,7 +395,14 @@ def test_branch_pipeline_from_node_code_data(monkeypatch, pg_test_db, dag_dummy_
     nodes_to_replace = descendants | {start_node}
     original_nodes = set(original_graph.nodes)
     new_nodes = set(new_graph.nodes)
-    replaced_nodes = new_nodes - (original_nodes - nodes_to_replace)
+    kept_nodes = original_nodes - nodes_to_replace
+    replaced_nodes = new_nodes - kept_nodes
+
+    # Create folder paths for the kept nodes
+    for node in kept_nodes:
+        folder_path_nodes = os.path.join(tmp_base_dir, node)
+        init_node_folder(folder_path_nodes, verbose=True)
+        db_utils.update_folder_path_node(cur, node, folder_path_nodes)
 
     # Folder path for the new node must exist
     for new_node in replaced_nodes:
@@ -404,6 +413,14 @@ def test_branch_pipeline_from_node_code_data(monkeypatch, pg_test_db, dag_dummy_
     for new_node in replaced_nodes:
         new_venv = os.path.join(db_utils.get_node_folder_path(cur, new_node), "code/.venv")
         assert os.path.exists(new_venv), f".venv folder for new node {new_node} must exist."
+
+    # Nodes that become refrenced should no have write permission
+    for node in kept_nodes:
+        folder_path_node = db_utils.get_node_folder_path(cur, node)
+        permissions = os.stat(os.path.join(folder_path_node, 'code')).st_mode & 0o444
+        from fusionpipe.utils.pip_utils import FILE_CHMOD_BLOCKED
+        assert permissions == FILE_CHMOD_BLOCKED, f"Folder {folder_path_node} should not have R/W permissions for user and group."
+
 
 def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp_base_dir):
     """

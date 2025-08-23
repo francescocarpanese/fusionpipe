@@ -12,7 +12,7 @@ import toml
 import stat
 
 
-FILE_CHMOD_DEFAULT = 0o664  # Read and write for owner and group, read for others
+FILE_CHMOD_DEFAULT = 0o660  # Read and write for owner and group, read for others
 DIR_CHMOD_DEFAULT = 0o2770  # Read, write, and execute for owner and group, read and execute for others
 FILE_CHMOD_BLOCKED = 0o444  # Read-only for owner, group, and others
 DIR_CHMOD_BLOCKED = 0o555  # Read and execute for owner, group, and others, no write permission
@@ -603,8 +603,6 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
         if n in nodes_to_replace:
             new_id = id_map[n]
             attrs = original_graph.nodes[n].copy()
-            #folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"),new_id)
-            #attrs['folder_path'] = folder_path_nodes
             new_graph.add_node(new_id, **attrs)
         else:
             attrs = original_graph.nodes[n].copy()
@@ -622,6 +620,9 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
     # Copy code and data and initialise new nodes
     for old_node, new_node in id_map.items():
         duplicate_node_code_and_data(cur, old_node, new_node, withdata=False)
+
+    # Update the permission of all referenced nodes
+    update_all_referenced_node_permission_by_pipeline(cur, pipeline_id=new_pip_id)
 
     # Add pipeline-to-project relation for the new pipeline
     db_utils.add_pipeline_relation(cur, child_id=new_pip_id, parent_id=pipeline_id)

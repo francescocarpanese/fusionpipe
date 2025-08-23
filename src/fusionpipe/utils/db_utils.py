@@ -196,7 +196,7 @@ def add_node_to_pipeline(cur, node_id, pipeline_id, position_x=0., position_y=0.
 
     # If the node is present in more than one pipeline, set referenced to false
     if count > 1:
-        cur.execute('UPDATE nodes SET referenced = TRUE WHERE node_id = %s', (node_id,))
+        update_referenced_status(cur, node_id, referenced=True)
     
     return node_id
 
