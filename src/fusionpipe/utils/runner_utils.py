@@ -184,7 +184,8 @@ def _create_local_process(cur, node_id, node_path, log_file):
                 ["uv", "run", "main.py"],
                 cwd=working_dir,
                 stdout=logf,
-                stderr=subprocess.STDOUT
+                stderr=subprocess.STDOUT,
+                start_new_session=True  # To prevent signals from propagating
             )
             
             # Log process information
@@ -641,7 +642,7 @@ def kill_running_process(conn, node_id, ray_futures=None):
     if proc_ids:
         for pid in proc_ids:
             try:
-                os.kill(int(pid), 9)
+                os.killpg(int(pid), 9)
                 # Write to log file that the process was killed
                 with open(log_file, "a") as logf:
                     kill_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
