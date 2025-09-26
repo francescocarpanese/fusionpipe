@@ -954,3 +954,16 @@ def get_edge_id_of_all_node_parents(cur, child_id):
     rows = cur.fetchall()
     return [row[0] for row in rows]
 
+def get_node_parents_and_edge_ids(cur, node_id):
+    """
+    Retrieve the parent node IDs for a given node from the database.
+
+    Args:
+        cur (psycopg2.extensions.cursor): Database cursor.
+        node_id (str): The node ID whose parents are to be fetched.
+
+    Returns:
+        list: A list of parent node IDs.
+    """
+    cur.execute('SELECT parent_id, edge_id FROM node_relation WHERE child_id = %s', (node_id,))
+    return {row[0]: row[1] for row in cur.fetchall()}

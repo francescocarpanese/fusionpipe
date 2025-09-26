@@ -508,7 +508,8 @@ def pipeline_graph_to_db(Gnx, cur):
     for node in Gnx.nodes:
         for parent in Gnx.predecessors(node):
             if not db_utils.check_node_relation_exists(cur, child_id=node, parent_id=parent):
-                connect_node(cur, child_id=node, parent_id=parent)
+                edge_id = Gnx.edges[parent, node].get('edge_id', None)
+                connect_node(cur, child_id=node, parent_id=parent, edge_id=edge_id)
 
 
 def project_graph_to_db(Gnx, cur):
@@ -771,11 +772,12 @@ def branch_pipeline_from_node(cur, pipeline_id, node_id):
             attrs = original_graph.nodes[n].copy()
             new_graph.add_node(n, **attrs)
 
-    # Add edges: remap edges for replaced nodes
-    for u, v in original_graph.edges:
-        u_new = id_map[u] if u in nodes_to_replace else u
-        v_new = id_map[v] if v in nodes_to_replace else v
-        new_graph.add_edge(u_new, v_new)
+    # Add edges
+    for parent, child in original_graph.edges:
+        parent_new = id_map[parent] if parent in nodes_to_replace else parent
+        child_new = id_map[child] if child in nodes_to_replace else child
+        edge_id = db_utils.get_node_relation_edge_id(cur, child_id=child, parent_id=parent)
+        new_graph.add_edge(parent_new, child_new, edge_id=edge_id)
 
     # Add the new graph to the database
     pipeline_graph_to_db(new_graph, cur)
@@ -1292,26 +1294,42 @@ def detach_subgraph_from_node(cur, pipeline_id, node_id):
         if referenced_parents:
             referenced_parents_dict_of_referenced_node[node] = referenced_parents
 
-    # Remove from the subthree all the nodes which are in referenced status
-    subgraph_nodes = [n for n in subgraph_nodes if n not in not_referenced_nodes_in_subgraph]
+    # Get the list of nodes which are in the subgraph an
+    subgraph_node_only_referenced = [n for n in subgraph_nodes if n not in not_referenced_nodes_in_subgraph]
 
     # Duplicate the nodes with their relations
     id_map = duplicate_nodes_in_pipeline_with_relations(
         cur, source_pipeline_id=pipeline_id, target_pipeline_id=pipeline_id,
-        source_node_ids=subgraph_nodes, withdata=True
+        source_node_ids=subgraph_node_only_referenced, withdata=True
     )
 
-    # Remove the original nodes from the pipeline
-    for node in subgraph_nodes:
-        db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node)
-    
-    # Attach not referenced nodes with referenced parents to the new nodes
-    for node, parents in referenced_parents_dict_of_referenced_node.items():
-        new_parents = [id_map[parent] for parent in parents]
-        for new_parent in new_parents:
+    # Loop on all nodes that have been copied.
+    for old_node, new_node in id_map.items():
+        # Get the parents and the ids of the node that was copied
+        parents_dict = db_utils.get_node_parents_and_edge_ids(cur, node_id=old_node)
+        # Take only the parents which haven't been copied
+        parents_not_in_subgraph = set(parents_dict.keys()) - set(subgraph_node_only_referenced)
+        # Loop on all these paraents
+        for parent in parents_not_in_subgraph:
+            edge_id = parents_dict[parent]
             # Add the relation to the new node
-            connect_node(cur, child_id=node, parent_id=new_parent)
+            db_utils.add_node_relation(cur, child_id=new_node, parent_id=parent, edge_id=edge_id)
     
+    for node in not_referenced_nodes_in_subgraph:
+        # Get the parents and the ids of the node that was copied
+        parents_dict = db_utils.get_node_parents_and_edge_ids(cur, node_id=node)
+        # Take only the parents inside the subgraph
+        parents_in_subgraph = [parent for parent in parents_dict.keys() if parent in subgraph_node_only_referenced]
+        # Loop on all these paraents
+        for parent in parents_in_subgraph:
+            edge_id = parents_dict[parent]
+            # Add the relation to the new node
+            db_utils.add_node_relation(cur, child_id=node, parent_id=id_map[parent], edge_id=edge_id)
+
+    # Remove the original nodes from the pipeline
+    for node in subgraph_node_only_referenced:
+        db_utils.remove_node_from_pipeline(cur, pipeline_id=pipeline_id, node_id=node)
+
     return id_map
 
 
@@ -1513,7 +1531,8 @@ def generate_edge_id(cur, child_node_id):
     # Ensure it's a 2-digit integer (01, 02, ..., 99)
     return f"{new_edge_id:02d}"
 
-def connect_node(cur, child_id, parent_id):
-    edge_id = generate_edge_id(cur, child_node_id=child_id)
+def connect_node(cur, child_id, parent_id, edge_id=None):
+    if edge_id is None:
+        edge_id = generate_edge_id(cur, child_node_id=child_id)
     db_utils.add_node_relation(cur, child_id, parent_id, edge_id)
     return edge_id
