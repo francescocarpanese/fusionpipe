@@ -93,6 +93,7 @@ def dag_dummy_1():
         G.nodes[node]['notes'] = 'test notes'
         G.nodes[node]['position'] = [0, 0]  # Default position
         G.nodes[node]['blocked'] = False
+        G.nodes[node]['project_id'] = G.graph['project_id']
         if node == "A":
             G.nodes[node]['status'] = "ready"
             G.nodes[node]['blocked'] = True  # A is blocked
@@ -133,14 +134,14 @@ def dict_dummy_1():
         "project_id": "test_project",
         "blocked": False,
         "nodes": {
-            "A": {"status": "ready", "referenced": False, "tag": 'A', 'notes': 'test notes', 'parents': [], 'parent_edge_ids': {}, 'position': [0, 0], 'folder_path': 'dummy_folder_path_A', 'blocked': True},
-            "B": {"status": "running", "referenced": False, "tag": 'B', 'notes': 'test notes', 'parents': ['A'], 'parent_edge_ids': {'A':'01'}, 'position': [0, 0], 'folder_path': 'dummy_folder_path_B', 'blocked': False},
-            "C": {"status": "completed", "referenced": False, "tag": 'C', 'notes': 'test notes', 'parents': ['A'], 'parent_edge_ids': {'A':'01'}, 'position': [0, 0], 'folder_path': 'dummy_folder_path_C', 'blocked': False},
-            "D": {"status": "staledata", "referenced": False, "tag": 'D', 'notes': 'test notes', 'parents': ['C'], 'parent_edge_ids': {'C':'01'}, 'position': [0, 0], 'folder_path': 'dummy_folder_path_D', 'blocked': False},
-            "E": {"status": "ready", "referenced": False, "tag": 'E', 'notes': 'test notes', 'parents': [], 'parent_edge_ids': {}, 'position': [0, 0,], 'folder_path': 'dummy_folder_path_E', 'blocked': False},
-            "F": {"status": "ready", "referenced": False, "tag": 'F', 'notes': 'test notes', 'parents': [], 'parent_edge_ids': {}, 'position': [0, 0,], 'folder_path': 'dummy_folder_path_F', 'blocked': False},
-            "G": {"status": "ready", "referenced": False, "tag": 'G', 'notes': 'test notes', 'parents': [], 'parent_edge_ids': {}, 'position': [0, 0,], 'folder_path': 'dummy_folder_path_G', 'blocked': False},
-            "H": {"status": "ready", "referenced": False, "tag": 'H', 'notes': 'test notes', 'parents': ['F','G'], 'parent_edge_ids':{'F':'01', 'G':'02'}, 'position': [0, 0,], 'folder_path': 'dummy_folder_path_H', 'blocked': False}
+            "A": {"status": "ready", "referenced": False, "tag": 'A', 'notes': 'test notes', 'parents': [], 'parent_edge_ids': {}, 'position': [0, 0], 'folder_path': 'dummy_folder_path_A', 'blocked': True, 'project_id': 'test_project'},
+            "B": {"status": "running", "referenced": False, "tag": 'B', 'notes': 'test notes', 'parents': ['A'], 'parent_edge_ids': {'A':'01'}, 'position': [0, 0], 'folder_path': 'dummy_folder_path_B', 'blocked': False, 'project_id': 'test_project'},
+            "C": {"status": "completed", "referenced": False, "tag": 'C', 'notes': 'test notes', 'parents': ['A'], 'parent_edge_ids': {'A':'01'}, 'position': [0, 0], 'folder_path': 'dummy_folder_path_C', 'blocked': False, 'project_id': 'test_project'},
+            "D": {"status": "staledata", "referenced": False, "tag": 'D', 'notes': 'test notes', 'parents': ['C'], 'parent_edge_ids': {'C':'01'}, 'position': [0, 0], 'folder_path': 'dummy_folder_path_D', 'blocked': False, 'project_id': 'test_project'},
+            "E": {"status": "ready", "referenced": False, "tag": 'E', 'notes': 'test notes', 'parents': [], 'parent_edge_ids': {}, 'position': [0, 0,], 'folder_path': 'dummy_folder_path_E', 'blocked': False, 'project_id': 'test_project'},
+            "F": {"status": "ready", "referenced": False, "tag": 'F', 'notes': 'test notes', 'parents': [], 'parent_edge_ids': {}, 'position': [0, 0,], 'folder_path': 'dummy_folder_path_F', 'blocked': False, 'project_id': 'test_project'},
+            "G": {"status": "ready", "referenced": False, "tag": 'G', 'notes': 'test notes', 'parents': [], 'parent_edge_ids': {}, 'position': [0, 0,], 'folder_path': 'dummy_folder_path_G', 'blocked': False, 'project_id': 'test_project'},
+            "H": {"status": "ready", "referenced": False, "tag": 'H', 'notes': 'test notes', 'parents': ['F','G'], 'parent_edge_ids':{'F':'01', 'G':'02'}, 'position': [0, 0,], 'folder_path': 'dummy_folder_path_H', 'blocked': False, 'project_id': 'test_project'}
         }
     }
 
@@ -206,6 +207,7 @@ def dag_detach_1():
     ])
     G.name = "12345"
     G.graph['pipeline_id'] = G.name
+    G.graph['project_id'] = "test_project"
 
     G.nodes['A']['referenced'] = True
     G.nodes['B']['referenced'] = True
@@ -230,6 +232,7 @@ def dag_detach_2():
     ])
     G.name = "12345"
     G.graph['pipeline_id'] = G.name
+    G.graph['project_id'] = "test_project"
 
     G.nodes['A']['referenced'] = True
     G.nodes['B']['referenced'] = True

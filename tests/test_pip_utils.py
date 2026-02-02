@@ -4,6 +4,33 @@ import os
 import sqlite3
 
 
+
+
+
+def test_create_projet_creates_project_and_folder(monkeypatch, pg_test_db, tmp_base_dir):
+    """
+    Test that create_projet creates a new project in the database and initializes its folder.
+    """
+    from fusionpipe.utils.pip_utils import create_projet
+    from fusionpipe.utils import db_utils
+
+    # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
+    monkeypatch.setenv("FUSIONPIPE_DATA_PATH", tmp_base_dir)
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Call create_projet
+    project_id = create_projet(cur)
+    conn.commit()
+
+    # Check that the project exists in the database
+    assert db_utils.check_if_project_exists(cur, project_id), f"Project {project_id} should exist in the database."
+
+    # Check that the project folder exists
+    project_folder = os.path.join(tmp_base_dir, project_id)
+    assert os.path.isdir(project_folder), f"Project folder {project_folder} should exist."
+
 def test_generate_data_folder(tmp_base_dir):
     # Test if the function creates the expected directory structure
     from fusionpipe.utils.pip_utils import generate_data_folder
@@ -373,6 +400,17 @@ def test_branch_pipeline_from_node_code_data(monkeypatch, pg_test_db, dag_dummy_
     pipeline_graph_to_db(original_graph, cur)
     conn.commit()
 
+    original_nodes = set(original_graph.nodes)
+    # Init all nodes in the original graph
+    for node in original_nodes:
+        project_id = db_utils.get_project_id_by_node(cur, node)
+        folder_path_nodes = os.path.join(tmp_base_dir, project_id,  node)
+        try:
+          init_node_folder(folder_path_nodes, verbose=True)
+        except:
+          print(f"Failed to init folder for node {node} at {folder_path_nodes}")
+        db_utils.update_folder_path_node(cur, node, folder_path_nodes)
+
     # Get all pipeline IDs before
     pipeline_ids_before = set(db_utils.get_all_pipeline_ids(cur))
 
@@ -398,11 +436,6 @@ def test_branch_pipeline_from_node_code_data(monkeypatch, pg_test_db, dag_dummy_
     kept_nodes = original_nodes - nodes_to_replace
     replaced_nodes = new_nodes - kept_nodes
 
-    # Create folder paths for the kept nodes
-    for node in kept_nodes:
-        folder_path_nodes = os.path.join(tmp_base_dir, node)
-        init_node_folder(folder_path_nodes, verbose=True)
-        db_utils.update_folder_path_node(cur, node, folder_path_nodes)
 
     # Folder path for the new node must exist
     for new_node in replaced_nodes:
@@ -429,7 +462,7 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp
     """
     import os
     import shutil
-    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id, duplicate_node_in_pipeline_w_code_and_data, init_node_folder
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id, duplicate_node_in_pipeline_w_code_and_data, init_node_folder, generate_project_id
     from fusionpipe.utils import db_utils
     import toml
 
@@ -441,13 +474,15 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp
     cur = db_utils.init_db(conn)
     pipeline_id = generate_pip_id()
     node_id = generate_node_id()
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, notes="test node", folder_path=None, node_tag="test")
+    project_id = generate_project_id()
+    db_utils.add_project(cur,project_id=project_id)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline", project_id=project_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, notes="test node", folder_path=None, node_tag="test", project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, position_x=0, position_y=0)
-    db_utils.update_folder_path_node(cur, node_id, os.path.join(tmp_base_dir, node_id))
+    db_utils.update_folder_path_node(cur, node_id, os.path.join(tmp_base_dir, project_id, node_id))
     conn.commit()
   
-    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    folder_path_nodes = os.path.join(tmp_base_dir, project_id, node_id)
     init_node_folder(folder_path_nodes, verbose=True)
 
     # Create a file in the data folder to test duplication
@@ -467,7 +502,7 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp
     assert new_node_id in nodes_in_pipeline
 
     # Check new folder exists and file is copied
-    new_folder_path_nodes = os.path.join(tmp_base_dir, new_node_id)
+    new_folder_path_nodes = os.path.join(tmp_base_dir, project_id, new_node_id)
     assert os.path.exists(new_folder_path_nodes)
     # Check if pyproject.toml file exists in the new node's code folder
     new_code_folder_path = os.path.join(new_folder_path_nodes, "code")
@@ -488,7 +523,8 @@ def test_duplicate_node_in_pipeline_w_code_and_data(monkeypatch, pg_test_db, tmp
     duplicate_node_in_pipeline_w_code_and_data(cur, pipeline_id, pipeline_id, node_id, new_node_id2, withdata=True)
     conn.commit()
 
-    new_folder_path_nodes2 = os.path.join(tmp_base_dir, new_node_id2)
+    project_id_new_node2 = db_utils.get_project_id_by_node(cur, new_node_id2)
+    new_folder_path_nodes2 = os.path.join(tmp_base_dir, project_id_new_node2, new_node_id2)
     new_data_folder2 = os.path.join(new_folder_path_nodes2, "data")
     assert os.path.exists(new_data_folder2)
     assert os.path.exists(os.path.join(new_data_folder2, "testfile.txt")), "Data file should be copied when withdata=True"
@@ -499,7 +535,7 @@ def test_duplicate_node_in_different_pipeline_w_code_and_data(monkeypatch, pg_te
     including its code and data folder.
     """
     import os
-    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id, duplicate_node_in_pipeline_w_code_and_data, init_node_folder
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id, duplicate_node_in_pipeline_w_code_and_data, init_node_folder, generate_project_id
     from fusionpipe.utils import db_utils
     import toml
 
@@ -509,17 +545,19 @@ def test_duplicate_node_in_different_pipeline_w_code_and_data(monkeypatch, pg_te
     # Setup: create two pipelines and a node with a folder in the first pipeline
     conn = pg_test_db
     cur = db_utils.init_db(conn)
+
+    project_id = db_utils.add_project(cur, project_id=generate_project_id())
     pipeline_id_src = generate_pip_id()
     pipeline_id_dst = generate_pip_id()
     node_id = generate_node_id()
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id_src, tag="src", owner="tester", notes="src pipeline")
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id_dst, tag="dst", owner="tester", notes="dst pipeline")
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, notes="test node", folder_path=None, node_tag="test")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id_src, tag="src", owner="tester", notes="src pipeline", project_id=project_id)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id_dst, tag="dst", owner="tester", notes="dst pipeline", project_id=project_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, notes="test node", folder_path=None, node_tag="test", project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id_src, position_x=0, position_y=0)
     db_utils.update_folder_path_node(cur, node_id, os.path.join(tmp_base_dir, node_id))
     conn.commit()
 
-    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
+    folder_path_nodes = os.path.join(tmp_base_dir, project_id, node_id)
     init_node_folder(folder_path_nodes, verbose=True)
 
     # Run duplication into a different pipeline
@@ -532,7 +570,7 @@ def test_duplicate_node_in_different_pipeline_w_code_and_data(monkeypatch, pg_te
     assert new_node_id in nodes_in_dst
 
     # Check new folder exists and file is copied
-    new_folder_path_nodes = os.path.join(tmp_base_dir, new_node_id)
+    new_folder_path_nodes = os.path.join(tmp_base_dir, project_id,new_node_id)
     assert os.path.exists(new_folder_path_nodes)
     new_code_folder_path = os.path.join(new_folder_path_nodes, "code")
     pyproject_file_path = os.path.join(new_code_folder_path, "pyproject.toml")
@@ -596,7 +634,8 @@ def test_duplicate_nodes_in_pipeline_with_relations(monkeypatch, pg_test_db, dag
         all_nodes = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
         assert new_id in all_nodes
         # The new node's folder should exist
-        new_folder = os.path.join(tmp_base_dir, new_id)
+        project_id = db_utils.get_project_id_by_node(cur, new_id)
+        new_folder = os.path.join(tmp_base_dir,project_id, new_id)
         assert os.path.exists(new_folder)
 
     # Check: parent-child relations are preserved in the duplicated subtree
@@ -624,7 +663,7 @@ def test_delete_node_data_removes_data_contents(monkeypatch, pg_test_db, tmp_bas
     Test that delete_node_data removes all contents of the node's data folder but not the folder itself.
     """
     import os
-    from fusionpipe.utils.pip_utils import generate_node_id, delete_node_data, init_node_folder
+    from fusionpipe.utils.pip_utils import generate_node_id, delete_node_data, init_node_folder, generate_project_id
     from fusionpipe.utils import db_utils
 
     # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
@@ -633,14 +672,16 @@ def test_delete_node_data_removes_data_contents(monkeypatch, pg_test_db, tmp_bas
     # Setup: create a node with a data folder and some files
     conn = pg_test_db
     cur = db_utils.init_db(conn)
+
+    project_id = db_utils.add_project(cur, project_id=generate_project_id())
     node_id = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, notes="test node", folder_path=None)
-    db_utils.update_folder_path_node(cur, node_id, os.path.join(tmp_base_dir, node_id))
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, notes="test node", folder_path=None, project_id=project_id)
+    db_utils.update_folder_path_node(cur, node_id, os.path.join(tmp_base_dir, project_id, node_id))
     conn.commit()
 
-    folder_path_nodes = os.path.join(tmp_base_dir, node_id)
-    init_node_folder(folder_path_nodes, verbose=True)
-    data_folder = os.path.join(folder_path_nodes, "data")
+    node_dir = os.path.join(tmp_base_dir, project_id, node_id)
+    init_node_folder(node_dir, verbose=True)
+    data_folder = os.path.join(node_dir, "data")
     os.makedirs(data_folder, exist_ok=True)
     # Create dummy files and subfolders
     file1 = os.path.join(data_folder, "file1.txt")
@@ -673,7 +714,8 @@ def test_delete_node_from_pipeline_with_referenced_logic(monkeypatch, pg_test_db
     """
     import os
     from fusionpipe.utils.pip_utils import (
-        generate_node_id, generate_pip_id, init_node_folder, delete_node_from_pipeline_with_referenced_logic
+        generate_node_id, generate_pip_id, init_node_folder,
+        delete_node_from_pipeline_with_referenced_logic, generate_project_id
     )
     from fusionpipe.utils import db_utils
 
@@ -682,27 +724,29 @@ def test_delete_node_from_pipeline_with_referenced_logic(monkeypatch, pg_test_db
 
     conn = pg_test_db
     cur = db_utils.init_db(conn)
+
+    project_id = db_utils.add_project(cur, project_id=generate_project_id())
     pipeline_id = generate_pip_id()
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline", project_id=project_id)
 
     # Case 1: Not Referenced node
     node_id_not_referenced = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=node_id_not_referenced, status="ready", referenced=False, notes="not referenced node", folder_path=None)
+    db_utils.add_node_to_nodes(cur, node_id=node_id_not_referenced, status="ready", referenced=False, notes="not referenced node", folder_path=None, project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=node_id_not_referenced, pipeline_id=pipeline_id, position_x=0, position_y=0)
-    db_utils.update_folder_path_node(cur, node_id_not_referenced, os.path.join(tmp_base_dir, node_id_not_referenced))
+    db_utils.update_folder_path_node(cur, node_id_not_referenced, os.path.join(tmp_base_dir, project_id, node_id_not_referenced))
     conn.commit()
-    folder_path_nodes = os.path.join(tmp_base_dir, node_id_not_referenced)
-    init_node_folder(folder_path_nodes, verbose=True)
-    assert os.path.exists(folder_path_nodes)
+    node_dir = os.path.join(tmp_base_dir, project_id, node_id_not_referenced)
+    init_node_folder(node_dir, verbose=True)
+    assert os.path.exists(node_dir)
     # Should delete node and folder
     delete_node_from_pipeline_with_referenced_logic(cur, pipeline_id, node_id_not_referenced)
     conn.commit()
-    assert not os.path.exists(folder_path_nodes)
+    assert not os.path.exists(node_dir)
     assert node_id_not_referenced not in db_utils.get_all_nodes_from_pip_id(cur, pipeline_id)
 
     # Case 2: Node is referenced and a leaf in the referenced subgraph
     node_id_referenced = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=node_id_referenced, status="ready", referenced=True, notes="referenced node", folder_path=None)
+    db_utils.add_node_to_nodes(cur, node_id=node_id_referenced, status="ready", referenced=True, notes="referenced node", folder_path=None, project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=node_id_referenced, pipeline_id=pipeline_id, position_x=1, position_y=1)
     conn.commit()
     # Should delete node from pipeline (no error)
@@ -713,8 +757,8 @@ def test_delete_node_from_pipeline_with_referenced_logic(monkeypatch, pg_test_db
     # Case 3: Referenced node that is not a leaf in referenced subgraph
     to_be_deleted_id = generate_node_id()
     child_id = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=to_be_deleted_id, status="ready", referenced=True, notes="parent", folder_path=None, node_tag="parent")
-    db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", referenced=True, notes="child", folder_path=None, node_tag="child")
+    db_utils.add_node_to_nodes(cur, node_id=to_be_deleted_id, status="ready", referenced=True, notes="parent", folder_path=None, node_tag="parent", project_id=project_id)
+    db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", referenced=True, notes="child", folder_path=None, node_tag="child", project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=to_be_deleted_id, pipeline_id=pipeline_id, position_x=2, position_y=2)
     db_utils.add_node_to_pipeline(cur, node_id=child_id, pipeline_id=pipeline_id, position_x=3, position_y=3)
     db_utils.add_node_relation(cur, child_id=child_id, parent_id=to_be_deleted_id, edge_id='01')
@@ -730,24 +774,29 @@ def test_delete_referenced_node_from_pipeline(tmp_base_dir, pg_test_db):
     Test deleting a referenced node from one pipeline and ensuring its status is updated in another pipeline.
     """
     from fusionpipe.utils import db_utils
-    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id, delete_node_from_pipeline_with_referenced_logic
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id, delete_node_from_pipeline_with_referenced_logic, generate_project_id
     from fusionpipe.utils.pip_utils import init_node_folder
 
     conn = pg_test_db
     cur = db_utils.init_db(conn)
 
+    # Create project
+    project_id = generate_project_id()
+
     # Create two pipelines
     pipeline_id1 = generate_pip_id()
     pipeline_id2 = generate_pip_id()
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1)
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2)
+    db_utils.add_project(cur, project_id=project_id)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1, project_id=project_id)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2, project_id=project_id)
 
     # Create a node and add it to both pipelines
     node_id = generate_node_id()
-    folder_path_node = os.path.join(tmp_base_dir, node_id)
+
+    folder_path_node = os.path.join(tmp_base_dir,project_id,node_id)
     init_node_folder(folder_path_node, verbose=True)
 
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=True, folder_path=folder_path_node)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=True, folder_path=folder_path_node, project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id1)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id2)
     conn.commit()
@@ -755,6 +804,8 @@ def test_delete_referenced_node_from_pipeline(tmp_base_dir, pg_test_db):
     # Delete the node from pipeline 2
     delete_node_from_pipeline_with_referenced_logic(cur, pipeline_id2, node_id)
     conn.commit()
+
+    raise RuntimeError("This needs review. What is the right permission expected ?")
 
     # Check that the node is deleted from pipeline 2
     nodes_in_pipeline2 = db_utils.get_all_nodes_from_pip_id(cur, pipeline_id2)
@@ -778,7 +829,7 @@ def test_delete_node_from_pipeline_with_referenced_logic_blocked_node(monkeypatc
     import warnings
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import (
-        generate_node_id, generate_pip_id, init_node_folder, delete_node_from_pipeline_with_referenced_logic
+        generate_node_id, generate_pip_id, init_node_folder, delete_node_from_pipeline_with_referenced_logic, generate_project_id
     )
 
     # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
@@ -786,18 +837,20 @@ def test_delete_node_from_pipeline_with_referenced_logic_blocked_node(monkeypatc
 
     conn = pg_test_db
     cur = db_utils.init_db(conn)
+
+    project_id = db_utils.add_project(cur, project_id=generate_project_id())
     pipeline_id = generate_pip_id()
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline")
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test", owner="tester", notes="test pipeline", project_id=project_id)
 
     # Create a blocked node
     node_id_blocked = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=node_id_blocked, status="ready", referenced=False, notes="blocked node", folder_path=None)
+    db_utils.add_node_to_nodes(cur, node_id=node_id_blocked, status="ready", referenced=False, notes="blocked node", folder_path=None, project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=node_id_blocked, pipeline_id=pipeline_id, position_x=0, position_y=0)
     db_utils.update_node_blocked_status(cur, node_id=node_id_blocked, blocked=True)
-    db_utils.update_folder_path_node(cur, node_id_blocked, os.path.join(tmp_base_dir, node_id_blocked))
+    db_utils.update_folder_path_node(cur, node_id_blocked, os.path.join(tmp_base_dir, project_id, node_id_blocked))
     conn.commit()
 
-    folder_path_nodes = os.path.join(tmp_base_dir, node_id_blocked)
+    folder_path_nodes = os.path.join(tmp_base_dir, project_id, node_id_blocked)
     init_node_folder(folder_path_nodes, verbose=True)
     assert os.path.exists(folder_path_nodes)
     # Attempt to delete the blocked node and expect an error
@@ -899,7 +952,7 @@ def test_add_node_relation_safe(pg_test_db):
     - Fails if child is referenced.
     - Fails if adding the edge would create a cycle.
     """
-    from fusionpipe.utils.pip_utils import add_node_relation_safe, generate_node_id, generate_pip_id
+    from fusionpipe.utils.pip_utils import add_node_relation_safe, generate_node_id, generate_pip_id, generate_project_id
     from fusionpipe.utils.pip_utils import pipeline_graph_to_db, db_to_pipeline_graph_from_pip_id
     from fusionpipe.utils import db_utils
     import networkx as nx
@@ -908,13 +961,15 @@ def test_add_node_relation_safe(pg_test_db):
     conn = pg_test_db
     cur = db_utils.init_db(conn)
 
+    project_id = db_utils.add_project(cur, project_id=generate_project_id())
+
     # Create a simple pipeline with two nodes
     pipeline_id = generate_pip_id()
     parent_id = generate_node_id()
     child_id = generate_node_id()
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id)
-    db_utils.add_node_to_nodes(cur, node_id=parent_id, status="ready", referenced=False)
-    db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", referenced=False)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, project_id=project_id)
+    db_utils.add_node_to_nodes(cur, node_id=parent_id, status="ready", referenced=False, project_id=project_id)
+    db_utils.add_node_to_nodes(cur, node_id=child_id, status="ready", referenced=False, project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=parent_id, pipeline_id=pipeline_id)
     db_utils.add_node_to_pipeline(cur, node_id=child_id, pipeline_id=pipeline_id)
     conn.commit()
@@ -938,26 +993,30 @@ def test_merge_pipelines(pg_test_db):
     """
     Test that merge_pipelines creates a new pipeline containing all nodes from the source pipelines.
     """
-    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id, merge_pipelines
+    from fusionpipe.utils.pip_utils import generate_node_id, generate_pip_id, merge_pipelines, generate_project_id
     from fusionpipe.utils import db_utils
 
     conn = pg_test_db
     cur = db_utils.init_db(conn)
+
+
 
     # Create two source pipelines with different nodes
     pipeline_id1 = generate_pip_id()
     pipeline_id2 = generate_pip_id()
     node_ids1 = [generate_node_id() for _ in range(2)]
     node_ids2 = [generate_node_id() for _ in range(2)]
-    db_utils.add_project(cur, project_id="p1")
 
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1, project_id="p1")
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2, project_id="p1")
+    project_id = 'p1'
+    db_utils.add_project(cur, project_id=project_id)
+
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1, project_id=project_id)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2, project_id=project_id)
     for node_id in node_ids1:
-        db_utils.add_node_to_nodes(cur, node_id=node_id)
+        db_utils.add_node_to_nodes(cur, node_id=node_id, project_id=project_id)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id1)
     for node_id in node_ids2:
-        db_utils.add_node_to_nodes(cur, node_id=node_id)
+        db_utils.add_node_to_nodes(cur, node_id=node_id, project_id=project_id)
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id2)
     conn.commit()
 
@@ -999,19 +1058,19 @@ def test_merge_pipelines_with_duplicate_nodes(pg_test_db):
     common_node_id = generate_node_id()
     unique_node_id1 = generate_node_id()
     unique_node_id2 = generate_node_id()
-    db_utils.add_project(cur, project_id="p1")
+    project_id = "p1"
+    db_utils.add_project(cur, project_id=project_id)
 
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1, project_id="p1")
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2, project_id="p1")
-
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1, project_id=project_id)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2, project_id=project_id)
     # Add nodes to the first pipeline
-    db_utils.add_node_to_nodes(cur, node_id=common_node_id)
-    db_utils.add_node_to_nodes(cur, node_id=unique_node_id1)
+    db_utils.add_node_to_nodes(cur, node_id=common_node_id, project_id=project_id)
+    db_utils.add_node_to_nodes(cur, node_id=unique_node_id1, project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=common_node_id, pipeline_id=pipeline_id1)
     db_utils.add_node_to_pipeline(cur, node_id=unique_node_id1, pipeline_id=pipeline_id1)
 
     # Add nodes to the second pipeline
-    db_utils.add_node_to_nodes(cur, node_id=unique_node_id2)
+    db_utils.add_node_to_nodes(cur, node_id=unique_node_id2, project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=common_node_id, pipeline_id=pipeline_id2)
     db_utils.add_node_to_pipeline(cur, node_id=unique_node_id2, pipeline_id=pipeline_id2)
 
@@ -1073,7 +1132,8 @@ def test_detach_pipeline_from_node(
 
     # Setup folders for all nodes to be duplicated
     for node_id in original_graph:
-        folder_path = os.path.join(tmp_base_dir, node_id)
+        project_id = db_utils.get_project_id_by_node(cur, node_id)
+        folder_path = os.path.join(tmp_base_dir, project_id, node_id)
         init_node_folder(folder_path)
         db_utils.update_folder_path_node(cur, node_id, folder_path)
     conn.commit()
@@ -1101,10 +1161,12 @@ def test_detach_pipeline_from_node(
                 expected_parents[i] = id_map[parent]
         assert set(new_parents_dict_not_detached_nodes[node]) == set(expected_parents), f"Parents of node {node} do not match expected parents. Expected: {expected_parents}, Found: {new_parents_dict_not_detached_nodes[node]}"
 
-    # # Check that the folder paths for the detached nodes have been set correctly
+    # Check that the folder paths for the detached nodes have been set correctly
     for old_id, new_id in id_map.items():
-        folder_path_old = os.path.join(tmp_base_dir, old_id)
-        folder_path_new = os.path.join(tmp_base_dir, new_id)
+        project_id_old = db_utils.get_project_id_by_node(cur, old_id)
+        project_id_new = db_utils.get_project_id_by_node(cur, new_id)
+        folder_path_old = os.path.join(tmp_base_dir,project_id_old, old_id)
+        folder_path_new = os.path.join(tmp_base_dir,project_id_new, new_id)
         assert os.path.exists(folder_path_new), f"Folder for new node {new_id} does not exist."
         assert os.path.exists(folder_path_old), f"Folder for old node {old_id} does not exist."
 
@@ -1121,24 +1183,26 @@ def test_reference_node_into_pipeline(tmp_base_dir, pg_test_db):
     - Fails if the node does not exist in the source pipeline.
     - Fails if the source and target pipelines are the same.
     """
-    from fusionpipe.utils.pip_utils import reference_nodes_into_pipeline, generate_node_id, generate_pip_id
+    from fusionpipe.utils.pip_utils import reference_nodes_into_pipeline, generate_node_id, generate_pip_id, generate_project_id
     from fusionpipe.utils import db_utils
     from fusionpipe.utils.pip_utils import init_node_folder    
 
     conn = pg_test_db
     cur = db_utils.init_db(conn)
 
+    project_id = db_utils.add_project(cur, project_id=generate_project_id())
+
     # Create two pipelines
     source_pipeline_id = generate_pip_id()
     target_pipeline_id = generate_pip_id()
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=source_pipeline_id)
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=target_pipeline_id)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=source_pipeline_id, project_id=project_id)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=target_pipeline_id, project_id=project_id)
 
     # Create a node in the source pipeline
     node_id = generate_node_id()
     folder_path_node = os.path.join(tmp_base_dir, node_id)
     init_node_folder(folder_path_node, verbose=True)    
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path_node)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path_node, project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=source_pipeline_id)
     conn.commit()
 
@@ -1172,7 +1236,7 @@ def test_reference_node_into_pipeline(tmp_base_dir, pg_test_db):
     # Case 4: Fail if the node is not head of the subgraph
     # Create a second node in the source pipeline and create a relation
     second_node_id = generate_node_id()
-    db_utils.add_node_to_nodes(cur, node_id=second_node_id, status="ready", referenced=False)
+    db_utils.add_node_to_nodes(cur, node_id=second_node_id, status="ready", referenced=False, project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=second_node_id, pipeline_id=source_pipeline_id)
     db_utils.add_node_relation(cur, parent_id=node_id, child_id=second_node_id, edge_id='01')
     conn.commit()
@@ -1199,6 +1263,7 @@ def test_reference_and_delete_node_logic(monkeypatch, pg_test_db, tmp_base_dir):
         init_node_folder,
         reference_nodes_into_pipeline,
         delete_node_from_pipeline_with_referenced_logic,
+        generate_project_id,
         DIR_CHMOD_BLOCKED,
         DIR_CHMOD_DEFAULT,
     )
@@ -1210,18 +1275,20 @@ def test_reference_and_delete_node_logic(monkeypatch, pg_test_db, tmp_base_dir):
     conn = pg_test_db
     cur = db_utils.init_db(conn)
 
+    project_id = db_utils.add_project(cur, project_id=generate_project_id())
+
     # Step 1: Create a node and initialize its folder
     node_id = generate_node_id()
     folder_path_node = os.path.join(tmp_base_dir, node_id)
     init_node_folder(folder_path_node, verbose=True)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path_node)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path_node, project_id=project_id)
     conn.commit()
 
-    # Step 2: Create two pipelines
+    # Step 2: Create two pipelines. Add note to the first pipeline.
     pipeline_id1 = generate_pip_id()
     pipeline_id2 = generate_pip_id()
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1)
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1, project_id=project_id)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2, project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id1)
     conn.commit()
 
@@ -1259,6 +1326,7 @@ def test_detach_node_from_pipeline_logic(monkeypatch, pg_test_db, tmp_base_dir):
         generate_pip_id,
         init_node_folder,
         detach_node_from_pipeline,
+        generate_project_id,
         DIR_CHMOD_BLOCKED,
         DIR_CHMOD_DEFAULT,
     )
@@ -1273,12 +1341,13 @@ def test_detach_node_from_pipeline_logic(monkeypatch, pg_test_db, tmp_base_dir):
 
     # Step 1: Create a pipeline and a node
     pipeline_id = generate_pip_id()
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id)
+    project_id = db_utils.add_project(cur, project_id=generate_project_id())
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, project_id=project_id)
 
     node_id = generate_node_id()
     folder_path_node = os.path.join(tmp_base_dir, node_id)
     init_node_folder(folder_path_node, verbose=True)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=True, folder_path=folder_path_node)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=True, folder_path=folder_path_node, project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
     conn.commit()
 
@@ -1294,7 +1363,7 @@ def test_detach_node_from_pipeline_logic(monkeypatch, pg_test_db, tmp_base_dir):
     assert new_node_id in nodes_in_pipeline, f"New node {new_node_id} should be added to the pipeline."
 
     # Check that the new node's folder exists
-    new_folder_path_node = os.path.join(tmp_base_dir, new_node_id)
+    new_folder_path_node = os.path.join(tmp_base_dir, project_id, new_node_id)
     assert os.path.exists(new_folder_path_node), f"New node folder {new_folder_path_node} should exist."
 
     # Check that the new node's permissions are DIR_CHMOD_DEFAULT
@@ -1305,7 +1374,7 @@ def test_detach_node_from_pipeline_logic(monkeypatch, pg_test_db, tmp_base_dir):
     non_referenced_node_id = generate_node_id()
     folder_path_non_referenced = os.path.join(tmp_base_dir, non_referenced_node_id)
     init_node_folder(folder_path_non_referenced, verbose=True)
-    db_utils.add_node_to_nodes(cur, node_id=non_referenced_node_id, status="ready", referenced=False, folder_path=folder_path_non_referenced)
+    db_utils.add_node_to_nodes(cur, node_id=non_referenced_node_id, status="ready", referenced=False, folder_path=folder_path_non_referenced, project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=non_referenced_node_id, pipeline_id=pipeline_id)
     conn.commit()
 
@@ -1316,7 +1385,7 @@ def test_detach_node_from_pipeline_logic(monkeypatch, pg_test_db, tmp_base_dir):
     blocked_node_id = generate_node_id()
     folder_path_blocked = os.path.join(tmp_base_dir, blocked_node_id)
     init_node_folder(folder_path_blocked, verbose=True)
-    db_utils.add_node_to_nodes(cur, node_id=blocked_node_id, status="ready", referenced=True, folder_path=folder_path_blocked)
+    db_utils.add_node_to_nodes(cur, node_id=blocked_node_id, status="ready", referenced=True, folder_path=folder_path_blocked, project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=blocked_node_id, pipeline_id=pipeline_id)
     db_utils.update_node_blocked_status(cur, node_id=blocked_node_id, blocked=True)
     conn.commit()
@@ -1346,6 +1415,7 @@ def test_reference_and_detach_node_logic(monkeypatch, pg_test_db, tmp_base_dir):
         init_node_folder,
         reference_nodes_into_pipeline,
         detach_node_from_pipeline,
+        generate_project_id,
         DIR_CHMOD_BLOCKED,
         DIR_CHMOD_DEFAULT,
     )
@@ -1357,18 +1427,20 @@ def test_reference_and_detach_node_logic(monkeypatch, pg_test_db, tmp_base_dir):
     conn = pg_test_db
     cur = db_utils.init_db(conn)
 
+    project_id = db_utils.add_project(cur, project_id=generate_project_id())
+
     # Step 1: Create a node and initialize its folder
     node_id = generate_node_id()
-    folder_path_node = os.path.join(tmp_base_dir, node_id)
+    folder_path_node = os.path.join(tmp_base_dir, project_id, node_id)
     init_node_folder(folder_path_node, verbose=True)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path_node)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path_node, project_id=project_id)
     conn.commit()
 
     # Step 2: Create two pipelines
     pipeline_id1 = generate_pip_id()
     pipeline_id2 = generate_pip_id()
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1)
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id1, project_id=project_id)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id2, project_id=project_id)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id1)
     conn.commit()
 
@@ -1454,7 +1526,8 @@ def test_duplicate_pipeline(pg_test_db, dag_dummy_1, tmp_base_dir, monkeypatch):
 
     # Initialize folders for all nodes in the pipeline
     for node_id in dag_dummy_1.nodes:
-        folder_path = os.path.join(tmp_base_dir, node_id)
+        project_id = db_utils.get_project_id_by_node(cur, node_id)
+        folder_path = os.path.join(tmp_base_dir, project_id, node_id)
         init_node_folder(folder_path)
         db_utils.update_folder_path_node(cur, node_id, folder_path)
     conn.commit()
@@ -1488,9 +1561,9 @@ def test_duplicate_pipeline(pg_test_db, dag_dummy_1, tmp_base_dir, monkeypatch):
 
     # Check that the node folders were duplicated
     for node_id in dag_dummy_1.nodes:
-        original_folder = os.path.join(tmp_base_dir, node_id)
         new_node_id = [n for n in duplicated_graph.nodes if duplicated_graph.nodes[n].get('tag') == dag_dummy_1.nodes[node_id].get('tag')][0]
-        duplicated_folder = os.path.join(tmp_base_dir, new_node_id)
+        project_id = db_utils.get_project_id_by_node(cur, node_id)
+        duplicated_folder = os.path.join(tmp_base_dir, project_id, new_node_id)
         assert os.path.exists(duplicated_folder), f"Duplicated folder for node {new_node_id} does not exist."
         assert os.path.exists(os.path.join(duplicated_folder, "data")), f"Data folder for node {new_node_id} was not duplicated."
 
@@ -1521,17 +1594,19 @@ def test_branch_pipeline(pg_test_db, dag_dummy_1, tmp_base_dir, monkeypatch):
     conn.commit()
 
     original_pipeline_id = dag_dummy_1.graph['pipeline_id']
+    project_id = dag_dummy_1.graph['project_id']
 
     # Initialize folders for all nodes in the pipeline
     for node_id in dag_dummy_1.nodes:
-        folder_path = os.path.join(tmp_base_dir, node_id)
+        project_id = db_utils.get_project_id_by_node(cur, node_id)
+        folder_path = os.path.join(tmp_base_dir, project_id, node_id)
         init_node_folder(folder_path)
         db_utils.update_folder_path_node(cur, node_id, folder_path)
     conn.commit()
 
     # Add a parent pipeline to the original pipeline
     parent_pipeline_id = pip_utils.generate_pip_id()
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=parent_pipeline_id)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=parent_pipeline_id, project_id=project_id)
     db_utils.add_pipeline_relation(cur, child_id=original_pipeline_id, parent_id=parent_pipeline_id)
     conn.commit()
 
@@ -1568,9 +1643,9 @@ def test_branch_pipeline(pg_test_db, dag_dummy_1, tmp_base_dir, monkeypatch):
 
     # Check that the node folders were duplicated
     for node_id in dag_dummy_1.nodes:
-        original_folder = os.path.join(tmp_base_dir, node_id)
         new_node_id = [n for n in branched_graph.nodes if branched_graph.nodes[n].get('tag') == dag_dummy_1.nodes[node_id].get('tag')][0]
-        branched_folder = os.path.join(tmp_base_dir, new_node_id)
+        project_id = db_utils.get_project_id_by_node(cur, node_id)
+        branched_folder = os.path.join(tmp_base_dir,project_id, new_node_id)
         assert os.path.exists(branched_folder), f"Branched folder for node {new_node_id} does not exist."
         assert os.path.exists(os.path.join(branched_folder, "data")), f"Data folder for node {new_node_id} was not duplicated."
 
@@ -1584,6 +1659,7 @@ def test_create_node_in_pipeline(monkeypatch, pg_test_db, tmp_base_dir):
     from fusionpipe.utils.pip_utils import (
         create_node_in_pipeline,
         init_node_folder,
+        generate_project_id,
     )
 
     # Patch FUSIONPIPE_DATA_PATH to tmp_base_dir
@@ -1592,9 +1668,11 @@ def test_create_node_in_pipeline(monkeypatch, pg_test_db, tmp_base_dir):
     conn = pg_test_db
     cur = db_utils.init_db(conn)
 
+    project_id = db_utils.add_project(cur, project_id=generate_project_id())
+
     # Create a pipeline
     pipeline_id = "p_testpipeline"
-    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id)
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, project_id=project_id)
     conn.commit()
 
     # Call create_node_in_pipeline
@@ -1610,7 +1688,7 @@ def test_create_node_in_pipeline(monkeypatch, pg_test_db, tmp_base_dir):
     assert node_id in nodes_in_pipeline, f"Node {node_id} should be in pipeline {pipeline_id}."
 
     # Check that the node's folder exists
-    folder_path = os.path.join(tmp_base_dir, node_id)
+    folder_path = os.path.join(tmp_base_dir, project_id, node_id)
     assert os.path.exists(folder_path), f"Node folder {folder_path} should exist."
 
     # Check that the code, data, and reports subfolders exist

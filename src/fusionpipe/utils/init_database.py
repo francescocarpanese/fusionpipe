@@ -1,27 +1,36 @@
-from fusionpipe.utils.db_utils import create_db, connect_to_db, init_db, clear_all_tables, get_all_tables_names
 
-# Assuming that a postgres database is already running and accessible.
-# Set the enviroment variable DATABASE_URL="dbname=<dbname> user=<user> password=<password> host=localhost port=<dbport>"
-# Make sure that you are putting the right database name to prevent deleting the database from production.
+import argparse
+from fusionpipe.utils.db_utils import connect_to_db, init_db, clear_all_tables, get_all_tables_names, drop_all_tables
 
-# Add a simple pipeline
-conn = connect_to_db()
-cur = conn.cursor()
+def main():
+    parser = argparse.ArgumentParser(description="Database table management utility.")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--clear', action='store_true', help='Clear all tables (delete all data, keep schema)')
+    group.add_argument('--recreate', action='store_true', help='Drop and recreate all tables (delete everything)')
+    args = parser.parse_args()
 
+    conn = connect_to_db()
+    tables = get_all_tables_names(conn)
+    print(f"Connected to database: {conn.info.dbname}")
+    print(f"Current tables: {tables}")
 
-init_db(conn)
-tables = get_all_tables_names(conn)
+    action = "clear ALL data from" if args.clear else "DROP and RECREATE"
+    confirm = input(f"Type the database name '{conn.info.dbname}' to confirm you want to {action} all tables: ")
+    if confirm != conn.info.dbname:
+        print("Database name does not match. Aborting operation.")
+        return
 
-print(f"Connected to database: {conn.info.dbname}")
-
-if not tables:
-    print("No tables found. Initializing the database...")
-    init_db(conn)
-else:
-    print(f"Database contains the following tables: {tables}")
-    db_name = input("Enter the name of the database to confirm clearing all tables: ")
-    if db_name == conn.info.dbname:
+    if args.clear:
         print("Clearing all tables...")
         clear_all_tables(conn)
-    else:
-        print("Database name does not match. Aborting operation.")
+        print("All tables cleared.")
+    elif args.recreate:
+        print("Dropping all tables...")
+        drop_all_tables(conn)
+        print("Re-initializing tables...")
+        init_db(conn)
+        print("All tables recreated.")
+
+if __name__ == "__main__":
+    main()
+

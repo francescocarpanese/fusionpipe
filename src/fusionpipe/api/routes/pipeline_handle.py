@@ -33,9 +33,8 @@ def create_pipeline(payload: dict, db_conn=Depends(get_db)):
 @router.post("/create_project")
 def create_project(db_conn=Depends(get_db)):
     cur = db_conn.cursor()
-    project_id = pip_utils.generate_project_id()
     try:
-        db_utils.add_project(cur, project_id=project_id)
+        project_id = pip_utils.create_projet(cur)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
