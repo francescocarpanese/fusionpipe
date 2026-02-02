@@ -1,5 +1,6 @@
 import psycopg2
 
+
 def migrate_database():
     """
     Migrate data from fusionpipe_prod3 (v2_0_0) to fusionpipe_prod4 (v2_1_0)
@@ -17,14 +18,13 @@ def migrate_database():
 
     try:
         # --- Initialize new DB schema (should include project_id in nodes) ---
-        from src.fusionpipe.utils.db_utils import init_db
+        from fusionpipe.utils.db_utils import init_db
         print("Initializing new database schema...")
         init_db(new_conn)
 
         # --- Copy all tables except nodes ---
         tables_to_copy = [
-            "projects", "pipelines", "node_pipeline_relation",
-            "node_relation", "pipeline_relation", "processes"
+            "projects", "pipelines", "processes"
         ]
         for table in tables_to_copy:
             print(f"Migrating {table}...")
@@ -83,6 +83,27 @@ def migrate_database():
                 """,
                 (node_id, status, referenced, notes, new_folder_path, node_tag, blocked, project_id)
             )
+
+
+        # --- Copy all tables except nodes ---
+        tables_to_copy = [
+            "node_pipeline_relation",
+            "node_relation", "pipeline_relation",
+        ]
+        for table in tables_to_copy:
+            print(f"Migrating {table}...")
+            old_cur.execute(f"SELECT * FROM {table}")
+            rows = old_cur.fetchall()
+            if not rows:
+                continue
+            columns = [desc[0] for desc in old_cur.description]
+            colnames = ', '.join(columns)
+            placeholders = ', '.join(['%s'] * len(columns))
+            for row in rows:
+                new_cur.execute(
+                    f"INSERT INTO {table} ({colnames}) VALUES ({placeholders}) ON CONFLICT DO NOTHING",
+                    row
+                )
 
         new_conn.commit()
         print("✅ Migration completed successfully.")
