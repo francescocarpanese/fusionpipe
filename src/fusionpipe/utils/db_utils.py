@@ -1,5 +1,6 @@
 import psycopg2
 import os
+import pandas as pd
 
 table_names = [
     'node_relation',
@@ -1015,3 +1016,13 @@ def get_node_parents_and_edge_ids(cur, node_id):
     """
     cur.execute('SELECT parent_id, edge_id FROM node_relation WHERE child_id = %s', (node_id,))
     return {row[0]: row[1] for row in cur.fetchall()}
+
+def table_df(conn, table_name):
+    """
+    Dump a table from the database to a pandas DataFrame.
+    :param conn: Database connection
+    :param table_name: Name of the table to dump
+    :return: pandas DataFrame containing the table data
+    """
+    query = f'SELECT * FROM {table_name}'
+    return pd.read_sql_query(query, conn)

@@ -1,6 +1,16 @@
 import psycopg2
 
 
+def reset_serial(cur_dst, table, col='id'):
+    cur_dst.execute(f"""
+    SELECT setval(
+      pg_get_serial_sequence('{table}','{col}'),
+      (SELECT COALESCE(MAX({col}),0) + 1 FROM {table}),
+      false
+    )
+    """)
+
+
 def migrate_database():
     """
     Migrate data from fusionpipe_prod3 (v2_0_0) to fusionpipe_prod4 (v2_1_0)
@@ -99,6 +109,10 @@ def migrate_database():
                     f"INSERT INTO {table} ({colnames}) VALUES ({placeholders}) ON CONFLICT DO NOTHING",
                     row
                 )
+        
+        # Need to reset serials for tables with serial primary keys
+        reset_serial(new_cur, 'node_relation')
+        reset_serial(new_cur, 'pipeline_relation')
 
         new_conn.commit()
         print("✅ Migration completed successfully.")
