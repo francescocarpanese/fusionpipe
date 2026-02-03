@@ -29,6 +29,7 @@ dependencies = [
     "ray[default]>=2.48.0",
     "ipython>=9.3.0",
     "fp-user-utils",
+    "tqdm>=4.67.2",
 ]
 
 [build-system]
