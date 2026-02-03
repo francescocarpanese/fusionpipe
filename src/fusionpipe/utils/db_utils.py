@@ -275,6 +275,13 @@ def get_nodes_without_pipeline(cur):
     ''')
     return [row[0] for row in cur.fetchall()]
 
+def get_nodes_without_project(cur):
+    cur.execute('''
+        SELECT node_id FROM nodes
+        WHERE project_id IS NULL
+    ''')
+    return [row[0] for row in cur.fetchall()]
+
 def clear_database(cur):
     cur.execute('DELETE FROM pipelines')
     cur.execute('DELETE FROM nodes')

@@ -63,16 +63,11 @@ def migrate_database():
                     project_id = project_row[0]
 
             # 2. Update folder_path: */node_id -> */project_id/node_id
-            new_folder_path = folder_path
+            
             if folder_path and project_id:
-                # Find the last occurrence of /node_id in the path
-                idx = folder_path.rfind(f"/{node_id}")
-                if idx != -1:
-                    base = folder_path[:idx]
-                    new_folder_path = f"{base}/{project_id}/{node_id}"
-                else:
-                    # fallback: just append
-                    new_folder_path = f"{folder_path}/{project_id}/{node_id}"
+                new_folder_path = f'/data/defuse/fusionpipe-data-1/{project_id}/{node_id}'
+            else:
+                new_folder_path = f'error project {project_id}, folder_path {folder_path}'
 
             # Insert into new DB
             new_cur.execute(
