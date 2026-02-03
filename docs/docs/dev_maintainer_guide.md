@@ -486,26 +486,37 @@ systemctl --user status fusionpipe_ray.service
 
 # Onboard a new user
 
-- Create new user with `<newusername>` in postgres 
+## 1) Grant user access to postgres database
 
-`psql -U postgres -d fusionpipe_prod1 -c "CREATE USER <newusername>;"`
+- Create new user with `<newusername>` in postgres
 
-- Grant user access to role `fusionpipeusers` in postgres database
+`psql -U postgres -c "CREATE USER <newusername>;"`
 
-`psql -U postgres -d fusionpipe_prod1 -c "GRANT fusionpipeusers TO <newusername>;"`
+- Grant user access to role `fusionpipeusers` of postrgres
 
-- Ask user to write the following line in the `.profile` or `.bashrc_profile`, in order to persist the access to the database when it log in.
+`psql -U postgres -c "GRANT fusionpipeusers TO <newusername>;"`
 
+## 2) Create user env variables and set up .bashrc
+- The user needs to have the following env variable set
 ```bash
+export USER_UTILS_FOLDER_PATH=<user_util_folder_path>
 export DATABASE_URL="dbname=fusionpipe_prod1 port=5432"
+export FP_MATLAB_RUNNER_PATH=<matlab_exe_foler_path>
+export UV_CACHE_DIR=<uv_cache_dir>
 ```
 
-- Write the location of the user utils in the `.profile`, `.bashrc_profile`.
+It is suggested to create a dedicate `.base_fusionpipeenv` file. This file can then be imported in the `.bashrc` of the user in the host so that `.env` are set at every ssh connection of the user.
+
+- Import the env file in the `.bashrc` of the host
 ```bash
-export USER_UTILS_FOLDER_PATH="<absolute/path/to/user/utils>"
+if [ -f ~/.bash_fusionpipeenv ]; then
+    . ~/.bash_fusionpipeenv
 ```
 
-- Add user to the group in the server, in order for him to have access to the shared repository
+A convenience script is provided in `src/fusionpipe/admin_utils/set_usr_env.sh`, for this step.
+
+## 3) Add user to all needed groups in the Host
+- Add user to the group, in order for him to have access to the shared repository. Add to the per-project permission if neeeded.
 ```bash
 sudo usermod -aG fusionpipeusers username
 ```
@@ -527,23 +538,17 @@ ssh -L <fronend_port>:localhost:<fronend_port> -L <backend_port>:localhost:<back
 ```
 Usually ray port is set to 8265
 
-- Write the following line in the `.profile`. This allows the user to have access to the database
-```bash
-export DATABASE_URL="dbname=fusionpipe_prod1 port=5432"
-```
-
-- Write the location of the user utils in the `.profile`
-```bash
-export USER_UTILS_FOLDER_PATH="<absolute_path_to_user_utils>"
-```
+- Make sure that you or the admin has modified the your  `.bashrc` to include the import of the needed env variables.
 
 - When switching to a node run, if you want to user jupyter notebooks, run the following command to initialise the python kernel.
 ```bash
 uv run python init_node_kernel.py
 ```
 
-
-# Migration of database
-- Use the migration script based on your version
-- Remember to update the .bash_fusionpipeenv
-- Sometimes jypternotebook does not update the env variable. Delete the folder `.vscode_server` to force reinstalling the server
+# PostgresSQL databse migration
+Migrating the databset is always a delicated operation. It is recommended to:
+- Create a new databaset which will be the destination of your script.
+- Use the migration script provided in fusionpipe to migrate between versions of the database.
+- If you are migrating across multiple version, you will need to apply the migration script chained in the correct order.
+- Remember to update the `.bash_fusionpipeenv` with the name of the new database.
+- Sometimes jypternotebook does not update the env variable. Delete the folder `.vscode_server` to force reinstalling the server.
