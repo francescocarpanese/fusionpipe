@@ -799,7 +799,8 @@ def remove_project_from_everywhere(cur, project_id):
     :param project_id: ID of the project to remove
     :return: Number of rows affected
     """
-    cur.execute('UPDATE pipelines SET project_id = NULL WHERE project_id = %s', (project_id,))    
+    cur.execute('UPDATE pipelines SET project_id = NULL WHERE project_id = %s', (project_id,))
+    cur.execute('UPDATE nodes SET project_id = NULL WHERE project_id = %s', (project_id,))
     cur.execute('DELETE FROM projects WHERE project_id = %s', (project_id,))
     return cur.rowcount
 

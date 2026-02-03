@@ -1611,6 +1611,7 @@ def test_remove_project_from_everywhere(pg_test_db):
     db_utils.add_project(cur, project_id=project_id, tag="tag", notes="notes", owner="owner")
     for pid in pipeline_ids:
         db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pid, tag=f"pipeline_{pid}", project_id=project_id)
+    db_utils.add_node_to_nodes(cur, node_id="node1", project_id=project_id)
     conn.commit()
 
     # Remove project from everywhere
