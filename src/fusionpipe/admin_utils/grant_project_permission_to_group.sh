@@ -1,6 +1,7 @@
 #!/bin/bash
 # filepath: /home/fusionpipeadmin/Documents/fusionpipe/scratch/grant_project_access.sh
 
+# Script to grant the unix group permission to a project folder
 # Example call ./grant_project_permission_to_group.sh <group_name> <project_folder_path>
 
 if [ "$#" -ne 2 ]; then
@@ -27,7 +28,9 @@ else
     echo "  $USERS"
 fi
 
-# Set permissions
+# Set permissions.
+# User and group has rwx permission
+# AFCL is set to ensure new files and folders inherit the same permissions
 echo "Setting permissions for $PROJECT_PATH with group $GROUP_NAME..."
 sudo chown -R :"$GROUP_NAME" "$PROJECT_PATH"
 sudo chmod -R 2770 "$PROJECT_PATH"

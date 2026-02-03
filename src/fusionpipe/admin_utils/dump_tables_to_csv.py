@@ -1,3 +1,4 @@
+# Admin helper fuction to dump the database onto CSV files for quick inspection
 import pandas as pd
 
 def table_df(conn, table_name):
