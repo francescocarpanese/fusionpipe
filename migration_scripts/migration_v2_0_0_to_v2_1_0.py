@@ -1,6 +1,7 @@
 import psycopg2
 
-
+# This is very important. During a migratio of the database, the entris which are SERIAL 
+# in tables need to reset the index to the max value + 1 of the existing entries.
 def reset_serial(cur_dst, table, col='id'):
     cur_dst.execute(f"""
     SELECT setval(
