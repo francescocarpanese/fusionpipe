@@ -34,6 +34,9 @@ def get_run_mode_from_params(conn, node_id):
         raise FileNotFoundError(f"Parameter file not found for node {node_id}: {param_file}")
     with open(param_file, "r") as f:
         params = yaml.safe_load(f)
+    if not params:
+        params = {}
+    
     run_mode = params.get("run_mode", "local")
     return run_mode
 
