@@ -30,6 +30,7 @@ export USER_UTILS_FOLDER_PATH="${USER_UTILS_FOLDER_PATH:-/home/fusionpipeadmin/D
 export DATABASE_URL="${DATABASE_URL:-dbname=fusionpipe_prod4 port=5432}"
 export FP_MATLAB_RUNNER_PATH="${FP_MATLAB_RUNNER_PATH:-/data/codes/MATLAB/R2025a/bin/matlab}"
 export UV_CACHE_DIR="${UV_CACHE_DIR:-/data/defuse/fusionpipe-data-1/.cache/uv_cache}"
+export UV_PYTHON_INSTALL_DIR="${UV_PYTHON_INSTALL_DIR:-/home/fusionpipeadmin/.local/share/uv/python}"
 EOF
 
 chown "$USERNAME" "$ENV_FILE"

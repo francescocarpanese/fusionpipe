@@ -3,6 +3,7 @@
 
 # Script to grant the unix group permission to a project folder
 # Example call ./grant_project_permission_to_group.sh <group_name> <project_folder_path>
+# <project_folder_path> is the full path to the project folder
 
 if [ "$#" -ne 2 ]; then
     echo "Usage: $0 <group_name> <project_folder_path>"
