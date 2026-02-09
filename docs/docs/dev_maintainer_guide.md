@@ -225,6 +225,28 @@ sudo usermod -aG fusionpipeusers restrictedgroup
 
 - Grant R/W permission of the `project_id` folder to a specific group. Follow the instructions on the previous section, or use the script in `src/fusionpipe/admin_utils/grant_folder_permission_to_group.sh`
 
+# (TO BE IMPROVED) Python .exe set up.
+In order to guarantee that users run with the same python exe as the admin account.
+The python installation in the admin account is found in.
+```bash
+/home/fusionpipeadmin/.local/share/uv
+```
+This folder and subfolder needs to have have read and executable permission to `fp_users_all`.
+```bash
+drwxr-xr-x. fusionpipeadmin fp_users_all
+```
+
+The permission are the default for the file system, so you should only need to assign the folder to the group
+```bash
+sudo chgrp -R fp_users_all /home/fusionpipeadmin/.local/share/uv
+```
+
+In case the executable permission are different, then
+```bash
+chown :groupname /path/to/folder
+chmod g+rx /path/to/folder
+```
+
 # Set enviroment variables
 If you are the maintainer or single developer user, we recommend to collect all your environment variables into a single file `<myenvfile>.env`.
 Careful with the syntax, `.env` file does not allow for spaces in the definition definition of the environment variables. The strings needs to be withing `""` and not `''`. 
