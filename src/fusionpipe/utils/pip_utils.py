@@ -50,14 +50,20 @@ def change_permissions_recursive(path, file_mode=FILE_CHMOD_DEFAULT, dir_mode=DI
             for d in dirs:
                 dir_path = os.path.join(root, d)
                 if not os.path.islink(dir_path):
-                    os.chmod(dir_path, dir_mode)
+                        try:
+                            os.chmod(dir_path, dir_mode)
+                        except PermissionError:
+                            pass  # Skip directories we can't change
             for f in files:
                 # Skip excluded file patterns
                 if any(fnmatch.fnmatch(f, pattern) for pattern in excluded_dir):
                     continue
                 file_path = os.path.join(root, f)
                 if os.path.isfile(file_path) and not os.path.islink(file_path):
-                    os.chmod(file_path, file_mode)
+                        try:
+                            os.chmod(file_path, file_mode)
+                        except PermissionError:
+                            pass  # Skip files we can't change
 
 def take_ownership_of_files(folder_path, excluded_patterns=None, current_user=None):
     """
@@ -99,104 +105,65 @@ def take_ownership_of_files(folder_path, excluded_patterns=None, current_user=No
     for root, dirs, files in os.walk(folder_path, topdown=False):
         # Filter out excluded directories from traversal
         dirs[:] = [d for d in dirs if not should_exclude(d, excluded_patterns)]
-        
+
         # Process files
         for file_name in files:
-            # Skip excluded file patterns
             if should_exclude(file_name, excluded_patterns):
                 continue
-                
             file_path = os.path.join(root, file_name)
-            
             try:
-                # Skip symbolic links
                 if os.path.islink(file_path):
                     continue
-                
-                # Get file owner
                 file_stat = os.stat(file_path)
                 file_owner = pwd.getpwuid(file_stat.st_uid).pw_name
-                
-                # Skip if already owned by current user
                 if file_owner == current_user:
                     continue
-                
-                # Check if we have read access
                 if not os.access(file_path, os.R_OK):
                     errors.append(f"No read access to {file_path}")
                     continue
-                
-                # Check if we have write access to the parent directory
                 parent_dir = os.path.dirname(file_path)
                 if not os.access(parent_dir, os.W_OK):
                     errors.append(f"No write access to parent directory of {file_path}")
                     continue
-                
-                # Create temporary file name
                 temp_file = file_path + ".tmp_ownership"
-                
-                # Copy the file (preserves metadata)
                 shutil.copy2(file_path, temp_file)
-                
-                # Remove original file
                 os.remove(file_path)
-                
-                # Rename temp file to original name
                 os.rename(temp_file, file_path)
-                
                 processed_files.append(file_path)
-                
             except Exception as e:
                 errors.append(f"Error processing file {file_path}: {str(e)}")
-        
-        # Process directories
+
+    # Now process directories, but only if they are empty after file processing
+    for root, dirs, files in os.walk(folder_path, topdown=False):
+        dirs[:] = [d for d in dirs if not should_exclude(d, excluded_patterns)]
         for dir_name in dirs:
-            # Skip excluded directory patterns (already filtered above, but double-check)
             if should_exclude(dir_name, excluded_patterns):
                 continue
-                
             dir_path = os.path.join(root, dir_name)
-            
             try:
-                # Skip symbolic links
                 if os.path.islink(dir_path):
                     continue
-                
-                # Get directory owner
                 dir_stat = os.stat(dir_path)
                 dir_owner = pwd.getpwuid(dir_stat.st_uid).pw_name
-                
-                # Skip if already owned by current user
                 if dir_owner == current_user:
                     continue
-                
-                # Check if we have write access to the parent directory
                 parent_dir = os.path.dirname(dir_path)
                 if not os.access(parent_dir, os.W_OK):
                     errors.append(f"No write access to parent directory of {dir_path}")
                     continue
-                
-                # Get original permissions
-                original_stat = os.stat(dir_path)
-                original_mode = original_stat.st_mode
-                
-                # Create temporary directory name
-                temp_dir = dir_path + ".tmp_ownership"
-                
-                # Create new directory with same permissions
-                os.makedirs(temp_dir, mode=original_mode & 0o777, exist_ok=False)
-                
-                # Copy directory metadata
-                shutil.copystat(dir_path, temp_dir)
-                
-                # Remove original directory (should be empty at this point)
-                os.rmdir(dir_path)
-                
-                # Rename temp directory to original name
-                os.rename(temp_dir, dir_path)
-                
-                processed_dirs.append(dir_path)
-                
+                # Only replace directory if it is now empty
+                if not os.listdir(dir_path):
+                    original_stat = os.stat(dir_path)
+                    original_mode = original_stat.st_mode
+                    temp_dir = dir_path + ".tmp_ownership"
+                    os.makedirs(temp_dir, mode=original_mode & 0o777, exist_ok=False)
+                    shutil.copystat(dir_path, temp_dir)
+                    os.rmdir(dir_path)
+                    os.rename(temp_dir, dir_path)
+                    processed_dirs.append(dir_path)
+                else:
+                    # Directory not empty, so cannot replace; just skip
+                    continue
             except Exception as e:
                 errors.append(f"Error processing directory {dir_path}: {str(e)}")
     
