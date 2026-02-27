@@ -2076,3 +2076,396 @@ def test_drop_all_tables(pg_test_db):
     with pytest.raises(psycopg2.errors.UndefinedTable):
         cur.execute("SELECT * FROM processes")
     conn.rollback()  # Reset transaction state after error
+
+
+# ---------------------------------------------------------------------------
+# Node group tests
+# ---------------------------------------------------------------------------
+
+def _setup_pipeline_with_nodes(cur, conn, n_nodes=2):
+    """Helper: create a project, pipeline, and n_nodes; return (pipeline_id, node_ids)."""
+    from fusionpipe.utils import db_utils
+    from fusionpipe.utils.pip_utils import generate_pip_id, generate_project_id, generate_node_id, generate_id
+
+    project_id = generate_project_id()
+    db_utils.add_project(cur, project_id=project_id)
+    pipeline_id = generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag=generate_id(), project_id=project_id)
+    node_ids = []
+    for _ in range(n_nodes):
+        node_id = generate_node_id()
+        db_utils.add_node_to_nodes(cur, node_id=node_id, project_id=project_id, folder_path=f"/tmp/{node_id}")
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+        node_ids.append(node_id)
+    conn.commit()
+    return pipeline_id, node_ids
+
+
+def test_create_node_group(pg_test_db):
+    """create_node_group inserts a row in node_groups with the expected values."""
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id, _ = _setup_pipeline_with_nodes(cur, conn)
+
+    group_id = "ng_test1"
+    db_utils.create_node_group(
+        cur, group_id, pipeline_id,
+        tag="my group", collapsed=False,
+        pos_x=10.0, pos_y=20.0, width=300.0, height=200.0,
+    )
+    conn.commit()
+
+    cur.execute(
+        "SELECT group_id, pipeline_id, tag, collapsed, pos_x, pos_y, width, height "
+        "FROM node_groups WHERE group_id = %s",
+        (group_id,),
+    )
+    row = cur.fetchone()
+    assert row is not None, "Node group row not found."
+    assert row[0] == group_id
+    assert row[1] == pipeline_id
+    assert row[2] == "my group"
+    assert row[3] is False
+    assert float(row[4]) == 10.0
+    assert float(row[5]) == 20.0
+    assert float(row[6]) == 300.0
+    assert float(row[7]) == 200.0
+
+
+def test_create_node_group_defaults(pg_test_db):
+    """create_node_group uses sensible defaults for optional parameters."""
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id, _ = _setup_pipeline_with_nodes(cur, conn)
+
+    group_id = "ng_defaults"
+    db_utils.create_node_group(cur, group_id, pipeline_id)
+    conn.commit()
+
+    cur.execute(
+        "SELECT collapsed, pos_x, pos_y, width, height FROM node_groups WHERE group_id = %s",
+        (group_id,),
+    )
+    row = cur.fetchone()
+    assert row is not None
+    assert row[0] is False          # collapsed default
+    assert float(row[1]) == 0.0    # pos_x default
+    assert float(row[2]) == 0.0    # pos_y default
+    assert float(row[3]) == 400.0  # width default
+    assert float(row[4]) == 300.0  # height default
+
+
+def test_add_node_to_group_relation(pg_test_db):
+    """add_node_to_group_relation creates a membership row for each node."""
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id, node_ids = _setup_pipeline_with_nodes(cur, conn, n_nodes=3)
+
+    group_id = "ng_members"
+    db_utils.create_node_group(cur, group_id, pipeline_id)
+    for nid in node_ids:
+        db_utils.add_node_to_group_relation(cur, nid, group_id)
+    conn.commit()
+
+    cur.execute(
+        "SELECT node_id FROM node_group_relation WHERE group_id = %s ORDER BY node_id",
+        (group_id,),
+    )
+    db_members = {row[0] for row in cur.fetchall()}
+    assert db_members == set(node_ids)
+
+
+def test_add_node_to_group_relation_upsert(pg_test_db):
+    """Assigning a node already in one group to another group (upsert) works correctly."""
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id, node_ids = _setup_pipeline_with_nodes(cur, conn, n_nodes=1)
+    node_id = node_ids[0]
+
+    group_a = "ng_upsert_a"
+    group_b = "ng_upsert_b"
+    db_utils.create_node_group(cur, group_a, pipeline_id)
+    db_utils.create_node_group(cur, group_b, pipeline_id)
+
+    # Assign to group A first
+    db_utils.add_node_to_group_relation(cur, node_id, group_a)
+    conn.commit()
+    assert db_utils.get_group_for_node(cur, node_id) == group_a
+
+    # Re-assign to group B via upsert
+    db_utils.add_node_to_group_relation(cur, node_id, group_b)
+    conn.commit()
+    assert db_utils.get_group_for_node(cur, node_id) == group_b
+
+    # Only one row should exist for this node
+    cur.execute("SELECT COUNT(*) FROM node_group_relation WHERE node_id = %s", (node_id,))
+    assert cur.fetchone()[0] == 1
+
+
+def test_delete_node_group(pg_test_db):
+    """delete_node_group removes the group row and all membership rows."""
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id, node_ids = _setup_pipeline_with_nodes(cur, conn, n_nodes=2)
+
+    group_id = "ng_del"
+    db_utils.create_node_group(cur, group_id, pipeline_id)
+    for nid in node_ids:
+        db_utils.add_node_to_group_relation(cur, nid, group_id)
+    conn.commit()
+
+    db_utils.delete_node_group(cur, group_id)
+    conn.commit()
+
+    cur.execute("SELECT COUNT(*) FROM node_groups WHERE group_id = %s", (group_id,))
+    assert cur.fetchone()[0] == 0, "Group row should be gone."
+
+    cur.execute("SELECT COUNT(*) FROM node_group_relation WHERE group_id = %s", (group_id,))
+    assert cur.fetchone()[0] == 0, "All membership rows should be gone."
+
+    # Nodes themselves must still exist
+    for nid in node_ids:
+        cur.execute("SELECT COUNT(*) FROM nodes WHERE node_id = %s", (nid,))
+        assert cur.fetchone()[0] == 1, f"Node {nid} should not be deleted."
+
+
+def test_get_groups_for_pipeline(pg_test_db):
+    """get_groups_for_pipeline returns the correct structure for all groups in a pipeline."""
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id, node_ids = _setup_pipeline_with_nodes(cur, conn, n_nodes=4)
+
+    # Create two groups on the same pipeline
+    g1, g2 = "ng_gfp_1", "ng_gfp_2"
+    db_utils.create_node_group(cur, g1, pipeline_id, tag="alpha", pos_x=1.0, pos_y=2.0, width=100.0, height=50.0)
+    db_utils.create_node_group(cur, g2, pipeline_id, tag="beta", collapsed=True, pos_x=5.0, pos_y=6.0, width=200.0, height=80.0)
+    db_utils.add_node_to_group_relation(cur, node_ids[0], g1)
+    db_utils.add_node_to_group_relation(cur, node_ids[1], g1)
+    db_utils.add_node_to_group_relation(cur, node_ids[2], g2)
+    conn.commit()
+
+    groups = db_utils.get_groups_for_pipeline(cur, pipeline_id)
+    assert len(groups) == 2
+
+    by_id = {g["group_id"]: g for g in groups}
+
+    assert by_id[g1]["tag"] == "alpha"
+    assert by_id[g1]["collapsed"] is False
+    assert by_id[g1]["pos_x"] == 1.0
+    assert by_id[g1]["pos_y"] == 2.0
+    assert by_id[g1]["width"] == 100.0
+    assert by_id[g1]["height"] == 50.0
+    assert set(by_id[g1]["node_ids"]) == {node_ids[0], node_ids[1]}
+
+    assert by_id[g2]["tag"] == "beta"
+    assert by_id[g2]["collapsed"] is True
+    assert set(by_id[g2]["node_ids"]) == {node_ids[2]}
+
+    # node_ids[3] belongs to no group and must not appear in any node_ids list
+    all_member_ids = by_id[g1]["node_ids"] + by_id[g2]["node_ids"]
+    assert node_ids[3] not in all_member_ids
+
+
+def test_get_groups_for_pipeline_no_groups(pg_test_db):
+    """get_groups_for_pipeline returns an empty list when no groups exist."""
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id, _ = _setup_pipeline_with_nodes(cur, conn)
+
+    groups = db_utils.get_groups_for_pipeline(cur, pipeline_id)
+    assert groups == []
+
+
+def test_update_node_group_collapse(pg_test_db):
+    """update_node_group_collapse persists the collapsed flag correctly."""
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id, _ = _setup_pipeline_with_nodes(cur, conn)
+
+    group_id = "ng_collapse"
+    db_utils.create_node_group(cur, group_id, pipeline_id, collapsed=False)
+    conn.commit()
+
+    # Collapse the group
+    db_utils.update_node_group_collapse(cur, group_id, True)
+    conn.commit()
+    cur.execute("SELECT collapsed FROM node_groups WHERE group_id = %s", (group_id,))
+    assert cur.fetchone()[0] is True
+
+    # Expand again
+    db_utils.update_node_group_collapse(cur, group_id, False)
+    conn.commit()
+    cur.execute("SELECT collapsed FROM node_groups WHERE group_id = %s", (group_id,))
+    assert cur.fetchone()[0] is False
+
+
+def test_update_node_group_position(pg_test_db):
+    """update_node_group_position persists pos_x, pos_y, width, height."""
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id, _ = _setup_pipeline_with_nodes(cur, conn)
+
+    group_id = "ng_pos"
+    db_utils.create_node_group(cur, group_id, pipeline_id)
+    conn.commit()
+
+    db_utils.update_node_group_position(cur, group_id, 50.5, 75.0, 500.0, 400.0)
+    conn.commit()
+
+    cur.execute(
+        "SELECT pos_x, pos_y, width, height FROM node_groups WHERE group_id = %s",
+        (group_id,),
+    )
+    row = cur.fetchone()
+    assert float(row[0]) == 50.5
+    assert float(row[1]) == 75.0
+    assert float(row[2]) == 500.0
+    assert float(row[3]) == 400.0
+
+
+def test_update_node_group_tag(pg_test_db):
+    """update_node_group_tag changes the human-readable label."""
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id, _ = _setup_pipeline_with_nodes(cur, conn)
+
+    group_id = "ng_tag"
+    db_utils.create_node_group(cur, group_id, pipeline_id, tag="original")
+    conn.commit()
+
+    db_utils.update_node_group_tag(cur, group_id, "renamed")
+    conn.commit()
+
+    cur.execute("SELECT tag FROM node_groups WHERE group_id = %s", (group_id,))
+    assert cur.fetchone()[0] == "renamed"
+
+
+def test_get_group_for_node(pg_test_db):
+    """get_group_for_node returns the correct group_id or None."""
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id, node_ids = _setup_pipeline_with_nodes(cur, conn, n_nodes=2)
+    grouped_node, ungrouped_node = node_ids
+
+    group_id = "ng_gfn"
+    db_utils.create_node_group(cur, group_id, pipeline_id)
+    db_utils.add_node_to_group_relation(cur, grouped_node, group_id)
+    conn.commit()
+
+    assert db_utils.get_group_for_node(cur, grouped_node) == group_id
+    assert db_utils.get_group_for_node(cur, ungrouped_node) is None
+
+
+def test_delete_groups_for_pipeline(pg_test_db):
+    """delete_groups_for_pipeline removes all groups and memberships for a pipeline."""
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id, node_ids = _setup_pipeline_with_nodes(cur, conn, n_nodes=3)
+
+    # Create two groups on the target pipeline and one on a different pipeline
+    pipeline_id2, other_nodes = _setup_pipeline_with_nodes(cur, conn, n_nodes=1)
+
+    g1, g2, g_other = "ng_dp_1", "ng_dp_2", "ng_dp_other"
+    db_utils.create_node_group(cur, g1, pipeline_id)
+    db_utils.create_node_group(cur, g2, pipeline_id)
+    db_utils.create_node_group(cur, g_other, pipeline_id2)
+
+    db_utils.add_node_to_group_relation(cur, node_ids[0], g1)
+    db_utils.add_node_to_group_relation(cur, node_ids[1], g2)
+    db_utils.add_node_to_group_relation(cur, other_nodes[0], g_other)
+    conn.commit()
+
+    db_utils.delete_groups_for_pipeline(cur, pipeline_id)
+    conn.commit()
+
+    # All groups on pipeline_id should be gone
+    cur.execute("SELECT COUNT(*) FROM node_groups WHERE pipeline_id = %s", (pipeline_id,))
+    assert cur.fetchone()[0] == 0
+
+    # Memberships of those groups should be gone
+    cur.execute("SELECT COUNT(*) FROM node_group_relation WHERE group_id IN (%s, %s)", (g1, g2))
+    assert cur.fetchone()[0] == 0
+
+    # Group on the other pipeline must be intact
+    cur.execute("SELECT COUNT(*) FROM node_groups WHERE group_id = %s", (g_other,))
+    assert cur.fetchone()[0] == 1
+
+
+def test_remove_node_from_everywhere_removes_from_group(pg_test_db):
+    """remove_node_from_everywhere also cleans up node_group_relation for that node."""
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id, node_ids = _setup_pipeline_with_nodes(cur, conn, n_nodes=2)
+    node_to_delete, surviving_node = node_ids
+
+    group_id = "ng_rnfe"
+    db_utils.create_node_group(cur, group_id, pipeline_id)
+    db_utils.add_node_to_group_relation(cur, node_to_delete, group_id)
+    db_utils.add_node_to_group_relation(cur, surviving_node, group_id)
+    conn.commit()
+
+    db_utils.remove_node_from_everywhere(cur, node_to_delete)
+    conn.commit()
+
+    # The deleted node's membership must be gone
+    cur.execute(
+        "SELECT COUNT(*) FROM node_group_relation WHERE node_id = %s", (node_to_delete,)
+    )
+    assert cur.fetchone()[0] == 0
+
+    # The surviving node's membership should remain
+    assert db_utils.get_group_for_node(cur, surviving_node) == group_id
+
+    # The group itself must still exist
+    cur.execute("SELECT COUNT(*) FROM node_groups WHERE group_id = %s", (group_id,))
+    assert cur.fetchone()[0] == 1
+
+
+def test_remove_pipeline_from_everywhere_removes_groups(pg_test_db):
+    """remove_pipeline_from_everywhere also removes all node groups for the pipeline."""
+    from fusionpipe.utils import db_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id, node_ids = _setup_pipeline_with_nodes(cur, conn, n_nodes=2)
+
+    group_id = "ng_rpfe"
+    db_utils.create_node_group(cur, group_id, pipeline_id)
+    for nid in node_ids:
+        db_utils.add_node_to_group_relation(cur, nid, group_id)
+    conn.commit()
+
+    db_utils.remove_pipeline_from_everywhere(cur, pipeline_id)
+    conn.commit()
+
+    # Group and memberships must be gone
+    cur.execute("SELECT COUNT(*) FROM node_groups WHERE group_id = %s", (group_id,))
+    assert cur.fetchone()[0] == 0
+    cur.execute("SELECT COUNT(*) FROM node_group_relation WHERE group_id = %s", (group_id,))
+    assert cur.fetchone()[0] == 0

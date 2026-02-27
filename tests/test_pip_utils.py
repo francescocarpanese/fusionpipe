@@ -1822,3 +1822,84 @@ def test_delete_edge_and_update_status(pg_test_db, dag_dummy_1):
     conn.commit()
     with pytest.raises(ValueError, match="referenced"):
         delete_edge_and_update_status(cur, pipeline_id, parent_id, child_id)
+
+
+# ---------------------------------------------------------------------------
+# Node group integration in pipeline dict
+# ---------------------------------------------------------------------------
+
+def test_db_to_pipeline_dict_includes_groups(pg_test_db):
+    """
+    db_to_pipeline_dict_from_pip_id must include a 'groups' key whose value
+    is the list returned by get_groups_for_pipeline.
+    The returned group dicts must contain the correct fields and member node IDs.
+    """
+    from fusionpipe.utils import db_utils, pip_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Build a minimal pipeline with two nodes
+    project_id = pip_utils.generate_project_id()
+    db_utils.add_project(cur, project_id=project_id)
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_grp", project_id=project_id)
+
+    node_a = pip_utils.generate_node_id()
+    node_b = pip_utils.generate_node_id()
+    node_c = pip_utils.generate_node_id()
+    for nid in (node_a, node_b, node_c):
+        db_utils.add_node_to_nodes(cur, node_id=nid, project_id=project_id, folder_path=f"/tmp/{nid}")
+        db_utils.add_node_to_pipeline(cur, node_id=nid, pipeline_id=pipeline_id)
+
+    # Create a group containing node_a and node_b
+    group_id = "ng_dict_test"
+    db_utils.create_node_group(
+        cur, group_id, pipeline_id,
+        tag="group alpha", collapsed=True,
+        pos_x=3.0, pos_y=7.0, width=350.0, height=250.0,
+    )
+    db_utils.add_node_to_group_relation(cur, node_a, group_id)
+    db_utils.add_node_to_group_relation(cur, node_b, group_id)
+    conn.commit()
+
+    pipeline_dict = pip_utils.db_to_pipeline_dict_from_pip_id(cur, pipeline_id)
+
+    # 'groups' key must be present
+    assert "groups" in pipeline_dict, "'groups' key missing from pipeline dict."
+
+    groups = pipeline_dict["groups"]
+    assert len(groups) == 1, "Expected exactly one group."
+
+    g = groups[0]
+    assert g["group_id"] == group_id
+    assert g["tag"] == "group alpha"
+    assert g["collapsed"] is True
+    assert g["pos_x"] == 3.0
+    assert g["pos_y"] == 7.0
+    assert g["width"] == 350.0
+    assert g["height"] == 250.0
+    assert set(g["node_ids"]) == {node_a, node_b}
+
+
+def test_db_to_pipeline_dict_groups_empty_when_no_groups(pg_test_db):
+    """'groups' key is an empty list when no groups have been created for the pipeline."""
+    from fusionpipe.utils import db_utils, pip_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    project_id = pip_utils.generate_project_id()
+    db_utils.add_project(cur, project_id=project_id)
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="no_grp", project_id=project_id)
+
+    node_id = pip_utils.generate_node_id()
+    db_utils.add_node_to_nodes(cur, node_id=node_id, project_id=project_id, folder_path=f"/tmp/{node_id}")
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    conn.commit()
+
+    pipeline_dict = pip_utils.db_to_pipeline_dict_from_pip_id(cur, pipeline_id)
+
+    assert "groups" in pipeline_dict
+    assert pipeline_dict["groups"] == []
