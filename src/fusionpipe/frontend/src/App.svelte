@@ -115,6 +115,10 @@
   }
   let currentGroups = $state<NodeGroupState[]>([]);
 
+  // Stores each node's position at the moment a drag begins so we can revert
+  // if the drop violates a group boundary constraint.
+  let preDragPositions = new Map<string, { x: number; y: number }>();
+
   let nodeTypes = { custom: CustomNode, customProject: CustomNodeProject, nodeGroup: GroupNode };
 
   const dagreGraph = new dagre.graphlib.Graph();
@@ -1174,12 +1178,15 @@
       });
 
       // Apply node group membership to regular nodes (relative positions + hidden when collapsed)
+      // extent: "parent" makes SvelteFlow enforce that child nodes cannot be dragged
+      // outside their container at the interaction level.
       const processedNodes: Node[] = rawNodes.map((node) => {
         const st = nodeGroupMap.get(node.id);
         if (!st) return node;
         return {
           ...node,
           parentId: st.groupId,
+          extent: "parent" as const,
           // Convert absolute position → relative to container
           position: {
             x: node.position.x - st.pos_x,
@@ -2768,14 +2775,40 @@
           onnodecontextmenu={handleContextMenu}
           onpanecontextmenu={({ event }) => handlePaneContextMenu(event)}
           onpaneclick={handlePaneClick}
+          onnodedragstart={({ node }) => {
+            // Capture position before any drag so we can revert if needed
+            preDragPositions.set(node.id, { ...node.position });
+          }}
           onnodedragstop={async (e) => {
-            await saveNodePositions();
-            nodes = resolveCollisions(nodes, {
-              margin: 20,
-              defaultWidth: nodeWidth,
-              defaultHeight: nodeHeight,
+            // Guard: revert any external node that landed inside a group's bounding box
+            const groupContainers = nodes.filter((n) => n.type === "nodeGroup");
+            let anyReverted = false;
+            nodes = nodes.map((n) => {
+              if (n.type === "nodeGroup" || n.parentId || n.hidden) return n;
+              for (const g of groupContainers) {
+                const gx = g.position.x;
+                const gy = g.position.y;
+                const gw = (g as any).width ?? 400;
+                const gh = (g as any).height ?? 300;
+                const nx = n.position.x;
+                const ny = n.position.y;
+                // AABB overlap: node rect vs group rect
+                if (nx < gx + gw && nx + nodeWidth > gx && ny < gy + gh && ny + nodeHeight > gy) {
+                  const prev = preDragPositions.get(n.id);
+                  if (prev) { anyReverted = true; return { ...n, position: prev }; }
+                }
+              }
+              return n;
             });
             await saveNodePositions();
+            if (!anyReverted) {
+              nodes = resolveCollisions(nodes, {
+                margin: 20,
+                defaultWidth: nodeWidth,
+                defaultHeight: nodeHeight,
+              });
+              await saveNodePositions();
+            }
           }}
           {nodeTypes}
           style="height: 100%;"
