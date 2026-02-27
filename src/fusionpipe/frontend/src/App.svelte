@@ -66,7 +66,7 @@
   const nodeHeight = 36;
   // Fixed pixel size of a collapsed node group container (wide enough to show the label)
   const COLLAPSED_WIDTH = 220;
-  const COLLAPSED_HEIGHT = 42;
+  const COLLAPSED_HEIGHT = 56;
   let nodeDrawereForm = $state({
     id: "",
     tag: "",

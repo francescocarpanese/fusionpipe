@@ -103,7 +103,7 @@
 
   .group-header.header-only {
     border-radius: 18px;
-    min-height: 32px;
+    min-height: 46px;
   }
 
   .group-label {
