@@ -4,24 +4,22 @@ This is the developer/maintainer guide for `fusionpipe`.
 
 - Frontend in Svelte. 
 - FASTAPI web-app as backend.
-- A postgresSQL database which is used 
+- A postgresSQL database called by the FASTAPI backend.
 
-With the current guidelines `fusionpipe` 
-This guide has different level of complexity depending on what is your role an your deployment solution:
+The guide following guide has different level of complexity depending on what is your role an your deployment solution:
 
-- **user** (without installation): In case you are only using `fusionpipe` which is already set-up by your IT, refer to the user guide
-- **user** (with installation): In case you would like to run `fusionpipe` locally on your device and use it. This is the same set-up as for the maintainer. If you are the only user, the installation is simplified.
-- **developer**: In this case you would like to contribute to the development of `fusionpipe`. You will have some special command to run the different systems in debugging mode. It is expected that in this set-up you will be developing the application as a single user.
-- **maintainer**: If you are a maintainer of `fusionpipe`, you are deploying fusion for yourself and potentially other users. In case you will have multiple users using the service, you will need some extra set-up to grant the necessary permission to the different users. 
+- **user** (without installation): In case you are only using `fusionpipe` which is already set-up by your IT, refer to the user guide directly.
+- **user** (with installation): In case you would like to run `fusionpipe` locally on your device and use it. This is the same set-up as for the maintainer. If you are the only user, the installation is simplified. Refer to the single user installation.
+- **developer**: In this case you would like to contribute to the development of `fusionpipe`. You will have some special command to run the different systems in debugging mode. It is expected that in this set-up you will be developing the application as a single user. Refer to the single user installation.
+- **maintainer**: If you are a maintainer of `fusionpipe`, you are deploying fusion for yourself and other users. Special set-up are required to grant the necessary permission to the different users. 
 
 Some operation during the installation process will require to have sudo access. Reach out to your admin if needed. The operation that requires sudo are:
 
 - Setting up `postgresSQL` 
-- Grant access to `docker` group to your user.
 - Extend permission r/w permission if setting up the deployment for multiple users.
 - Networking in case you are deploying the solution on a server which firewall and port restriction.
 
-In summary `fusionpipe` has the following things to be set-up:
+The summary of `fusionpipe` installation has the following things to be set-up:
 
 - Svelte application
 - FAST-API backend
@@ -37,8 +35,6 @@ In case of multiple users installation, also the following needs to be set-up.
 
 ### Postgres
 [PostgreSQL](https://www.postgresql.org/) is used as a database to keep track of the relation between nodes and pipeline and other metadata.
-- Set-up postgres in your local machine.
-- Use docker to set up postgres.
 
 #### local installation (need sudo)
 
@@ -60,45 +56,18 @@ After changing the authorisatio, reload postgres
 sudo systemctl reload postgresql
 ```
 
-#### docker installation 
-* TO BE UPDATED *
-
-Set the env variable.
-
-- Modify the variables into the `developer.env` file.
-
-- Navigate the docker folder
-```bash
-cd docker
-```
-
-- Set up the variables in `docker-compose-psg.yml`. See documentation in the file.
-- If you already have a database and you want to remove all the data related to it, delete the folder with the database location. Otherwise, to continue with the existing database, skip this step.
-- Run the docker compose command to start the postgres database.
-```bash
-docker-compose -f docker-compose-psg.yml up
-```
-This will startup yuor postgres database in a docker container, and expose to the port specified in the `docker-compose-psg.yml` file.
-
-Test connection
-```bash
-psql -h localhost -p 5542 -U <user> -d <database>
-```
-
 ### UV package manager
-UV package manager is the solution used to in order to deal with python packages.
-
+[UV](https://docs.astral.sh/uv/) package manager is the solution used to in order to deal with python packages 
 
 ## Set-up the database
-The following commands needs to be run from the OS user `postgres` which has all the access.
+The following commands needs to be run from the OS user `postgres` which has all the needed access.
 It is assumed that there is a priviledge OS user, which is the maintainer/developer for `fusionpipe` in your machine.
 There are different possibilities for that.
 
 - If you are the only user/developer, use your user as admin.
-- If you are the maintainer for fusionpipe on a server, we recommend to create an OS user which will manage the `fusionpipe` installation. We will assume this user to be to be called `fusionpipeadmin` in the following.
+- If you are the maintainer for fusionpipe on a server, which servers multiple user, it is recommended to create an OS user which will manage the `fusionpipe` installation. This user is called `fusionpipeadmin` in the following.
 
-
-The following opeartion must be done in the order they are presented
+The following operation must be done in the order they are presented:
 
 - Log in as `postgres` user in your machine
 ```bash
@@ -138,12 +107,12 @@ psql -d fusionpipe_prod1 -c "REVOKE CREATE ON SCHEMA public FROM PUBLIC;"
 psql -d fusionpipe_prod1 -c "REVOKE CREATE ON SCHEMA public FROM fusionpipeusers;"
 ```
 
-- Grant the possibility to the ROLE `fusionusers` to be modify the table in the database.
+- Grant the possibility to the ROLE `fusionpipeusers` to be modify the table in the database.
 ```bash
 psql -d fusionpipe_prod1 -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO fusionpipeusers;"
 ```
 
-- Grant the possibiliy to create tables to the `fusionpipeadmin`.
+- Grant the possibiliy to create tables to the `fusionpipeadmin`. This is convenient for fusionpipeadmin to create the initial tables.
 ```bash
 psql -d fusionpipe_prod1 -c "GRANT CREATE ON SCHEMA public TO fusionpipeadmin;"
 ```
@@ -158,7 +127,8 @@ psql -U postgres -d fusionpipe_prod1 -c "GRANT fusionpipeusers TO fusionpipeadmi
 This **extends** the permissions of `fusionpipeadmin` to include all privileges granted to `fusionpipeusers`. The `fusionpipeadmin` will retain its own privileges and additionally inherit those of `fusionpipeusers`. It does **not** restrict `fusionpipeadmin` to only the permissions of `fusionpipeusers`; instead, it is a superset of both.
 
 
-- The following command updates the default privileges for tables created in the `public` schema of the `fusionpipe_prod1` database. It ensures that any new tables will automatically grant `SELECT`, `INSERT`, `UPDATE`, and `DELETE` permissions to the `fusionpipeusers` role. Run this command as the `fusionpipeadmin` user:
+- The following command updates the default privileges for tables created in the `public` schema of the `fusionpipe_prod1` database. It ensures that any new tables will automatically grant `SELECT`, `INSERT`, `UPDATE`, and `DELETE` permissions to the `fusionpipeusers` role.
+- Run this command as the `fusionpipeadmin` user:
 ```bash
 psql -U fusionpipeadmin -d fusionpipe_prod1 -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO fusionpipeusers;"
 ```
@@ -166,7 +136,7 @@ psql -U fusionpipeadmin -d fusionpipe_prod1 -c "ALTER DEFAULT PRIVILEGES IN SCHE
 
 # Create and initialise the required tables for database
 
-> **⚠️ WARNING:** The following operations will modify your PostgreSQL database. Ensure you have backed up any important data before proceeding. Only users with the appropriate privileges should perform these actions.
+> **⚠️ WARNING:** The following operations will modify your PostgreSQL database. Ensure you have backed up any important data before proceeding. Only users with the appropriate privileges should perform these actions. In case you are migrating the database it is recomended to create a new database which contains the migration.
 
 The database needs to be initialised with the tables for the `fusionpipe` application. Given the role that have been granted in the previous step, only the `fusionpipeadmin` user is able to create this.
 
@@ -181,6 +151,7 @@ uv run python fusionpipe/src/fusionpipe/utils/init_database.py
 ```
 
 # Create data folder and extend R/W access for multiple users
+
 - Create the folder that will contain application data for `fusionpipe` data application. 
 ```bash
 mkdir <fusion_pipe_data_folder>
@@ -211,15 +182,69 @@ sudo chmod -R 2770 <fusion_pipe_data_folder>
 - Enforce Permissions with ACLs. This will let other user to write on files generated by other users, independently of the user mask.
 ```bash
 sudo setfacl -R -m g::rwx <fusion_pipe_data_folder>
+sudo setfacl -R -m m::rwx <fusion_pipe_data_folder>
 sudo setfacl -R -m o::--- <fusion_pipe_data_folder>
+
+sudo setfacl -R -d -m g::rwx <fusion_pipe_data_folder>
+sudo setfacl -R -d -m m::rwx <fusion_pipe_data_folder>
+sudo setfacl -R -d -m o::--- <fusion_pipe_data_folder>
 ```
+
 The second special folder is the one containing the user utility scripts. This needs to be (only) readable by all users of `fusionpipe`.
+
+In order to simplify the set-up of the folder permission 
+
 
 - Login with `fusionpipeadmin` in the folder containing the source code of fusion pipe.
 - Grant reading access to the group `fusionpipeusers`
 ```bash
 sudo chown -R :fusionpipeusers fusionpipe/src/fusionpipe/user_utils
 sudo chmod -R 2750 fusionpipe/src/fusionpipe/user_utils
+```
+
+## Multiple groups with different project permission
+In the following set-up for multiple users, all the users belonging to the group `fusionpipeusers` have R/W access to all the subfolder of the fusion_pipe folder path.
+
+There are cases where it is desired that users are divided into groups, and groups have access to different `projects` and related node folders. In the current version of `fusionpipe` (v.2.1.0), authentication and access control is not yet implemented. All users will have therefore access in the frontend to all the pipelines.
+
+However it is possible to block the access to the project data at the OS level.
+
+In order to do that.
+- Create a new group
+```bash
+sudo groupadd restrictedgroup
+```
+
+- Add `fusionpipeadmin` to the group and all other users. 
+```bash
+sudo usermod -aG fusionpipeusers restrictedgroup
+```
+
+!!! Warning
+   In order to propagate the user affiliation to the group, the user needs to loging again. It a known problem is that VSCode remote extension uses some cache, and it is not enough to reload the remote session window. In this case unistall vscode from the host of the user with `rm -r /.vscode-server`.
+
+- Grant R/W permission of the `project_id` folder to a specific group. Follow the instructions on the previous section, or use the script in `src/fusionpipe/admin_utils/grant_folder_permission_to_group.sh`
+
+# (TO BE IMPROVED) Python .exe set up.
+In order to guarantee that users run with the same python exe as the admin account.
+The python installation in the admin account is found in.
+```bash
+/home/fusionpipeadmin/.local/share/uv
+```
+This folder and subfolder needs to have have read and executable permission to `fp_users_all`.
+```bash
+drwxr-xr-x. fusionpipeadmin fp_users_all
+```
+
+The permission are the default for the file system, so you should only need to assign the folder to the group
+```bash
+sudo chgrp -R fp_users_all /home/fusionpipeadmin/.local/share/uv
+```
+
+In case the executable permission are different, then
+```bash
+chown :groupname /path/to/folder
+chmod g+rx /path/to/folder
 ```
 
 # Set enviroment variables
@@ -251,7 +276,7 @@ In the following some explanation of the different environment variables:
 - `<postgres_port>`: The port where postgresSQL is avilable in your host. Defaulat 5432
 - `<backend_port>`: Port for the FAST-API backend. We recommend to user a port >8000
 - `<frontend_port>`: This is the port for Svelte frontent. Usually Svelte is using a port >5000
-- `<absolute/path/to/user/utils>`: This is the absolute path where the user utilities, which needs to be readable by all users, are stored.
+- `<absolute/path/to/user/utils>`: This is the absolute path the user utilities are stored, and needs to be readable by all users.
 - `<abosolute/path/to/matlab/executable>`: It is conveninet to set-up the path to your local installation of matlab if you are considering using it for development.
 - `<database_test_name>`: The database name used for the test suite. Usually `fusionpipe_test`.
 
@@ -295,13 +320,12 @@ VITE_BACKEND_HOST=$VITE_BACKEND_HOST VITE_BACKEND_PORT=$VITE_BACKEND_PORT  npm r
 localhost:5174
 ```
 
-If your are developing the application and your environment variables are not change, you can consider to add them in your `.bashrc` or `.bashrc_profile` in order to have them loaded directly when you log with your user.
+If your are developing the application and your environment variables are not changed, you can consider to add them in your `.bashrc` or `.bashrc_profile` in order to have them loaded directly when you log with your user.
 
 ## Compile the frontend and serve
 If you want to compile the frontend 
 
-
-You need to set the environment variable before building the app as the environemtn variable will be backed in the app
+You need to set the environment variable before building the app as the environemtn variable will be backed in the app directly.
 ```bash
 npm run build
 ```
@@ -314,11 +338,11 @@ npm run preview -- --port $VITE_FRONTEND_PORT
 npx serve -s dist -l $VITE_FRONTEND_PORT
 ```
 
-- Start ray cluster locally if you want to use it for paralellelisation
+## Start ray for parallel (optional)
+- Start ray cluster locally if you want to use it for paralellelisation of nodes in pipelines.
 ```bash
 ray start --head
 ```
-
 
 # Run the frontend and backend (production)
 
@@ -484,26 +508,37 @@ systemctl --user status fusionpipe_ray.service
 
 # Onboard a new user
 
-- Create new user with `<newusername>` in postgres 
+## 1) Grant user access to postgres database
 
-`psql -U postgres -d fusionpipe_prod1 -c "CREATE USER <newusername>;"`
+- Create new user with `<newusername>` in postgres
 
-- Grant user access to role `fusionpipeusers` in postgres database
+`psql -U postgres -c "CREATE USER <newusername>;"`
 
-`psql -U postgres -d fusionpipe_prod1 -c "GRANT fusionpipeusers TO <newusername>;"`
+- Grant user access to role `fusionpipeusers` of postrgres
 
-- Ask user to write the following line in the `.profile` or `.bashrc_profile`, in order to persist the access to the database when it log in.
+`psql -U postgres -c "GRANT fusionpipeusers TO <newusername>;"`
 
+## 2) Create user env variables and set up .bashrc
+- The user needs to have the following env variable set
 ```bash
+export USER_UTILS_FOLDER_PATH=<user_util_folder_path>
 export DATABASE_URL="dbname=fusionpipe_prod1 port=5432"
+export FP_MATLAB_RUNNER_PATH=<matlab_exe_foler_path>
+export UV_CACHE_DIR=<uv_cache_dir>
 ```
 
-- Write the location of the user utils in the `.profile`, `.bashrc_profile`.
+It is suggested to create a dedicate `.base_fusionpipeenv` file. This file can then be imported in the `.bashrc` of the user in the host so that `.env` are set at every ssh connection of the user.
+
+- Import the env file in the `.bashrc` of the host
 ```bash
-export USER_UTILS_FOLDER_PATH="<absolute/path/to/user/utils>"
+if [ -f ~/.bash_fusionpipeenv ]; then
+    . ~/.bash_fusionpipeenv
 ```
 
-- Add user to the group in the server, in order for him to have access to the shared repository
+A convenience script is provided in `src/fusionpipe/admin_utils/set_usr_env.sh`, for this step.
+
+## 3) Add user to all needed groups in the Host
+- Add user to the group, in order for him to have access to the shared repository. Add to the per-project permission if neeeded.
 ```bash
 sudo usermod -aG fusionpipeusers username
 ```
@@ -525,59 +560,17 @@ ssh -L <fronend_port>:localhost:<fronend_port> -L <backend_port>:localhost:<back
 ```
 Usually ray port is set to 8265
 
-- Write the following line in the `.profile`. This allows the user to have access to the database
-```bash
-export DATABASE_URL="dbname=fusionpipe_prod1 port=5432"
-```
-
-- Write the location of the user utils in the `.profile`
-```bash
-export USER_UTILS_FOLDER_PATH="<absolute_path_to_user_utils>"
-```
+- Make sure that you or the admin has modified the your  `.bashrc` to include the import of the needed env variables.
 
 - When switching to a node run, if you want to user jupyter notebooks, run the following command to initialise the python kernel.
 ```bash
 uv run python init_node_kernel.py
 ```
 
-# Set up docker at system level. (require sudo)
-Or ask your admin to do that for you.
-
-```bash
-sudo apt-get update
-sudo apt-get install docker.io
-```
-
-Start docker service at system level
-```bash
-sudo systemctl enable docker
-sudo systemctl start docker
-```
-
-Add your user to docker
-```bash
-sudo usermod -aG docker $USER
-```
-
-Re-start your user session, and check your user is in the docker group
-```bash
-groups
-```
-
-Check if docker compose is installed
-```bash
-docker compose version
-```
-
-Otherwise install it with
-```bash
-pip install docker-compose
-```
-
-Docker can load many images, that can occopy space in your disk. You might want to consider to set the location where docker images are saved.
-
-
-# Migration of database
-- Use the migration script based on your version
-- Remember to update the .bash_fusionpipeenv
-- Sometimes jypternotebook does not update the env variable. Delete the folder `.vscode_server` to force reinstalling the server
+# PostgresSQL databse migration
+Migrating the databset is always a delicated operation. It is recommended to:
+- Create a new databaset which will be the destination of your script.
+- Use the migration script provided in fusionpipe to migrate between versions of the database.
+- If you are migrating across multiple version, you will need to apply the migration script chained in the correct order.
+- Remember to update the `.bash_fusionpipeenv` with the name of the new database.
+- Sometimes jypternotebook does not update the env variable. Delete the folder `.vscode_server` to force reinstalling the server.

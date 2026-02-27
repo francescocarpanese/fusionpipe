@@ -5,5 +5,7 @@
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "recommendations": ["svelte.svelte-vscode"],
-    "python.envFile": "${workspaceFolder}/developer.env",   
+    "python.envFile": "${workspaceFolder}/developer.env",
+    "MATLAB.installPath": "/usr/local/matlab-25.1/bin/matlab",
+    
 }

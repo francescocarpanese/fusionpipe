@@ -1,6 +1,7 @@
 import psycopg2
 import os
 
+
 table_names = [
     'node_relation',
     'node_pipeline_relation',
@@ -45,6 +46,22 @@ def get_all_tables_names(conn):
     cur.close()
     return tables
 
+def drop_all_tables(conn):
+    cur = conn.cursor()
+    cur.execute("""
+        DO $$
+        DECLARE
+            r RECORD;
+        BEGIN
+            FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = current_schema()) LOOP
+                EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+            END LOOP;
+        END $$;
+    """)
+    conn.commit()
+    print("All tables dropped.")
+
+
 def init_db(conn):
     cur = conn.cursor()
 
@@ -77,7 +94,9 @@ def init_db(conn):
             notes TEXT DEFAULT NULL,
             folder_path TEXT DEFAULT NULL,
             node_tag TEXT,
-            blocked BOOLEAN DEFAULT FALSE
+            blocked BOOLEAN DEFAULT FALSE,
+            project_id TEXT DEFAULT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(project_id)
         )
     ''')
 
@@ -145,17 +164,17 @@ def init_db(conn):
     return cur
 
 
-def add_pipeline_to_pipelines(cur, pipeline_id, tag=None, owner=None, notes=None, project_id=None, blocked=False):
+def add_pipeline_to_pipelines(cur, pipeline_id, project_id, tag=None, owner=None, notes=None, blocked=False):
     if tag is None:
         tag = pipeline_id
     cur.execute('INSERT INTO pipelines (pipeline_id, tag, owner, notes, project_id, blocked) VALUES (%s, %s, %s, %s, %s, %s)', (pipeline_id, tag, owner, notes, project_id, blocked))
     return pipeline_id
 
-def add_node_to_nodes(cur, node_id, status='ready', referenced=False, notes=None, folder_path=None, node_tag=None, blocked=False):
+def add_node_to_nodes(cur, node_id, project_id, status='ready', referenced=False, notes=None, folder_path=None, node_tag=None, blocked=False):
     if node_tag is None:
         node_tag = node_id
-    cur.execute('INSERT INTO nodes (node_id, status, referenced, notes, folder_path, node_tag, blocked) VALUES (%s, %s, %s, %s, %s, %s, %s)', 
-                (node_id, status, bool(referenced), notes, folder_path, node_tag, blocked))
+    cur.execute('INSERT INTO nodes (node_id, project_id, status, referenced, notes, folder_path, node_tag, blocked) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)', 
+                (node_id, project_id, status, bool(referenced), notes, folder_path, node_tag, blocked))
     return node_id
 
 def remove_node_from_nodes(cur, node_id):
@@ -254,6 +273,13 @@ def get_nodes_without_pipeline(cur):
     cur.execute('''
         SELECT node_id FROM nodes
         WHERE node_id NOT IN (SELECT node_id FROM node_pipeline_relation)
+    ''')
+    return [row[0] for row in cur.fetchall()]
+
+def get_nodes_without_project(cur):
+    cur.execute('''
+        SELECT node_id FROM nodes
+        WHERE project_id IS NULL
     ''')
     return [row[0] for row in cur.fetchall()]
 
@@ -367,8 +393,8 @@ def dupicate_node_in_pipeline(cur, source_node_id, new_node_id, source_pipeline_
 
     # Duplicate nodes table
     cur.execute('''
-        INSERT INTO nodes (node_id, status, notes)
-        SELECT %s, status, notes
+        INSERT INTO nodes (node_id, status, notes, project_id)
+        SELECT %s, status, notes, project_id
         FROM nodes
         WHERE node_id = %s
     ''', (new_node_id, source_node_id))
@@ -652,6 +678,17 @@ def add_project_to_pipeline(cur, project_id, pipeline_id):
     cur.execute('UPDATE pipelines SET project_id = %s WHERE pipeline_id = %s', (project_id, pipeline_id))
     return cur.rowcount
 
+def add_project_to_node(cur, project_id, node_id):
+    """
+    Add a project to a node.
+    :param cur: Database cursor
+    :param project_id: ID of the project to add
+    :param node_id: ID of the node to associate with the project
+    :return: Number of rows affected
+    """
+    cur.execute('UPDATE nodes SET project_id = %s WHERE node_id = %s', (project_id, node_id))
+    return cur.rowcount
+
 def remove_project_from_pipeline(cur, project_id, pipeline_id):
     """
     Remove a project from a pipeline.
@@ -762,7 +799,8 @@ def remove_project_from_everywhere(cur, project_id):
     :param project_id: ID of the project to remove
     :return: Number of rows affected
     """
-    cur.execute('UPDATE pipelines SET project_id = NULL WHERE project_id = %s', (project_id,))    
+    cur.execute('UPDATE pipelines SET project_id = NULL WHERE project_id = %s', (project_id,))
+    cur.execute('UPDATE nodes SET project_id = NULL WHERE project_id = %s', (project_id,))
     cur.execute('DELETE FROM projects WHERE project_id = %s', (project_id,))
     return cur.rowcount
 
@@ -774,6 +812,18 @@ def get_project_id_by_pipeline(cur, pipeline_id):
     :return: Project ID associated with the pipeline, or empty string if not found
     """
     cur.execute('SELECT project_id FROM pipelines WHERE pipeline_id = %s', (pipeline_id,))
+    row = cur.fetchone()
+    return row[0] if row and row[0] is not None else ""
+
+
+def get_project_id_by_node(cur, node_id):
+    """
+    Get the project ID associated with a specific node.
+    :param cur: Database cursor
+    :param node_id: ID of the node to query
+    :return: Project ID associated with the node, or empty string if not found
+    """
+    cur.execute('SELECT project_id FROM nodes WHERE node_id = %s', (node_id,))
     row = cur.fetchone()
     return row[0] if row and row[0] is not None else ""
 
@@ -967,3 +1017,4 @@ def get_node_parents_and_edge_ids(cur, node_id):
     """
     cur.execute('SELECT parent_id, edge_id FROM node_relation WHERE child_id = %s', (node_id,))
     return {row[0]: row[1] for row in cur.fetchall()}
+

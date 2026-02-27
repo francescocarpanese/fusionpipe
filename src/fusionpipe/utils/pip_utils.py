@@ -20,6 +20,15 @@ DIR_CHMOD_BLOCKED = 0o555  # Read and execute for owner, group, and others, no w
 
 excluded_dir = {'.venv', '__pycache__', '*.pyc', '*.pyo', '*.pyd', '*.ipynb_checkpoints', '.node_id', '.git'}
 
+def create_projet(cur):
+    """ Create folder for new project"""
+    
+    project_id = generate_project_id()
+    db_utils.add_project(cur, project_id=project_id)
+    folder_path = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"), project_id)
+    init_project_folder(folder_path)
+    return project_id
+
 def change_permissions_recursive(path, file_mode=FILE_CHMOD_DEFAULT, dir_mode=DIR_CHMOD_DEFAULT, excluded_dir=excluded_dir):
     """Recursively change permissions of a directory and its contents."""
 
@@ -41,14 +50,20 @@ def change_permissions_recursive(path, file_mode=FILE_CHMOD_DEFAULT, dir_mode=DI
             for d in dirs:
                 dir_path = os.path.join(root, d)
                 if not os.path.islink(dir_path):
-                    os.chmod(dir_path, dir_mode)
+                        try:
+                            os.chmod(dir_path, dir_mode)
+                        except PermissionError:
+                            pass  # Skip directories we can't change
             for f in files:
                 # Skip excluded file patterns
                 if any(fnmatch.fnmatch(f, pattern) for pattern in excluded_dir):
                     continue
                 file_path = os.path.join(root, f)
                 if os.path.isfile(file_path) and not os.path.islink(file_path):
-                    os.chmod(file_path, file_mode)
+                        try:
+                            os.chmod(file_path, file_mode)
+                        except PermissionError:
+                            pass  # Skip files we can't change
 
 def take_ownership_of_files(folder_path, excluded_patterns=None, current_user=None):
     """
@@ -90,104 +105,65 @@ def take_ownership_of_files(folder_path, excluded_patterns=None, current_user=No
     for root, dirs, files in os.walk(folder_path, topdown=False):
         # Filter out excluded directories from traversal
         dirs[:] = [d for d in dirs if not should_exclude(d, excluded_patterns)]
-        
+
         # Process files
         for file_name in files:
-            # Skip excluded file patterns
             if should_exclude(file_name, excluded_patterns):
                 continue
-                
             file_path = os.path.join(root, file_name)
-            
             try:
-                # Skip symbolic links
                 if os.path.islink(file_path):
                     continue
-                
-                # Get file owner
                 file_stat = os.stat(file_path)
                 file_owner = pwd.getpwuid(file_stat.st_uid).pw_name
-                
-                # Skip if already owned by current user
                 if file_owner == current_user:
                     continue
-                
-                # Check if we have read access
                 if not os.access(file_path, os.R_OK):
                     errors.append(f"No read access to {file_path}")
                     continue
-                
-                # Check if we have write access to the parent directory
                 parent_dir = os.path.dirname(file_path)
                 if not os.access(parent_dir, os.W_OK):
                     errors.append(f"No write access to parent directory of {file_path}")
                     continue
-                
-                # Create temporary file name
                 temp_file = file_path + ".tmp_ownership"
-                
-                # Copy the file (preserves metadata)
                 shutil.copy2(file_path, temp_file)
-                
-                # Remove original file
                 os.remove(file_path)
-                
-                # Rename temp file to original name
                 os.rename(temp_file, file_path)
-                
                 processed_files.append(file_path)
-                
             except Exception as e:
                 errors.append(f"Error processing file {file_path}: {str(e)}")
-        
-        # Process directories
+
+    # Now process directories, but only if they are empty after file processing
+    for root, dirs, files in os.walk(folder_path, topdown=False):
+        dirs[:] = [d for d in dirs if not should_exclude(d, excluded_patterns)]
         for dir_name in dirs:
-            # Skip excluded directory patterns (already filtered above, but double-check)
             if should_exclude(dir_name, excluded_patterns):
                 continue
-                
             dir_path = os.path.join(root, dir_name)
-            
             try:
-                # Skip symbolic links
                 if os.path.islink(dir_path):
                     continue
-                
-                # Get directory owner
                 dir_stat = os.stat(dir_path)
                 dir_owner = pwd.getpwuid(dir_stat.st_uid).pw_name
-                
-                # Skip if already owned by current user
                 if dir_owner == current_user:
                     continue
-                
-                # Check if we have write access to the parent directory
                 parent_dir = os.path.dirname(dir_path)
                 if not os.access(parent_dir, os.W_OK):
                     errors.append(f"No write access to parent directory of {dir_path}")
                     continue
-                
-                # Get original permissions
-                original_stat = os.stat(dir_path)
-                original_mode = original_stat.st_mode
-                
-                # Create temporary directory name
-                temp_dir = dir_path + ".tmp_ownership"
-                
-                # Create new directory with same permissions
-                os.makedirs(temp_dir, mode=original_mode & 0o777, exist_ok=False)
-                
-                # Copy directory metadata
-                shutil.copystat(dir_path, temp_dir)
-                
-                # Remove original directory (should be empty at this point)
-                os.rmdir(dir_path)
-                
-                # Rename temp directory to original name
-                os.rename(temp_dir, dir_path)
-                
-                processed_dirs.append(dir_path)
-                
+                # Only replace directory if it is now empty
+                if not os.listdir(dir_path):
+                    original_stat = os.stat(dir_path)
+                    original_mode = original_stat.st_mode
+                    temp_dir = dir_path + ".tmp_ownership"
+                    os.makedirs(temp_dir, mode=original_mode & 0o777, exist_ok=False)
+                    shutil.copystat(dir_path, temp_dir)
+                    os.rmdir(dir_path)
+                    os.rename(temp_dir, dir_path)
+                    processed_dirs.append(dir_path)
+                else:
+                    # Directory not empty, so cannot replace; just skip
+                    continue
             except Exception as e:
                 errors.append(f"Error processing directory {dir_path}: {str(e)}")
     
@@ -223,6 +199,15 @@ def generate_pip_id():
 
 def generate_project_id():
     return "pr_" + generate_id()
+
+
+
+def init_project_folder(folder_path_project, verbose=False):
+    # Create the main project folder
+    os.makedirs(folder_path_project, exist_ok=True)
+    
+    if verbose:
+        print(f"Project folder created at: {folder_path_project}")
 
 def init_node_folder(folder_path_nodes, verbose=False):
     
@@ -302,7 +287,7 @@ def init_node_folder(folder_path_nodes, verbose=False):
         example_defuse_path = os.path.join(template_folder_path, 'DEFUSE_example.m')
         parmameter_yaml_path = os.path.join(template_folder_path, 'node_parameters.yaml')
 
-        # Copy and grand writing access to the example files
+        # Copy and grant writing access to the example files
         if os.path.exists(example_defuse_path):
             shutil.copy(example_defuse_path, node_examples_folder_path)
             os.chmod(os.path.join(node_examples_folder_path, "DEFUSE_example.m"), FILE_CHMOD_DEFAULT)
@@ -415,6 +400,7 @@ def pipeline_graph_to_dict(graph):
             'position': graph.nodes[node].get('position', None),  # Node position
             'folder_path': graph.nodes[node].get('folder_path', None),  # Optional folder path for the node
             'blocked': graph.nodes[node].get('blocked', False), 
+            'project_id': graph.nodes[node].get('project_id', ""),  # Optional list of project IDs associated with the node
         }
     return pipeline_data
 
@@ -468,7 +454,7 @@ def pipeline_graph_to_db(Gnx, cur):
     graph_tag = Gnx.graph.get('tag', None)
     owner = Gnx.graph.get('owner', None)
     notes = Gnx.graph.get('notes', None)
-    project_id = Gnx.graph.get('project_id', generate_project_id())
+    project_id = Gnx.graph['project_id']
     blocked = Gnx.graph.get('blocked', False)
 
     # Check if the project associated with the pipeline exists, if not, add it
@@ -482,6 +468,7 @@ def pipeline_graph_to_db(Gnx, cur):
     # Add nodes and their dependencies directly from the graph
     for node in Gnx.nodes:
         node_id = node
+        project_id = Gnx.nodes[node].get('project_id')
         status = Gnx.nodes[node].get('status', 'ready')  # Default status is 'ready'
         referenced = Gnx.nodes[node].get('referenced', False)  # Default referenced is False
         node_notes = Gnx.nodes[node].get('notes', "")  # Optional notes for the node
@@ -500,7 +487,8 @@ def pipeline_graph_to_db(Gnx, cur):
                 notes=node_notes,
                 folder_path=folder_path,
                 node_tag=node_tag,
-                blocked=blocked
+                blocked=blocked,
+                project_id=project_id
             )
         db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pip_id, 
                                 position_x=position[0], position_y=position[1])
@@ -579,6 +567,7 @@ def db_to_pipeline_graph_from_pip_id(cur, pip_id):
         G.nodes[node_id]['notes'] = db_utils.get_node_notes(cur, node_id=node_id)
         G.nodes[node_id]['folder_path'] = db_utils.get_node_folder_path(cur, node_id=node_id)
         G.nodes[node_id]['blocked'] = db_utils.get_node_blocked_status(cur, node_id=node_id)
+        G.nodes[node_id]['project_id'] = db_utils.get_project_id_by_node(cur, node_id=node_id)
 
         # Add position if available
         position = db_utils.get_node_position(cur, node_id=node_id, pipeline_id=pip_id)
@@ -901,8 +890,9 @@ def duplicate_node_code_and_data(cur, source_node_id, new_node_id, withdata=True
     """
     Duplicate the code and data of from source_node_id  to new_node_id and initialise the python env
     """
+    project_id = db_utils.get_project_id_by_node(cur, node_id=source_node_id)
     # Copy the folder into the new node folder
-    new_folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"), new_node_id)
+    new_folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"), project_id, new_node_id)
     # Update database
     db_utils.update_folder_path_node(cur, new_node_id, new_folder_path_nodes)
     source_node_tag = db_utils.get_node_tag(cur, node_id=source_node_id)
@@ -1294,7 +1284,7 @@ def detach_subgraph_from_node(cur, pipeline_id, node_id):
         if referenced_parents:
             referenced_parents_dict_of_referenced_node[node] = referenced_parents
 
-    # Get the list of nodes which are in the subgraph an
+    # Get the list of nodes which are in the subgraph
     subgraph_node_only_referenced = [n for n in subgraph_nodes if n not in not_referenced_nodes_in_subgraph]
 
     # Duplicate the nodes with their relations
@@ -1309,7 +1299,7 @@ def detach_subgraph_from_node(cur, pipeline_id, node_id):
         parents_dict = db_utils.get_node_parents_and_edge_ids(cur, node_id=old_node)
         # Take only the parents which haven't been copied
         parents_not_in_subgraph = set(parents_dict.keys()) - set(subgraph_node_only_referenced)
-        # Loop on all these paraents
+        # Loop on all these parents
         for parent in parents_not_in_subgraph:
             edge_id = parents_dict[parent]
             # Add the relation to the new node
@@ -1487,8 +1477,9 @@ def create_node_in_pipeline(cur, pipeline_id):
         raise ValueError(f"Pipeline {pipeline_id} is blocked. Cannot create a new node.")
 
     node_id = generate_node_id()
-    folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"),node_id)
-    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path_nodes)
+    project_id = db_utils.get_project_id_by_pipeline(cur, pipeline_id=pipeline_id)
+    folder_path_nodes = os.path.join(os.environ.get("FUSIONPIPE_DATA_PATH"), project_id, node_id)
+    db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder_path_nodes, project_id=project_id)
     position_x = random.randint(-10, 10)
     position_y = random.randint(-10, 10)
     db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id, position_x=position_x, position_y=position_y)
