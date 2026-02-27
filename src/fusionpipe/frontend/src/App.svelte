@@ -35,6 +35,8 @@
   import { ChevronDownOutline } from "flowbite-svelte-icons";
   import ContextMenu from "./ContextMenu.svelte";
   import CustomEdge from './CustomEdge.svelte';
+  import SubtreeNode from './SubtreeNode.svelte';
+  import { resolveCollisions } from './resolve-collisions';
 
   //  --- Variables and state definitions ---
   let nodes = $state<Node[]>([]);
@@ -62,6 +64,9 @@
   let currentTargetPipelineId = $state("");
   const nodeWidth = 172;
   const nodeHeight = 36;
+  // Fixed pixel size of a collapsed subtree container (wide enough to show the label)
+  const COLLAPSED_WIDTH = 220;
+  const COLLAPSED_HEIGHT = 42;
   let nodeDrawereForm = $state({
     id: "",
     tag: "",
@@ -97,7 +102,20 @@
   let PipelineDropdownList = $state<string[]>([]);
   let projects_dropdown = $state<string[]>([]);
 
-  let nodeTypes = { custom: CustomNode, customProject: CustomNodeProject };
+  // Subtree state — mirrors the subtrees returned by the API for the active pipeline
+  interface SubtreeState {
+    subtreeId: string;
+    tag: string;
+    collapsed: boolean;
+    pos_x: number;
+    pos_y: number;
+    width: number;
+    height: number;
+    node_ids: string[];
+  }
+  let currentSubtrees = $state<SubtreeState[]>([]);
+
+  let nodeTypes = { custom: CustomNode, customProject: CustomNodeProject, subtree: SubtreeNode };
 
   const dagreGraph = new dagre.graphlib.Graph();
 
@@ -224,18 +242,73 @@
     }
 
     try {
-      const response = await fetch(
-        `${BACKEND_URL}/update_node_position/${pipelineId}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            nodes: nodes.map((n) => ({ id: n.id, position: n.position })),
-          }),
-        },
-      );
+      // Build a map of subtree container positions for child-node absolute-position computation
+      const containerPosMap = new Map<string, { x: number; y: number }>();
+      for (const n of nodes) {
+        if (n.type === "subtree") {
+          containerPosMap.set(n.id, n.position);
+        }
+      }
 
-      if (!response.ok) await handleApiError(response);
+      // Save regular pipeline node positions (not subtree containers).
+      // Child nodes (parentId set) have relative positions — convert to absolute before saving.
+      const pipelineNodes = nodes
+        .filter((n) => n.type !== "subtree")
+        .map((n) => {
+          if (n.parentId) {
+            const containerPos = containerPosMap.get(n.parentId);
+            if (containerPos) {
+              return {
+                id: n.id,
+                position: {
+                  x: n.position.x + containerPos.x,
+                  y: n.position.y + containerPos.y,
+                },
+              };
+            }
+          }
+          return { id: n.id, position: n.position };
+        });
+
+      if (pipelineNodes.length > 0) {
+        const resp = await fetch(
+          `${BACKEND_URL}/update_node_position/${pipelineId}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nodes: pipelineNodes }),
+          },
+        );
+        if (!resp.ok) await handleApiError(resp);
+      }
+
+      // Save subtree container positions separately.
+      // IMPORTANT: never overwrite the stored "expanded" dimensions with the compact
+      // collapsed size (COLLAPSED_WIDTH × COLLAPSED_HEIGHT).  The DB always holds the
+      // expanded dimensions so that re-expanding restores the correct container size.
+      for (const st of currentSubtrees) {
+        const containerNode = nodes.find((n) => n.id === st.subtreeId);
+        if (containerNode) {
+          // Only update width/height from the live node when the subtree is expanded;
+          // while collapsed, keep the previously-stored expanded values.
+          const saveW = st.collapsed ? st.width : ((containerNode as any).width ?? st.width);
+          const saveH = st.collapsed ? st.height : ((containerNode as any).height ?? st.height);
+          const resp = await fetch(
+            `${BACKEND_URL}/update_subtree_position/${st.subtreeId}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                pos_x: containerNode.position.x,
+                pos_y: containerNode.position.y,
+                width: saveW,
+                height: saveH,
+              }),
+            },
+          );
+          if (!resp.ok) await handleApiError(resp);
+        }
+      }
     } catch (error) {
       console.error("Error saving node positions:", error);
     }
@@ -997,7 +1070,6 @@
       if (!response.ok) await handleApiError(response);
       const pipeline = await response.json();
 
-
       await loadProject(pipeline.project_id);
 
       const rawNodes = Object.entries(pipeline.nodes).map(([id, node]) => ({
@@ -1032,46 +1104,144 @@
         })),
       );
 
-      // Only apply layout if there are no positions stored
-      const needsLayout = rawNodes.some((node) => !node.position);
+      // --- Subtree processing ---
+      const subtreesFromApi: SubtreeState[] = (pipeline.subtrees ?? []).map((st: any) => ({
+        subtreeId: st.subtree_id,
+        tag: st.tag ?? "",
+        collapsed: !!st.collapsed,
+        pos_x: st.pos_x,
+        pos_y: st.pos_y,
+        width: st.width,
+        height: st.height,
+        node_ids: st.node_ids ?? [],
+      }));
+      currentSubtrees = subtreesFromApi;
 
-      if (needsLayout) {
-        const layoutedElements = getLayoutedElements(rawNodes, rawEdges);
+      // Build a lookup: nodeId → SubtreeState
+      const nodeSubtreeMap = new Map<string, SubtreeState>();
+      for (const st of subtreesFromApi) {
+        for (const nodeId of st.node_ids) {
+          nodeSubtreeMap.set(nodeId, st);
+        }
+      }
+
+      // Set of node IDs that are inside a collapsed subtree (will be hidden)
+      const hiddenNodeIds = new Set<string>();
+      for (const st of subtreesFromApi) {
+        if (st.collapsed) {
+          for (const nodeId of st.node_ids) {
+            hiddenNodeIds.add(nodeId);
+          }
+        }
+      }
+
+      // Build container nodes for subtrees (must appear BEFORE their children in the nodes array).
+      // When collapsed: fixed compact size (COLLAPSED_WIDTH × COLLAPSED_HEIGHT) so both axes shrink
+      // and the label is always readable. Set explicit width/height props so resolveCollisions
+      // can use them without having to parse the style string.
+      const containerNodes: Node[] = subtreesFromApi.map((st) => {
+        const w = st.collapsed ? COLLAPSED_WIDTH : st.width;
+        const h = st.collapsed ? COLLAPSED_HEIGHT : st.height;
+        return {
+          id: st.subtreeId,
+          type: "subtree",
+          position: { x: st.pos_x, y: st.pos_y },
+          width: w,
+          height: h,
+          style: `width: ${w}px; height: ${h}px;`,
+          data: {
+            tag: st.tag,
+            collapsed: st.collapsed,
+            subtreeId: st.subtreeId,
+            onToggleCollapse: toggleSubtreeCollapse,
+            onDeleteSubtree: deleteSubtree,
+          },
+          zIndex: -1,
+          selectable: true,
+          draggable: true,
+        };
+      });
+
+      // Apply subtree membership to regular nodes (relative positions + hidden when collapsed)
+      const processedNodes: Node[] = rawNodes.map((node) => {
+        const st = nodeSubtreeMap.get(node.id);
+        if (!st) return node;
+        return {
+          ...node,
+          parentId: st.subtreeId,
+          // Convert absolute position → relative to container
+          position: {
+            x: node.position.x - st.pos_x,
+            y: node.position.y - st.pos_y,
+          },
+          hidden: hiddenNodeIds.has(node.id),
+        };
+      });
+
+      // Merge: containers first, then regular nodes
+      const mergedNodes = [...containerNodes, ...processedNodes];
+
+      // Build edges: replace hidden-node endpoints with their container for proxy edges
+      const finalEdges: Edge[] = [];
+      const proxySet = new Set<string>();
+      for (const edge of rawEdges) {
+        const srcHidden = hiddenNodeIds.has(edge.source);
+        const tgtHidden = hiddenNodeIds.has(edge.target);
+        if (!srcHidden && !tgtHidden) {
+          finalEdges.push(edge);
+        } else {
+          const proxySrc = srcHidden ? nodeSubtreeMap.get(edge.source)!.subtreeId : edge.source;
+          const proxyTgt = tgtHidden ? nodeSubtreeMap.get(edge.target)!.subtreeId : edge.target;
+          // Skip internal edges (both endpoints in the same collapsed subtree)
+          if (proxySrc === proxyTgt) continue;
+          const key = `${proxySrc}→${proxyTgt}`;
+          if (!proxySet.has(key)) {
+            proxySet.add(key);
+            finalEdges.push({
+              id: `proxy-${proxySrc}-${proxyTgt}`,
+              source: proxySrc,
+              target: proxyTgt,
+              type: "custom",
+              data: { label: "▸", isProxy: true },
+              style: "stroke-dasharray: 6, 3; opacity: 0.7;",
+            });
+          }
+        }
+      }
+
+      // Only apply dagre layout if there are no positions stored (for regular nodes only)
+      const needsLayout = processedNodes.some((n) => !n.position || (n.position.x === 0 && n.position.y === 0 && !n.parentId));
+
+      if (needsLayout && subtreesFromApi.length === 0) {
+        const layoutedElements = getLayoutedElements(mergedNodes, finalEdges);
         nodes = [...layoutedElements.nodes];
         edges = [...layoutedElements.edges];
       } else {
-        nodes = [...rawNodes];
-        edges = [...rawEdges];
+        nodes = [...mergedNodes];
+        edges = [...finalEdges];
       }
 
       currentPipelineId = pipelineId;
       currentProjectId = pipeline.project_id || "";
-    
-      // Set status property to "active" for the projectNode that matches the pipeline id,
-      // and set the background color accordingly
+
+      // Highlight the active pipeline in the project graph panel
       projectNodes = projectNodes.map((node) => {
         if (node.id === pipelineId) {
           return {
             ...node,
-            data: {
-              ...node.data,
-            },
+            data: { ...node.data },
             style: `background: ${getNodeColor("active")}`,
           };
         } else {
           return {
             ...node,
-            data: {
-              ...node.data,
-            },
+            data: { ...node.data },
             style: `background: ${getNodeColor("")}`,
           };
         }
       });
 
       selectedPipelineDropdown = null;
-
-
     } catch (error) {
       console.error("Error loading selected pipeline:", error);
     }
@@ -1113,6 +1283,123 @@
       currentProjectId = project.project_id || "";
     } catch (error) {
       console.error("Error loading selected pipeline:", error);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Subtree actions (visual grouping only; no execution impact)
+  // ---------------------------------------------------------------------------
+
+  async function createSubtree() {
+    const pipelineId =
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
+    if (!pipelineId) { alert("No pipeline loaded."); return; }
+
+    // Collect selected regular nodes (skip subtree containers)
+    const selectedNodes = nodes.filter((n) => n.selected && n.type !== "subtree");
+    if (selectedNodes.length === 0) {
+      alert("Select at least one node before creating a subtree.");
+      return;
+    }
+
+    // Check that none are already in a subtree
+    for (const n of selectedNodes) {
+      const conflict = currentSubtrees.find((st) => st.node_ids.includes(n.id));
+      if (conflict) {
+        alert(`Node "${n.data?.tag || n.id}" is already in subtree "${conflict.tag || conflict.subtreeId}".`);
+        return;
+      }
+    }
+
+    const tag = prompt("Label for this subtree:", "Subtree");
+    if (tag === null) return; // cancelled
+
+    // Compute bounding box using absolute positions
+    const PADDING = 30;
+    const HEADER = 36;
+    const absPositions = selectedNodes.map((n) => {
+      if (n.parentId) {
+        const container = nodes.find((c) => c.id === n.parentId);
+        if (container) return { x: n.position.x + container.position.x, y: n.position.y + container.position.y };
+      }
+      return { x: n.position.x, y: n.position.y };
+    });
+    const minX = Math.min(...absPositions.map((p) => p.x));
+    const minY = Math.min(...absPositions.map((p) => p.y));
+    const maxX = Math.max(...absPositions.map((p) => p.x)) + nodeWidth;
+    const maxY = Math.max(...absPositions.map((p) => p.y)) + nodeHeight;
+
+    const pos_x = minX - PADDING;
+    const pos_y = minY - HEADER - PADDING;
+    const width = maxX - minX + PADDING * 2;
+    const height = maxY - minY + HEADER + PADDING * 2;
+
+    try {
+      const resp = await fetch(`${BACKEND_URL}/create_subtree`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pipeline_id: pipelineId,
+          node_ids: selectedNodes.map((n) => n.id),
+          tag: tag || "Subtree",
+          pos_x, pos_y, width, height,
+        }),
+      });
+      if (!resp.ok) await handleApiError(resp);
+      await loadPipeline(pipelineId);
+      // Push any nodes that now overlap with the new container apart
+      nodes = resolveCollisions(nodes, {
+        margin: 20,
+        defaultWidth: nodeWidth,
+        defaultHeight: nodeHeight,
+      });
+      await saveNodePositions();
+    } catch (error) {
+      console.error("Error creating subtree:", error);
+      alert("Failed to create subtree: " + error);
+    }
+  }
+
+  async function deleteSubtree(subtreeId: string) {
+    try {
+      const resp = await fetch(`${BACKEND_URL}/delete_subtree/${subtreeId}`, { method: "DELETE" });
+      if (!resp.ok) await handleApiError(resp);
+      const pipelineId =
+        typeof currentPipelineId === "string" ? currentPipelineId : currentPipelineId.value;
+      if (pipelineId) await loadPipeline(pipelineId);
+    } catch (error) {
+      console.error("Error deleting subtree:", error);
+    }
+  }
+
+  async function toggleSubtreeCollapse(subtreeId: string) {
+    const st = currentSubtrees.find((s) => s.subtreeId === subtreeId);
+    if (!st) return;
+    const newCollapsed = !st.collapsed;
+    try {
+      const resp = await fetch(`${BACKEND_URL}/update_subtree_collapse/${subtreeId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ collapsed: newCollapsed }),
+      });
+      if (!resp.ok) await handleApiError(resp);
+      const pipelineId =
+        typeof currentPipelineId === "string" ? currentPipelineId : currentPipelineId.value;
+      if (pipelineId) {
+        await loadPipeline(pipelineId);
+        // Resolve collisions so that collapsing/expanding the container
+        // doesn't leave nearby nodes overlapping.
+        nodes = resolveCollisions(nodes, {
+          margin: 20,
+          defaultWidth: nodeWidth,
+          defaultHeight: nodeHeight,
+        });
+        await saveNodePositions();
+      }
+    } catch (error) {
+      console.error("Error toggling subtree collapse:", error);
     }
   }
 
@@ -2206,7 +2493,9 @@
             <DropdownItem onclick={branchPipelineFromNode}
               >Branch Pipeline from Selected Node</DropdownItem
             >
-            <DropdownItem onclick={detachSelectedNodeFromPipeline}>Detach Subtree from Selected Node</DropdownItem>            
+            <DropdownItem onclick={detachSelectedNodeFromPipeline}>Detach Subtree from Selected Node</DropdownItem>
+            <DropdownDivider />
+            <DropdownItem onclick={createSubtree}>Create Subtree from Selected Nodes</DropdownItem>            
             <DropdownItem class="flex items-center justify-between">
               Duplicate Selected Nodes into this Pipeline 
               <ChevronRightOutline
@@ -2462,7 +2751,15 @@
           onconnect={handleConnect}
           onnodecontextmenu={handleContextMenu}
           onpaneclick={handlePaneClick}
-          onnodedragstop={saveNodePositions}
+          onnodedragstop={async (e) => {
+            await saveNodePositions();
+            nodes = resolveCollisions(nodes, {
+              margin: 20,
+              defaultWidth: nodeWidth,
+              defaultHeight: nodeHeight,
+            });
+            await saveNodePositions();
+          }}
           {nodeTypes}
           style="height: 100%;"
           disableKeyboardA11y={true}
@@ -2480,6 +2777,26 @@
               top={menu.top}
               left={menu.left}
               {copySelectedNodeFolderPathToClipboard}
+              {createSubtree}
+              {toggleSubtreeCollapse}
+              {deleteSubtree}
+              nodeSubtreeId={(() => {
+                // Check if the right-clicked node IS a subtree container
+                const asContainer = currentSubtrees.find((st) => st.subtreeId === menu?.id);
+                if (asContainer) return asContainer.subtreeId;
+                // Or a member of a subtree
+                const asMember = currentSubtrees.find((st) => st.node_ids.includes(menu?.id ?? ""));
+                return asMember ? asMember.subtreeId : null;
+              })()}
+              subtreeCollapsed={(() => {
+                const st =
+                  currentSubtrees.find((s) => s.subtreeId === menu?.id) ??
+                  currentSubtrees.find((s) => s.node_ids.includes(menu?.id ?? ""));
+                return st?.collapsed ?? false;
+              })()}
+              canCreateSubtree={nodes
+                .filter((n) => n.selected && n.type !== "subtree")
+                .every((n) => !currentSubtrees.some((st) => st.node_ids.includes(n.id)))}
             />
           {/if}
           <MiniMap />
