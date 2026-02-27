@@ -11,21 +11,21 @@
     data: {
       tag: string;
       collapsed: boolean;
-      subtreeId: string;
-      onToggleCollapse: (subtreeId: string) => void;
-      onDeleteSubtree: (subtreeId: string) => void;
+      groupId: string;
+      onToggle: (groupId: string) => void;
+      onDelete: (groupId: string) => void;
     };
   } = $props();
 
   function handleToggle(e: MouseEvent) {
     e.stopPropagation();
-    data.onToggleCollapse(data.subtreeId);
+    data.onToggle(data.groupId);
   }
 
   function handleDelete(e: MouseEvent) {
     e.stopPropagation();
-    if (confirm(`Remove subtree "${data.tag || data.subtreeId}"?\nMember nodes will remain in the pipeline.`)) {
-      data.onDeleteSubtree(data.subtreeId);
+    if (confirm(`Remove node group "${data.tag || data.groupId}"?\nMember nodes will remain in the pipeline.`)) {
+      data.onDelete(data.groupId);
     }
   }
 </script>
@@ -44,22 +44,22 @@
   style={data.collapsed ? "" : "opacity: 0; pointer-events: none;"}
 />
 
-<div class="subtree-wrapper" class:collapsed={data.collapsed}>
-  <div class="subtree-header" class:header-only={data.collapsed}>
-    <span class="subtree-label" title={data.tag || "Subtree"}>
-      {data.tag || "Subtree"}
+<div class="group-wrapper" class:collapsed={data.collapsed}>
+  <div class="group-header" class:header-only={data.collapsed}>
+    <span class="group-label" title={data.tag || "Node Group"}>
+      {data.tag || "Node Group"}
     </span>
-    <div class="subtree-actions">
-      <button class="subtree-btn" onclick={handleToggle} title={data.collapsed ? "Expand subtree" : "Collapse subtree"}>
+    <div class="group-actions">
+      <button class="group-btn" onclick={handleToggle} title={data.collapsed ? "Expand group" : "Collapse group"}>
         {data.collapsed ? "▶" : "▼"}
       </button>
-      <button class="subtree-btn delete-btn" onclick={handleDelete} title="Remove subtree grouping">
+      <button class="group-btn delete-btn" onclick={handleDelete} title="Remove node group">
         ✕
       </button>
     </div>
   </div>
   {#if !data.collapsed}
-    <div class="subtree-body"></div>
+    <div class="group-body"></div>
   {/if}
 </div>
 
@@ -71,7 +71,7 @@
 />
 
 <style>
-  .subtree-wrapper {
+  .group-wrapper {
     width: 100%;
     height: 100%;
     border: 2px dashed #6366f1;
@@ -83,13 +83,13 @@
     overflow: hidden;
   }
 
-  .subtree-wrapper.collapsed {
+  .group-wrapper.collapsed {
     background: rgba(99, 102, 241, 0.14);
     border-style: solid;
     border-radius: 20px;
   }
 
-  .subtree-header {
+  .group-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -101,12 +101,12 @@
     gap: 6px;
   }
 
-  .subtree-header.header-only {
+  .group-header.header-only {
     border-radius: 18px;
     min-height: 32px;
   }
 
-  .subtree-label {
+  .group-label {
     font-size: 11px;
     font-weight: 600;
     color: #3730a3;
@@ -117,13 +117,13 @@
     min-width: 0;
   }
 
-  .subtree-actions {
+  .group-actions {
     display: flex;
     gap: 2px;
     flex-shrink: 0;
   }
 
-  .subtree-btn {
+  .group-btn {
     border: none;
     background: transparent;
     cursor: pointer;
@@ -134,7 +134,7 @@
     line-height: 1.4;
   }
 
-  .subtree-btn:hover {
+  .group-btn:hover {
     background: rgba(99, 102, 241, 0.3);
   }
 
@@ -146,7 +146,7 @@
     background: rgba(185, 28, 28, 0.1);
   }
 
-  .subtree-body {
+  .group-body {
     flex: 1;
   }
 </style>

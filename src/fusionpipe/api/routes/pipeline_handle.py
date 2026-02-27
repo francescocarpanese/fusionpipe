@@ -710,16 +710,16 @@ def unblock_pipeline_route(pipeline_id: str, db_conn=Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
-# Visual subtree routes (purely for frontend grouping; no execution impact)
+# Visual node group routes (purely for frontend grouping; no execution impact)
 # ---------------------------------------------------------------------------
 
-@router.post("/create_subtree")
-def create_subtree_route(payload: dict, db_conn=Depends(get_db)):
+@router.post("/create_node_group")
+def create_node_group_route(payload: dict, db_conn=Depends(get_db)):
     """
-    Create a visual subtree container grouping a set of nodes inside a pipeline.
+    Create a visual node group container grouping a set of nodes inside a pipeline.
 
     Payload: {pipeline_id, node_ids, tag?, pos_x, pos_y, width, height}
-    Returns: {subtree_id, message}
+    Returns: {group_id, message}
     """
     cur = db_conn.cursor()
     pipeline_id = payload.get("pipeline_id")
@@ -733,66 +733,66 @@ def create_subtree_route(payload: dict, db_conn=Depends(get_db)):
     if not pipeline_id or not node_ids or not isinstance(node_ids, list):
         raise HTTPException(status_code=400, detail="pipeline_id and node_ids (list) are required")
 
-    # Enforce: each node may belong to at most one subtree
+    # Enforce: each node may belong to at most one node group
     for node_id in node_ids:
-        existing = db_utils.get_subtree_for_node(cur, node_id)
+        existing = db_utils.get_group_for_node(cur, node_id)
         if existing:
             raise HTTPException(
                 status_code=400,
-                detail=f"Node {node_id} already belongs to subtree {existing}"
+                detail=f"Node {node_id} already belongs to node group {existing}"
             )
 
-    subtree_id = "st_" + pip_utils.generate_id()
+    group_id = "ng_" + pip_utils.generate_id()
     try:
-        db_utils.create_subtree(cur, subtree_id, pipeline_id, tag=tag,
-                                pos_x=pos_x, pos_y=pos_y, width=width, height=height)
+        db_utils.create_node_group(cur, group_id, pipeline_id, tag=tag,
+                                   pos_x=pos_x, pos_y=pos_y, width=width, height=height)
         for node_id in node_ids:
-            db_utils.add_node_to_subtree_relation(cur, node_id, subtree_id)
+            db_utils.add_node_to_group_relation(cur, node_id, group_id)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-    return {"subtree_id": subtree_id, "message": "Subtree created successfully"}
+    return {"group_id": group_id, "message": "Node group created successfully"}
 
 
-@router.delete("/delete_subtree/{subtree_id}")
-def delete_subtree_route(subtree_id: str, db_conn=Depends(get_db)):
-    """Remove a subtree container. Member nodes remain in the pipeline untouched."""
+@router.delete("/delete_node_group/{group_id}")
+def delete_node_group_route(group_id: str, db_conn=Depends(get_db)):
+    """Remove a node group container. Member nodes remain in the pipeline untouched."""
     cur = db_conn.cursor()
     try:
-        db_utils.delete_subtree(cur, subtree_id)
+        db_utils.delete_node_group(cur, group_id)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-    return {"message": f"Subtree {subtree_id} deleted successfully"}
+    return {"message": f"Node group {group_id} deleted successfully"}
 
 
-@router.post("/update_subtree_collapse/{subtree_id}")
-def update_subtree_collapse_route(subtree_id: str, payload: dict, db_conn=Depends(get_db)):
-    """Persist the collapsed/expanded state of a subtree. Payload: {collapsed: bool}"""
+@router.post("/update_node_group_collapse/{group_id}")
+def update_node_group_collapse_route(group_id: str, payload: dict, db_conn=Depends(get_db)):
+    """Persist the collapsed/expanded state of a node group. Payload: {collapsed: bool}"""
     collapsed = payload.get("collapsed")
     if collapsed is None:
         raise HTTPException(status_code=400, detail="'collapsed' is required")
     cur = db_conn.cursor()
     try:
-        db_utils.update_subtree_collapse(cur, subtree_id, bool(collapsed))
+        db_utils.update_node_group_collapse(cur, group_id, bool(collapsed))
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-    return {"message": f"Subtree {subtree_id} collapse state updated to {collapsed}"}
+    return {"message": f"Node group {group_id} collapse state updated to {collapsed}"}
 
 
-@router.post("/update_subtree_position/{subtree_id}")
-def update_subtree_position_route(subtree_id: str, payload: dict, db_conn=Depends(get_db)):
-    """Persist the canvas position and dimensions of a subtree container.
+@router.post("/update_node_group_position/{group_id}")
+def update_node_group_position_route(group_id: str, payload: dict, db_conn=Depends(get_db)):
+    """Persist the canvas position and dimensions of a node group container.
     Payload: {pos_x, pos_y, width, height}"""
     cur = db_conn.cursor()
     try:
-        db_utils.update_subtree_position(
-            cur, subtree_id,
+        db_utils.update_node_group_position(
+            cur, group_id,
             float(payload.get("pos_x", 0.0)),
             float(payload.get("pos_y", 0.0)),
             float(payload.get("width", 400.0)),
@@ -802,20 +802,20 @@ def update_subtree_position_route(subtree_id: str, payload: dict, db_conn=Depend
     except Exception as e:
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-    return {"message": f"Subtree {subtree_id} position updated"}
+    return {"message": f"Node group {group_id} position updated"}
 
 
-@router.post("/update_subtree_tag/{subtree_id}")
-def update_subtree_tag_route(subtree_id: str, payload: dict, db_conn=Depends(get_db)):
-    """Update the display label of a subtree. Payload: {tag}"""
+@router.post("/update_node_group_tag/{group_id}")
+def update_node_group_tag_route(group_id: str, payload: dict, db_conn=Depends(get_db)):
+    """Update the display label of a node group. Payload: {tag}"""
     tag = payload.get("tag")
     if tag is None:
         raise HTTPException(status_code=400, detail="'tag' is required")
     cur = db_conn.cursor()
     try:
-        db_utils.update_subtree_tag(cur, subtree_id, tag)
+        db_utils.update_node_group_tag(cur, group_id, tag)
         db_conn.commit()
     except Exception as e:
         db_conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-    return {"message": f"Subtree {subtree_id} tag updated to '{tag}'"}
+    return {"message": f"Node group {group_id} tag updated to '{tag}'"}

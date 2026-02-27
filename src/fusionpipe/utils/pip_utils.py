@@ -624,8 +624,8 @@ def db_to_project_graph_from_project_id(cur, project_id):
 def db_to_pipeline_dict_from_pip_id(cur, pip_id):
     graph = db_to_pipeline_graph_from_pip_id(cur, pip_id)
     pipeline_dict = pipeline_graph_to_dict(graph)
-    # Attach visual subtree metadata (no execution impact)
-    pipeline_dict['subtrees'] = db_utils.get_subtrees_for_pipeline(cur, pip_id)
+    # Attach visual node group metadata (no execution impact)
+    pipeline_dict['groups'] = db_utils.get_groups_for_pipeline(cur, pip_id)
     return pipeline_dict
 
 def db_to_project_dict_from_project_id(cur, project_id):

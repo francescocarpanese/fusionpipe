@@ -9,14 +9,14 @@
         bottom,
         onclick,
         copySelectedNodeFolderPathToClipboard,
-        // Subtree actions
-        createSubtree,
-        toggleSubtreeCollapse,
-        deleteSubtree,
-        // Context about the right-clicked node relative to subtrees
-        nodeSubtreeId,   // string | null — subtree the node belongs to (or the node IS a container)
-        subtreeCollapsed, // boolean
-        canCreateSubtree, // boolean — false if a selected node is already in a subtree
+        // Node group actions
+        createNodeGroup,
+        toggleGroupCollapse,
+        deleteNodeGroup,
+        // Context about the right-clicked node relative to node groups
+        nodeGroupId,      // string | null — group the node belongs to (or the node IS a container)
+        groupCollapsed,   // boolean
+        canCreateGroup,   // boolean — false if a selected node is already in a group
     }: {
         id: string;
         top: number | undefined;
@@ -25,12 +25,12 @@
         bottom: number | undefined;
         onclick: () => void;
         copySelectedNodeFolderPathToClipboard: () => void;
-        createSubtree: () => void;
-        toggleSubtreeCollapse: (subtreeId: string) => void;
-        deleteSubtree: (subtreeId: string) => void;
-        nodeSubtreeId: string | null;
-        subtreeCollapsed: boolean;
-        canCreateSubtree: boolean;
+        createNodeGroup: () => void;
+        toggleGroupCollapse: (groupId: string) => void;
+        deleteNodeGroup: (groupId: string) => void;
+        nodeGroupId: string | null;
+        groupCollapsed: boolean;
+        canCreateGroup: boolean;
     } = $props();
 </script>
 
@@ -42,18 +42,18 @@
   <button onclick={(e) => { e.stopPropagation(); copySelectedNodeFolderPathToClipboard(); }}>Copy Folder Path</button>
   <hr class="divider" />
   <button
-    class:disabled={!canCreateSubtree}
-    title={canCreateSubtree ? "Group selected nodes into a visual subtree" : "A selected node is already in a subtree"}
-    onclick={(e) => { e.stopPropagation(); if (canCreateSubtree) createSubtree(); }}
+    class:disabled={!canCreateGroup}
+    title={canCreateGroup ? "Group selected nodes into a visual node group" : "A selected node is already in a group"}
+    onclick={(e) => { e.stopPropagation(); if (canCreateGroup) createNodeGroup(); }}
   >
-    Create Subtree from Selected
+    Create Node Group from Selected
   </button>
-  {#if nodeSubtreeId}
-    <button onclick={(e) => { e.stopPropagation(); toggleSubtreeCollapse(nodeSubtreeId!); }}>
-      {subtreeCollapsed ? "Expand Subtree" : "Collapse Subtree"}
+  {#if nodeGroupId}
+    <button onclick={(e) => { e.stopPropagation(); toggleGroupCollapse(nodeGroupId!); }}>
+      {groupCollapsed ? "Expand Group" : "Collapse Group"}
     </button>
-    <button class="danger" onclick={(e) => { e.stopPropagation(); deleteSubtree(nodeSubtreeId!); }}>
-      Remove Subtree
+    <button class="danger" onclick={(e) => { e.stopPropagation(); deleteNodeGroup(nodeGroupId!); }}>
+      Remove Node Group
     </button>
   {/if}
 </div>
