@@ -5,7 +5,7 @@ def migrate_database():
 	Migrate data from fusionpipe_prod4 (v2_1_0) to fusionpipe_prod5 (v2_2_0)
 	- Adds new tables node_group_relation and node_groups, leaves them empty.
 	"""
-	db_url = "dbname=fusionpipe_prod5 port=5432"
+	db_url = "dbname=fusionpipe_prod4 port=5432"
 	conn = psycopg2.connect(db_url)
 	cur = conn.cursor()
 	try:
