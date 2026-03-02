@@ -1783,18 +1783,18 @@
       return;
     }
     const nodeIds = selectedNodes.map((n) => n.id);
+    const pipelineId =
+      typeof currentPipelineId === "string"
+        ? currentPipelineId
+        : currentPipelineId.value;
     try {
       const response = await fetch(`${BACKEND_URL}/run_nodes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ node_ids: nodeIds }),
+        body: JSON.stringify({ node_ids: nodeIds, pipeline_id: pipelineId }),
       });
       if (!response.ok) await handleApiError(response);
       const data = await response.json();
-      const pipelineId =
-        typeof currentPipelineId === "string"
-          ? currentPipelineId
-          : currentPipelineId.value;
       if (pipelineId) await loadPipeline(pipelineId);
       alert(data.message);
     } catch (error) {

@@ -473,56 +473,231 @@ def wait_ray_job_completion(conn, node_id, job_id):
         conn.commit()
 
 
-def run_nodes(conn, node_ids, poll_interval=1.0, debug=False):
+# ---------------------------------------------------------------------------
+# run_nodes helpers
+# ---------------------------------------------------------------------------
+
+def _group_nodes_into_subtrees(graph, node_ids):
     """
-    Submit a list of nodes in parallel and wait for all of them to finish.
-    Nodes that cannot be submitted (blocked, wrong status, missing files, etc.)
-    are silently skipped.
+    Partition *node_ids* into disjoint weakly-connected components using
+    only the edges present among those nodes in the pipeline *graph*.
+
+    Returns a list of frozensets, one per component.
+    """
+    import networkx as nx
+    node_set = set(node_ids) & set(graph.nodes)
+    subgraph = graph.subgraph(node_set)
+    return [frozenset(c) for c in nx.weakly_connected_components(subgraph)]
+
+
+def _get_blocking_external_nodes(cur, graph, component):
+    """
+    Return the set of nodes that are direct parents (in the full pipeline
+    *graph*) of nodes in *component* but are themselves outside *component*
+    and whose current DB status is NOT 'completed'.
+
+    These are the nodes that must finish before this component can be safely
+    executed.
+    """
+    blocking: set = set()
+    for node_id in component:
+        for parent in graph.predecessors(node_id):
+            if parent not in component:
+                status = db_utils.get_node_status(cur, parent)
+                if status != "completed":
+                    blocking.add(parent)
+    return blocking
+
+
+# ---------------------------------------------------------------------------
+# run_nodes
+# ---------------------------------------------------------------------------
+
+def run_nodes(conn, node_ids, pipeline_id=None, poll_interval=1.0, debug=False):
+    """
+    Submit a list of nodes for execution, respecting DAG ordering within each
+    weakly-connected subtree formed by the selection.
+
+    Algorithm
+    ---------
+    1. Infer *pipeline_id* from the nodes when not provided.
+    2. Split the selection into disjoint subtrees (weakly-connected components
+       in the induced subgraph).
+    3. For each subtree:
+       * If any direct-parent node outside the subtree is not 'completed',
+         skip the whole subtree and print a message explaining which external
+         nodes are blocking it.
+       * Otherwise execute the subtree via ``run_pipeline(last_node_id=leaf)``
+         for each leaf of the subtree.  ``run_pipeline`` already handles
+         correct dependency ordering within the subtree.
+    4. Nodes that are not in 'ready' status at call time are immediately
+       reported as skipped (they were completed/running/failed before this
+       call).
+
+    Falls back to the original flat-parallel submission when a single
+    pipeline cannot be inferred (e.g. nodes span multiple pipelines or
+    the pipeline_id is not available).
 
     Args:
         conn: Database connection
         node_ids: List of node IDs to run
+        pipeline_id: Pipeline the nodes belong to (inferred when omitted)
         poll_interval: Time between status-poll cycles (seconds)
         debug: Enable debug logging
 
     Returns:
-        dict: {"ran": [...], "skipped": [...],
-               "message": "Ran N node(s), skipped M node(s)"}
+        dict: {
+            "ran":            list of node IDs that transitioned ready→completed/failed,
+            "skipped":        list of node IDs that were not (fully) executed,
+            "message":        human-readable summary string,
+            "skipped_details": {node_id: reason_string, ...}
+        }
     """
+    if not node_ids:
+        return {
+            "ran": [], "skipped": [],
+            "message": "Ran 0 node(s), skipped 0 node(s)",
+            "skipped_details": {},
+        }
+
     cur = conn.cursor()
-    running_nodes: set = set()
-    completed_nodes: set = set()
-    failed_nodes: set = set()
+
+    # Snapshot initial statuses so we can classify results after execution
+    initial_status = {n: db_utils.get_node_status(cur, n) for n in node_ids}
+
+    # -----------------------------------------------------------------
+    # FALLBACK: flat parallel submission when no pipeline_id is provided.
+    # -----------------------------------------------------------------
+    if pipeline_id is None:
+        if debug:
+            print("[run_nodes] Cannot infer pipeline_id; falling back to flat submission")
+        running_nodes: set = set()
+        completed_nodes: set = set()
+        failed_nodes: set = set()
+        skipped_nodes_fb: list = []
+        running_node_procs: dict = {}
+        for node_id in node_ids:
+            try:
+                running_node_procs[node_id] = submit_run_node(conn, node_id)
+                running_nodes.add(node_id)
+                if debug:
+                    print(f"[run_nodes] submitted node {node_id}")
+            except Exception as e:
+                skipped_nodes_fb.append(node_id)
+                if debug:
+                    print(f"[run_nodes] skipped node {node_id}: {e}")
+        while running_nodes:
+            _update_running_nodes_status(
+                conn, cur,
+                running_nodes, completed_nodes, failed_nodes,
+                running_node_procs, debug,
+            )
+            if running_nodes:
+                time.sleep(poll_interval)
+        ran_fb = list(completed_nodes | failed_nodes)
+        return {
+            "ran": ran_fb,
+            "skipped": skipped_nodes_fb,
+            "message": f"Ran {len(ran_fb)} node(s), skipped {len(skipped_nodes_fb)} node(s)",
+            "skipped_details": {},
+        }
+
+    # -----------------------------------------------------------------
+    # DAG-AWARE path
+    # -----------------------------------------------------------------
+    graph = pip_utils.db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
+    pipeline_node_set = set(graph.nodes)
+
+    ran_nodes: list = []
     skipped_nodes: list = []
-    running_node_procs: dict = {}
+    skipped_details: dict = {}
+    valid_node_ids: list = []
 
-    # Submit all nodes immediately in parallel (no dependency ordering)
+    # Pre-filter: nodes not in pipeline or not in 'ready' status are skipped
     for node_id in node_ids:
-        try:
-            running_node_procs[node_id] = submit_run_node(conn, node_id)
-            running_nodes.add(node_id)
-            if debug:
-                print(f"[run_nodes] submitted node {node_id}")
-        except Exception as e:
+        if node_id not in pipeline_node_set:
             skipped_nodes.append(node_id)
-            if debug:
-                print(f"[run_nodes] skipped node {node_id}: {e}")
+            skipped_details[node_id] = f"Node not found in pipeline {pipeline_id}"
+        elif initial_status.get(node_id) != "ready":
+            skipped_nodes.append(node_id)
+            skipped_details[node_id] = (
+                f"Node is not in 'ready' status "
+                f"(current status: {initial_status.get(node_id)})"
+            )
+        else:
+            valid_node_ids.append(node_id)
 
-    # Poll until every submitted node has finished
-    while running_nodes:
-        _update_running_nodes_status(
-            conn, cur,
-            running_nodes, completed_nodes, failed_nodes,
-            running_node_procs, debug
-        )
-        if running_nodes:
-            time.sleep(poll_interval)
+    if not valid_node_ids:
+        return {
+            "ran": ran_nodes,
+            "skipped": skipped_nodes,
+            "message": f"Ran 0 node(s), skipped {len(skipped_nodes)} node(s)",
+            "skipped_details": skipped_details,
+        }
 
-    ran = list(completed_nodes | failed_nodes)
+    # Group into disjoint weakly-connected components
+    components = _group_nodes_into_subtrees(graph, valid_node_ids)
+    if debug:
+        print(f"[run_nodes] {len(components)} subtree(s): {[sorted(c) for c in components]}")
+
+    for component in components:
+        # Check all external direct-parent nodes are 'completed'
+        blocking = _get_blocking_external_nodes(cur, graph, component)
+        if blocking:
+            reason = (
+                f"Blocked: external parent node(s) {sorted(blocking)} "
+                f"must be 'completed' before this subtree can run."
+            )
+            print(f"[run_nodes] Skipping subtree {sorted(component)}: {reason}")
+            for node_id in component:
+                skipped_nodes.append(node_id)
+                skipped_details[node_id] = reason
+            continue
+
+        # Find leaves of the component (nodes with no selected children)
+        subgraph = graph.subgraph(component)
+        leaves = [n for n in component if subgraph.out_degree(n) == 0]
+        if debug:
+            print(f"[run_nodes] Running subtree {sorted(component)} to leaf(ves): {leaves}")
+
+        component_error = None
+        for leaf in leaves:
+            try:
+                run_pipeline(
+                    conn, pipeline_id,
+                    last_node_id=leaf,
+                    poll_interval=poll_interval,
+                    debug=debug,
+                )
+            except Exception as e:
+                component_error = e
+                if debug:
+                    print(f"[run_nodes] Error running to leaf {leaf}: {e}")
+                break  # Do not attempt remaining leaves on error
+
+        # Classify each node in the component based on status change
+        for node_id in component:
+            current_status = db_utils.get_node_status(cur, node_id)
+            if initial_status.get(node_id) == "ready" and current_status in ("completed", "failed"):
+                ran_nodes.append(node_id)
+            else:
+                skipped_nodes.append(node_id)
+                skipped_details[node_id] = (
+                    skipped_details.get(node_id)
+                    or (
+                        "Node was not executed"
+                        + (f" (execution error: {component_error})" if component_error else "")
+                        + f" (final status: {current_status})"
+                    )
+                )
+
     return {
-        "ran": ran,
+        "ran": ran_nodes,
         "skipped": skipped_nodes,
-        "message": f"Ran {len(ran)} node(s), skipped {len(skipped_nodes)} node(s)",
+        "message": (
+            f"Ran {len(ran_nodes)} node(s), skipped {len(skipped_nodes)} node(s)"
+        ),
+        "skipped_details": skipped_details,
     }
 
 

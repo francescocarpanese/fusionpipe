@@ -1372,3 +1372,142 @@ def test_run_node_backward_compat(pg_test_db, tmp_base_dir):
 
     assert db_utils.get_node_status(cur, node_id) == "completed"
     conn.close()
+
+
+# ---------------------------------------------------------------------------
+# run_nodes — DAG-aware subtree tests
+# ---------------------------------------------------------------------------
+
+def test_run_nodes_ordered_chain(pg_test_db, tmp_base_dir):
+    """
+    Selecting a connected sub-chain (A→B) runs nodes in dependency order.
+    Both nodes should be completed; C (downstream, not selected) stays ready.
+    Pipeline: A → B → C
+    Selection: [A, B]
+    """
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    project_id = db_utils.add_project(cur, project_id=pip_utils.generate_project_id())
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="t", project_id=project_id)
+
+    node_a = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir)
+    node_b = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir)
+    node_c = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir)
+
+    db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_a, edge_id="01")
+    db_utils.add_node_relation(cur, child_id=node_c, parent_id=node_b, edge_id="02")
+    conn.commit()
+
+    result = runner_utils.run_nodes(conn, [node_a, node_b], pipeline_id=pipeline_id, poll_interval=0.2, debug=True)
+
+    assert set(result["ran"]) == {node_a, node_b}
+    assert result["skipped"] == []
+    assert db_utils.get_node_status(cur, node_a) == "completed"
+    assert db_utils.get_node_status(cur, node_b) == "completed"
+    assert db_utils.get_node_status(cur, node_c) == "ready", "C must not be touched"
+    conn.close()
+
+
+def test_run_nodes_branch_excludes_non_ancestor(pg_test_db, tmp_base_dir):
+    """
+    Selecting nodes on one branch must not run sibling branches.
+    Pipeline: A → B → C
+                ↘ D
+    Selection: [A, B, C]  —  D must stay 'ready'.
+    """
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    project_id = db_utils.add_project(cur, project_id=pip_utils.generate_project_id())
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="t", project_id=project_id)
+
+    node_a = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir)
+    node_b = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir)
+    node_c = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir)
+    node_d = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir)
+
+    db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_a, edge_id="01")
+    db_utils.add_node_relation(cur, child_id=node_c, parent_id=node_b, edge_id="02")
+    db_utils.add_node_relation(cur, child_id=node_d, parent_id=node_a, edge_id="03")
+    conn.commit()
+
+    result = runner_utils.run_nodes(conn, [node_a, node_b, node_c], pipeline_id=pipeline_id, poll_interval=0.2, debug=True)
+
+    assert set(result["ran"]) == {node_a, node_b, node_c}
+    assert result["skipped"] == []
+    assert db_utils.get_node_status(cur, node_a) == "completed"
+    assert db_utils.get_node_status(cur, node_b) == "completed"
+    assert db_utils.get_node_status(cur, node_c) == "completed"
+    assert db_utils.get_node_status(cur, node_d) == "ready", "D is not an ancestor of C and must not run"
+    conn.close()
+
+
+def test_run_nodes_skips_when_external_ancestor_incomplete(pg_test_db, tmp_base_dir):
+    """
+    A subtree whose direct external parent is not 'completed' must be skipped.
+    Pipeline: A → B → C
+    Selection: [B, C]  with A in 'ready' (not completed)
+    Expected: B and C are skipped; message mentions A.
+    """
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    project_id = db_utils.add_project(cur, project_id=pip_utils.generate_project_id())
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="t", project_id=project_id)
+
+    node_a = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir, status="ready")
+    node_b = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir, status="ready")
+    node_c = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir, status="ready")
+
+    db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_a, edge_id="01")
+    db_utils.add_node_relation(cur, child_id=node_c, parent_id=node_b, edge_id="02")
+    conn.commit()
+
+    result = runner_utils.run_nodes(conn, [node_b, node_c], pipeline_id=pipeline_id, poll_interval=0.2, debug=True)
+
+    assert result["ran"] == []
+    assert set(result["skipped"]) == {node_b, node_c}
+    # Details should mention the blocking ancestor A
+    for node_id in [node_b, node_c]:
+        assert node_a in result["skipped_details"][node_id], (
+            f"skipped_details for {node_id} should mention blocking node {node_a}"
+        )
+    # Statuses unchanged
+    assert db_utils.get_node_status(cur, node_b) == "ready"
+    assert db_utils.get_node_status(cur, node_c) == "ready"
+    conn.close()
+
+
+def test_run_nodes_two_independent_subtrees(pg_test_db, tmp_base_dir):
+    """
+    Two disconnected chains in the same pipeline both run when selected together.
+    Pipeline: A → B    C → D
+    Selection: [A, B, C, D]
+    Expected: all four nodes completed.
+    """
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    project_id = db_utils.add_project(cur, project_id=pip_utils.generate_project_id())
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="t", project_id=project_id)
+
+    node_a = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir)
+    node_b = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir)
+    node_c = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir)
+    node_d = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir)
+
+    db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_a, edge_id="01")
+    db_utils.add_node_relation(cur, child_id=node_d, parent_id=node_c, edge_id="02")
+    conn.commit()
+
+    result = runner_utils.run_nodes(
+        conn, [node_a, node_b, node_c, node_d],
+        pipeline_id=pipeline_id, poll_interval=0.2, debug=True,
+    )
+
+    assert set(result["ran"]) == {node_a, node_b, node_c, node_d}
+    assert result["skipped"] == []
+    for nid in [node_a, node_b, node_c, node_d]:
+        assert db_utils.get_node_status(cur, nid) == "completed"
+    conn.close()

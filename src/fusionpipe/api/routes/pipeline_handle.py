@@ -367,14 +367,15 @@ def run_node_route(node_id: str, payload: dict = None, db_conn=Depends(get_db)):
 @router.post("/run_nodes")
 def run_nodes_route(payload: dict, db_conn=Depends(get_db)):
     """
-    Run a list of nodes in parallel. Nodes that cannot be run are silently skipped.
-    Payload: {"node_ids": ["n_1", "n_2", ...]}
+    Run a list of nodes respecting DAG ordering within each selected subtree.
+    Payload: {"node_ids": ["n_1", "n_2", ...], "pipeline_id": "p_1" (optional)}
     """
     node_ids = payload.get("node_ids")
     if not node_ids or not isinstance(node_ids, list):
         raise HTTPException(status_code=400, detail="Payload must contain a list 'node_ids'")
+    pipeline_id = payload.get("pipeline_id")  # optional; inferred from nodes when absent
     try:
-        result = runner_utils.run_nodes(db_conn, node_ids)
+        result = runner_utils.run_nodes(db_conn, node_ids, pipeline_id=pipeline_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return result
