@@ -1777,36 +1777,29 @@
   }
 
   async function runSelectedNode() {
-    const selectedNode = nodes.find((node) => node.selected);
-    const pipelineatcall =
-      typeof currentPipelineId === "string"
-        ? currentPipelineId
-        : currentPipelineId.value;
-    if (!selectedNode) {
+    const selectedNodes = nodes.filter((node) => node.selected);
+    if (!selectedNodes.length) {
       alert("No node selected");
       return;
     }
-    const nodeId = selectedNode.id;
-    alert(`Node ${nodeId} is starting to run...`);
+    const nodeIds = selectedNodes.map((n) => n.id);
     try {
-      const response = await fetch(`${BACKEND_URL}/run_node/${nodeId}`, {
+      const response = await fetch(`${BACKEND_URL}/run_nodes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ run_mode: "local" }),
+        body: JSON.stringify({ node_ids: nodeIds }),
       });
       if (!response.ok) await handleApiError(response);
       const data = await response.json();
-      // Optionally reload pipeline to update node status
-      if (currentPipelineId && pipelineatcall === currentPipelineId) {
-        const pipelineId =
-          typeof currentPipelineId === "string"
-            ? currentPipelineId
-            : currentPipelineId.value;
-        await loadPipeline(pipelineId);
-      }
+      const pipelineId =
+        typeof currentPipelineId === "string"
+          ? currentPipelineId
+          : currentPipelineId.value;
+      if (pipelineId) await loadPipeline(pipelineId);
+      alert(data.message);
     } catch (error) {
-      console.error("Error running node:", error);
-      alert("Failed to run node.");
+      console.error("Error running nodes:", error);
+      alert("Failed to run nodes.");
     }
   }
 
@@ -2604,7 +2597,7 @@
           </NavLi>
           <Dropdown simple>
             <DropdownItem onclick={runSelectedNode}
-              >Run selected node</DropdownItem
+              >Run selected nodes</DropdownItem
             >
             <DropdownItem onclick={runCurrentPipeline}
               >Run full pipeline</DropdownItem

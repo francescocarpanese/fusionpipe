@@ -337,7 +337,6 @@ def run_pipeline_route(pipeline_id: str, payload: dict = None, db_conn=Depends(g
 
 @router.post("/run_pipeline_up_to_node/{pipeline_id}/{node_id}")
 def run_pipeline_up_to_node_route(pipeline_id: str, node_id: str, payload: dict = None, db_conn=Depends(get_db)):
-    run_mode = "local"
     poll_interval = 1.0
     debug = False
 
@@ -364,6 +363,21 @@ def run_node_route(node_id: str, payload: dict = None, db_conn=Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Node {node_id} run completed"}
+
+@router.post("/run_nodes")
+def run_nodes_route(payload: dict, db_conn=Depends(get_db)):
+    """
+    Run a list of nodes in parallel. Nodes that cannot be run are silently skipped.
+    Payload: {"node_ids": ["n_1", "n_2", ...]}
+    """
+    node_ids = payload.get("node_ids")
+    if not node_ids or not isinstance(node_ids, list):
+        raise HTTPException(status_code=400, detail="Payload must contain a list 'node_ids'")
+    try:
+        result = runner_utils.run_nodes(db_conn, node_ids)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return result
 
 @router.post("/duplicate_nodes_in_pipeline")
 def duplicate_nodes_in_pipeline_route(payload: dict, db_conn=Depends(get_db)):

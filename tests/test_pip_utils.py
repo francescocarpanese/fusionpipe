@@ -296,6 +296,29 @@ def test_get_all_children_nodes(pg_test_db, dag_dummy_1):
         result = set(get_all_descendants(cur, dag_dummy_1.graph['pipeline_id'], node))
         assert result == expected, f"Children nodes for {node} do not match expected descendants."
 
+
+def test_get_all_ancestors(pg_test_db, dag_dummy_1):
+    """
+    Test that get_all_ancestors returns all ancestors of a node in the pipeline.
+    """
+    from fusionpipe.utils.pip_utils import get_all_ancestors, pipeline_graph_to_db
+    from fusionpipe.utils import db_utils
+    import networkx as nx
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    # Add the dummy graph to the database
+    pipeline_graph_to_db(dag_dummy_1, cur)
+    conn.commit()
+
+    # For each node, compare get_all_ancestors to nx.ancestors
+    for node in dag_dummy_1.nodes:
+        expected = set(nx.ancestors(dag_dummy_1, node))
+        result = set(get_all_ancestors(cur, dag_dummy_1.graph['pipeline_id'], node))
+        assert result == expected, f"Ancestor nodes for {node} do not match expected ancestors."
+
+
 from conftest import PARENT_NODE_LIST
 @pytest.mark.parametrize("start_node", PARENT_NODE_LIST)
 def test_branch_pipeline_from_node(monkeypatch, pg_test_db, dag_dummy_1, start_node, tmp_base_dir):

@@ -1138,6 +1138,55 @@ def test_run_pipeline_last_node_exclusion(pg_test_db, tmp_path):
     conn.close()
 
 
+def test_run_pipeline_last_node_only_runs_ancestors(pg_test_db, tmp_path):
+    """
+    Test that when last_node_id is specified, only the ancestors of that node
+    (and the node itself) are executed. Nodes on unrelated branches are skipped.
+
+    Pipeline topology:
+        A -> B -> C
+        A -> D
+
+    Running up to C should execute A, B, C and leave D untouched (status "ready").
+    """
+    from fusionpipe.utils import db_utils, pip_utils, runner_utils
+
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    pipeline_id = pip_utils.generate_pip_id()
+    project_id = db_utils.add_project(cur, project_id=pip_utils.generate_project_id())
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="test_pipeline", project_id=project_id)
+
+    # Create nodes A, B, C, D
+    node_a = pip_utils.generate_node_id()
+    node_b = pip_utils.generate_node_id()
+    node_c = pip_utils.generate_node_id()
+    node_d = pip_utils.generate_node_id()
+
+    for node_id in [node_a, node_b, node_c, node_d]:
+        folder = os.path.join(tmp_path, project_id, node_id)
+        db_utils.add_node_to_nodes(cur, node_id=node_id, status="ready", referenced=False, folder_path=folder, project_id=project_id)
+        db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+        pip_utils.init_node_folder(folder_path_nodes=folder)
+
+    # Build topology: A->B->C and A->D
+    db_utils.add_node_relation(cur, child_id=node_b, parent_id=node_a, edge_id="01")
+    db_utils.add_node_relation(cur, child_id=node_c, parent_id=node_b, edge_id="02")
+    db_utils.add_node_relation(cur, child_id=node_d, parent_id=node_a, edge_id="03")
+    conn.commit()
+
+    # Run pipeline up to node C (ancestors of C: A, B)
+    runner_utils.run_pipeline(conn, pipeline_id, last_node_id=node_c, poll_interval=0.2, debug=True)
+
+    # A, B, C should be completed; D is on a non-ancestor branch and must stay "ready"
+    assert db_utils.get_node_status(cur, node_a) == "completed"
+    assert db_utils.get_node_status(cur, node_b) == "completed"
+    assert db_utils.get_node_status(cur, node_c) == "completed"
+    assert db_utils.get_node_status(cur, node_d) == "ready"
+
+    conn.close()
+
+
 def test_run_pipeline_execution_error_recovery(pg_test_db, tmp_path):
     """Test run_pipeline error recovery during execution"""
     from fusionpipe.utils import db_utils, pip_utils, runner_utils
@@ -1174,4 +1223,152 @@ def test_run_pipeline_execution_error_recovery(pg_test_db, tmp_path):
         # Should handle the error gracefully and continue
         assert summary["failed"] == 1  # Node should be marked as failed due to submission error
 
+    conn.close()
+
+
+# ---------------------------------------------------------------------------
+# run_nodes tests
+# ---------------------------------------------------------------------------
+
+def _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir, status="ready", blocked=False):
+    """Helper: create a node, add it to the pipeline, initialise its folder."""
+    node_id = pip_utils.generate_node_id()
+    folder = os.path.join(tmp_base_dir, project_id, node_id)
+    db_utils.add_node_to_nodes(
+        cur, node_id=node_id, status=status,
+        referenced=False, folder_path=folder, project_id=project_id
+    )
+    db_utils.add_node_to_pipeline(cur, node_id=node_id, pipeline_id=pipeline_id)
+    pip_utils.init_node_folder(folder_path_nodes=folder)
+    if blocked:
+        db_utils.update_node_blocked_status(cur, node_id=node_id, blocked=True)
+    conn.commit()
+    return node_id
+
+
+def test_run_nodes_all_runnable(pg_test_db, tmp_base_dir):
+    """All submitted nodes complete successfully and appear in 'ran'."""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    project_id = db_utils.add_project(cur, project_id=pip_utils.generate_project_id())
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="t", project_id=project_id)
+
+    node_a = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir, status="ready")
+    node_b = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir, status="ready")
+
+    mock_proc = MagicMock()
+
+    def fake_update_status(conn, cur, running_nodes, completed_nodes, failed_nodes, procs, debug=False):
+        # Mark all running nodes as completed immediately
+        for nid in list(running_nodes):
+            completed_nodes.add(nid)
+            db_utils.update_node_status(cur, nid, "completed")
+            conn.commit()
+        running_nodes.clear()
+
+    with patch.object(runner_utils, 'submit_run_node', return_value=mock_proc), \
+         patch.object(runner_utils, '_update_running_nodes_status', side_effect=fake_update_status):
+        result = runner_utils.run_nodes(conn, [node_a, node_b], poll_interval=0.05)
+
+    assert set(result["ran"]) == {node_a, node_b}
+    assert result["skipped"] == []
+    assert db_utils.get_node_status(cur, node_a) == "completed"
+    assert db_utils.get_node_status(cur, node_b) == "completed"
+    conn.close()
+
+
+def test_run_nodes_partial_skip_blocked(pg_test_db, tmp_base_dir):
+    """Blocked nodes are skipped; runnable nodes complete and appear in 'ran'."""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    project_id = db_utils.add_project(cur, project_id=pip_utils.generate_project_id())
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="t", project_id=project_id)
+
+    node_ready   = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir, status="ready", blocked=False)
+    node_blocked = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir, status="ready", blocked=True)
+
+    mock_proc = MagicMock()
+
+    def fake_submit(conn, node_id):
+        # Blocked nodes cannot be submitted – simulate the RuntimeError that
+        # submit_run_node / node_execution_context would raise.
+        if node_id == node_blocked:
+            raise RuntimeError(f"Node {node_id} is blocked")
+        return mock_proc
+
+    def fake_update_status(conn, cur, running_nodes, completed_nodes, failed_nodes, procs, debug=False):
+        for nid in list(running_nodes):
+            completed_nodes.add(nid)
+            db_utils.update_node_status(cur, nid, "completed")
+            conn.commit()
+        running_nodes.clear()
+
+    with patch.object(runner_utils, 'submit_run_node', side_effect=fake_submit), \
+         patch.object(runner_utils, '_update_running_nodes_status', side_effect=fake_update_status):
+        result = runner_utils.run_nodes(conn, [node_ready, node_blocked], poll_interval=0.05)
+
+    assert result["ran"] == [node_ready]
+    assert result["skipped"] == [node_blocked]
+    assert db_utils.get_node_status(cur, node_ready) == "completed"
+    conn.close()
+
+
+def test_run_nodes_empty_list(pg_test_db):
+    """Passing an empty list returns immediately with empty ran/skipped."""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+
+    result = runner_utils.run_nodes(conn, [], poll_interval=0.05)
+
+    assert result["ran"] == []
+    assert result["skipped"] == []
+    assert "0 node(s)" in result["message"]
+    conn.close()
+
+
+def test_run_nodes_all_non_runnable(pg_test_db, tmp_base_dir):
+    """When every node fails to submit, all end up in 'skipped'."""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    project_id = db_utils.add_project(cur, project_id=pip_utils.generate_project_id())
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="t", project_id=project_id)
+
+    node_a = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir, status="completed")
+    node_b = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir, status="running")
+
+    with patch.object(runner_utils, 'submit_run_node', side_effect=RuntimeError("Cannot run")):
+        result = runner_utils.run_nodes(conn, [node_a, node_b], poll_interval=0.05)
+
+    assert result["ran"] == []
+    assert set(result["skipped"]) == {node_a, node_b}
+    conn.close()
+
+
+def test_run_node_backward_compat(pg_test_db, tmp_base_dir):
+    """run_node(conn, node_id) still works as a single-node shorthand."""
+    conn = pg_test_db
+    cur = db_utils.init_db(conn)
+    project_id = db_utils.add_project(cur, project_id=pip_utils.generate_project_id())
+    pipeline_id = pip_utils.generate_pip_id()
+    db_utils.add_pipeline_to_pipelines(cur, pipeline_id=pipeline_id, tag="t", project_id=project_id)
+
+    node_id = _setup_node(cur, conn, pipeline_id, project_id, tmp_base_dir, status="ready")
+
+    mock_proc = MagicMock()
+
+    def fake_update_status(conn, cur, running_nodes, completed_nodes, failed_nodes, procs, debug=False):
+        for nid in list(running_nodes):
+            completed_nodes.add(nid)
+            db_utils.update_node_status(cur, nid, "completed")
+            conn.commit()
+        running_nodes.clear()
+
+    with patch.object(runner_utils, 'submit_run_node', return_value=mock_proc), \
+         patch.object(runner_utils, '_update_running_nodes_status', side_effect=fake_update_status):
+        runner_utils.run_node(conn, node_id)  # must not raise
+
+    assert db_utils.get_node_status(cur, node_id) == "completed"
     conn.close()

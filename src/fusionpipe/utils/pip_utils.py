@@ -873,6 +873,14 @@ def get_all_descendants(cur, pipeline_id, node_id):
     graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
     return list(nx.descendants(graph, node_id))
 
+
+def get_all_ancestors(cur, pipeline_id, node_id):
+    """
+    Get all ancestors (predecessors) of a node in the pipeline.
+    """
+    graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
+    return list(nx.ancestors(graph, node_id))
+
 def copy_with_permissions(src, dst, *, follow_symlinks=True):
     """Custom copy function to ensure destination files are writable."""
     if os.path.isdir(dst):
