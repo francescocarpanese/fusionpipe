@@ -760,31 +760,33 @@
     }
   }
 
-  async function setNodeCompleted() {
-    const selectedNode = nodes.find((node) => node.selected);
-    if (!selectedNode) {
-      alert("No node selected");
+  // Set all selected nodes to completed
+  async function setSelectedNodesCompleted() {
+    const selectedNodeIds = nodes.filter((node) => node.selected).map((node) => node.id);
+    if (!selectedNodeIds.length) {
+      alert("No nodes selected");
       return;
     }
+    const pipelineId = typeof currentPipelineId === "string"
+      ? currentPipelineId
+      : currentPipelineId.value;
     try {
-      const pipelineId =
-        typeof currentPipelineId === "string"
-          ? currentPipelineId
-          : currentPipelineId.value;
-      const response = await fetch(
-        `${BACKEND_URL}/manual_set_node_status/${selectedNode.id}/completed`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pipeline_id: pipelineId }),
-        },
-      );
-      if (!response.ok) await handleApiError(response);
+      await Promise.all(selectedNodeIds.map(async (nodeId) => {
+        const response = await fetch(
+          `${BACKEND_URL}/manual_set_node_status/${nodeId}/completed`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pipeline_id: pipelineId }),
+          },
+        );
+        if (!response.ok) await handleApiError(response);
+      }));
       await loadPipeline(pipelineId);
-      alert(`Node ${selectedNode.id} status set to completed.`);
+      alert(`Nodes ${selectedNodeIds.join(", ")} status set to completed.`);
     } catch (error) {
-      console.error("Error setting node status:", error);
-      alert("Failed to set node status.");
+      console.error("Error setting nodes status:", error);
+      alert("Failed to set nodes status.");
     }
   }
 
@@ -2568,8 +2570,8 @@
             <DropdownItem class="text-yellow-600" onclick={unblockAllNodesInPipeline}
               >Unblock all Nodes in current Pipeline</DropdownItem
             >              
-            <DropdownItem class="text-yellow-600" onclick={setNodeCompleted}
-              >Manual set node "completed"</DropdownItem
+            <DropdownItem class="text-yellow-600" onclick={setSelectedNodesCompleted}
+              >Manual set selected nodes "completed"</DropdownItem
             >
             <DropdownItem class="text-yellow-600" onclick={setNodeStaleData}
               >Manual set node "stale-data"</DropdownItem
