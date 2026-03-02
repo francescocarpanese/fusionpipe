@@ -2703,11 +2703,12 @@
             bind:value={pipelineDrawerForm.tag}
           />
           <Label for="pipeline_notes" class="mb-2 block">Notes:</Label>
-          <Input
+          <Textarea
             id="pipeline_notes"
             name="pipeline_notes"
-            required
             bind:value={pipelineDrawerForm.notes}
+            rows={4}
+            placeholder="Enter notes here..."
           />
           <Button onclick={updatePipelineInfo} class="mt-4">Save Changes</Button
           >
