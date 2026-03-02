@@ -503,36 +503,30 @@
 
     alert('This operation can take long time if many nodes needs to be copied. Wait till completed.');
 
-    const selectedNode = projectNodes.find((node) => node.selected);
-    if (!selectedNode) {
-      console.error("No node selected");
+    // Use the active pipeline
+    const pipelineId = typeof currentPipelineId === "string"
+      ? currentPipelineId
+      : currentPipelineId?.value;
+
+    if (!pipelineId) {
+      alert("No active pipeline selected");
       return;
     }
 
-    const projectId =
-      typeof currentProjectId === "string"
-        ? currentProjectId
-        : currentProjectId?.value;
+    // Check if a pipeline is selected in the project graph and if it differs from the active pipeline
+    const selectedPipelineNode = projectNodes.find((node) => node.selected);
+    if (selectedPipelineNode && selectedPipelineNode.id !== pipelineId) {
+      alert("The selected pipeline is different from the active pipeline. Please activate the desired pipeline first.");
+      return;
+    }
+
+    // Use the selected project from dropdown
+    const projectId = typeof currentProjectId === "string"
+      ? currentProjectId
+      : currentProjectId?.value;
 
     if (!projectId) {
       alert("No project selected");
-      return;
-    }
-
-    const selectedCount = projectNodes.filter((node) => node.selected).length;
-    if (selectedCount !== 1) {
-      alert("Please select exactly one pipeline node to load.");
-      return;
-    }
-
-    if (!selectedNode.id) {
-      console.error("Selected node has no ID");
-      return;
-    }
-
-    const pipelineId = selectedNode.id;
-    if (!pipelineId) {
-      console.error("No pipeline selected");
       return;
     }
 
@@ -550,7 +544,7 @@
 
       const data = await response.json();
       alert(
-        `Pipeline ${pipelineId} branched into new pipeline ${data.new_pipeline_id} with parent relationships maintained.`
+        `Active pipeline ${pipelineId} branched into new pipeline ${data.new_pipeline_id} with parent relationships maintained.`
       );
 
       await fetchPipelines();
