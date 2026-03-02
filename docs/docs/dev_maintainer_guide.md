@@ -329,6 +329,7 @@ You need to set the environment variable before building the app as the environe
 ```bash
 npm run build
 ```
+This build is needed also while you develop the frontent. There is no live reload in svelte
 
 ```bash
 npm run preview -- --port $VITE_FRONTEND_PORT
