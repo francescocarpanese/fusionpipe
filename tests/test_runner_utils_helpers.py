@@ -50,12 +50,14 @@ class TestPipelineHelperFunctions:
                 runner_utils._initialize_pipeline_state(mock_cur, 'pipeline1')
 
     def test_initialize_pipeline_state_with_last_node(self):
-        """Test pipeline state initialization with last_node_id"""
+        """Test pipeline state initialization with last_node_id restricts to ancestor subtree"""
         mock_cur = Mock()
         
+        # Pipeline: node1 -> node2 -> node3
+        # last_node_id = 'node2', so only node1 (ancestor) + node2 should run; node3 is excluded.
         with patch('fusionpipe.utils.db_utils.check_if_pipeline_exists', return_value=True), \
              patch('fusionpipe.utils.db_utils.get_all_nodes_from_pip_id', return_value=['node1', 'node2', 'node3']), \
-             patch('fusionpipe.utils.pip_utils.get_all_descendants', return_value=['node3']):
+             patch('fusionpipe.utils.pip_utils.get_all_ancestors', return_value=['node1']):
             
             all_nodes, excluded_nodes = runner_utils._initialize_pipeline_state(mock_cur, 'pipeline1', 'node2')
             

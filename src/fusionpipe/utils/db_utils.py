@@ -3,6 +3,8 @@ import os
 
 
 table_names = [
+    'node_group_relation',
+    'node_groups',
     'node_relation',
     'node_pipeline_relation',
     'nodes',
@@ -160,6 +162,31 @@ def init_db(conn):
         )
     ''')
 
+    # Visual node group containers (purely for UI grouping; do not affect execution)
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS node_groups (
+            group_id TEXT PRIMARY KEY,
+            pipeline_id TEXT,
+            tag TEXT DEFAULT NULL,
+            collapsed BOOLEAN DEFAULT FALSE,
+            pos_x DOUBLE PRECISION DEFAULT 0.0,
+            pos_y DOUBLE PRECISION DEFAULT 0.0,
+            width DOUBLE PRECISION DEFAULT 400.0,
+            height DOUBLE PRECISION DEFAULT 300.0,
+            FOREIGN KEY (pipeline_id) REFERENCES pipelines(pipeline_id)
+        )
+    ''')
+
+    # One-to-one: each node belongs to at most one node group (per its home pipeline)
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS node_group_relation (
+            node_id TEXT PRIMARY KEY,
+            group_id TEXT,
+            FOREIGN KEY (node_id) REFERENCES nodes(node_id),
+            FOREIGN KEY (group_id) REFERENCES node_groups(group_id)
+        )
+    ''')
+
     conn.commit()
     return cur
 
@@ -300,6 +327,8 @@ def remove_node_from_node_pipeline_relation(cur, node_id):
     return cur.rowcount
 
 def remove_node_from_everywhere(cur, node_id):
+    # Remove from visual node group membership before deleting the node
+    cur.execute('DELETE FROM node_group_relation WHERE node_id = %s', (node_id,))
     remove_node_from_node_pipeline_relation(cur, node_id)
     remove_node_from_relations(cur, node_id)
     remove_node_from_nodes(cur, node_id)
@@ -441,6 +470,8 @@ def remove_pipeline_from_pipeline(cur, pipeline_id):
 def remove_pipeline_from_everywhere(cur, pipeline_id):
     if get_pipeline_blocked_status(cur, pipeline_id=pipeline_id):
         raise ValueError(f"Pipeline {pipeline_id} is blocked. Cannot remove pipeline.")
+    # Remove visual node groups before removing the pipeline (avoids FK violations)
+    delete_groups_for_pipeline(cur, pipeline_id)
     # Remove the pipeline from all tables
     cur.execute('DELETE FROM node_pipeline_relation WHERE pipeline_id = %s', (pipeline_id,))
     cur.execute('DELETE FROM pipeline_relation WHERE child_id = %s OR parent_id = %s', (pipeline_id, pipeline_id))
@@ -1018,3 +1049,97 @@ def get_node_parents_and_edge_ids(cur, node_id):
     cur.execute('SELECT parent_id, edge_id FROM node_relation WHERE child_id = %s', (node_id,))
     return {row[0]: row[1] for row in cur.fetchall()}
 
+
+# ---------------------------------------------------------------------------
+# Visual node group helpers (purely for frontend grouping; no execution impact)
+# ---------------------------------------------------------------------------
+
+def create_node_group(cur, group_id, pipeline_id, tag=None, collapsed=False,
+                      pos_x=0.0, pos_y=0.0, width=400.0, height=300.0):
+    """Create a new visual node group container for a pipeline."""
+    cur.execute(
+        'INSERT INTO node_groups (group_id, pipeline_id, tag, collapsed, pos_x, pos_y, width, height) '
+        'VALUES (%s, %s, %s, %s, %s, %s, %s, %s)',
+        (group_id, pipeline_id, tag, collapsed, pos_x, pos_y, width, height)
+    )
+
+
+def add_node_to_group_relation(cur, node_id, group_id):
+    """Assign a node to a group (upsert — each node can only be in one group)."""
+    cur.execute(
+        'INSERT INTO node_group_relation (node_id, group_id) VALUES (%s, %s) '
+        'ON CONFLICT (node_id) DO UPDATE SET group_id = EXCLUDED.group_id',
+        (node_id, group_id)
+    )
+
+
+def delete_node_group(cur, group_id):
+    """Delete a node group container and all its node memberships. Nodes themselves are unaffected."""
+    cur.execute('DELETE FROM node_group_relation WHERE group_id = %s', (group_id,))
+    cur.execute('DELETE FROM node_groups WHERE group_id = %s', (group_id,))
+
+
+def get_groups_for_pipeline(cur, pipeline_id):
+    """
+    Return all node groups belonging to a pipeline, including their member node IDs.
+
+    Returns a list of dicts:
+        {group_id, tag, collapsed, pos_x, pos_y, width, height, node_ids}
+    """
+    cur.execute(
+        'SELECT group_id, tag, collapsed, pos_x, pos_y, width, height '
+        'FROM node_groups WHERE pipeline_id = %s',
+        (pipeline_id,)
+    )
+    rows = cur.fetchall()
+    result = []
+    for row in rows:
+        group_id, tag, collapsed, pos_x, pos_y, width, height = row
+        cur.execute('SELECT node_id FROM node_group_relation WHERE group_id = %s', (group_id,))
+        node_ids = [r[0] for r in cur.fetchall()]
+        result.append({
+            'group_id': group_id,
+            'tag': tag,
+            'collapsed': collapsed,
+            'pos_x': float(pos_x),
+            'pos_y': float(pos_y),
+            'width': float(width),
+            'height': float(height),
+            'node_ids': node_ids,
+        })
+    return result
+
+
+def update_node_group_collapse(cur, group_id, collapsed):
+    """Persist the collapsed/expanded state of a node group."""
+    cur.execute('UPDATE node_groups SET collapsed = %s WHERE group_id = %s', (collapsed, group_id))
+
+
+def update_node_group_position(cur, group_id, pos_x, pos_y, width, height):
+    """Persist the position and dimensions of a node group container."""
+    cur.execute(
+        'UPDATE node_groups SET pos_x = %s, pos_y = %s, width = %s, height = %s WHERE group_id = %s',
+        (pos_x, pos_y, width, height, group_id)
+    )
+
+
+def update_node_group_tag(cur, group_id, tag):
+    """Update the human-readable label of a node group."""
+    cur.execute('UPDATE node_groups SET tag = %s WHERE group_id = %s', (tag, group_id))
+
+
+def get_group_for_node(cur, node_id):
+    """Return the group_id that a node belongs to, or None."""
+    cur.execute('SELECT group_id FROM node_group_relation WHERE node_id = %s', (node_id,))
+    row = cur.fetchone()
+    return row[0] if row else None
+
+
+def delete_groups_for_pipeline(cur, pipeline_id):
+    """Remove all node groups (and their memberships) for a pipeline."""
+    cur.execute(
+        'DELETE FROM node_group_relation WHERE group_id IN '
+        '(SELECT group_id FROM node_groups WHERE pipeline_id = %s)',
+        (pipeline_id,)
+    )
+    cur.execute('DELETE FROM node_groups WHERE pipeline_id = %s', (pipeline_id,))

@@ -337,7 +337,6 @@ def run_pipeline_route(pipeline_id: str, payload: dict = None, db_conn=Depends(g
 
 @router.post("/run_pipeline_up_to_node/{pipeline_id}/{node_id}")
 def run_pipeline_up_to_node_route(pipeline_id: str, node_id: str, payload: dict = None, db_conn=Depends(get_db)):
-    run_mode = "local"
     poll_interval = 1.0
     debug = False
 
@@ -364,6 +363,22 @@ def run_node_route(node_id: str, payload: dict = None, db_conn=Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Node {node_id} run completed"}
+
+@router.post("/run_nodes")
+def run_nodes_route(payload: dict, db_conn=Depends(get_db)):
+    """
+    Run a list of nodes respecting DAG ordering within each selected subtree.
+    Payload: {"node_ids": ["n_1", "n_2", ...], "pipeline_id": "p_1" (optional)}
+    """
+    node_ids = payload.get("node_ids")
+    if not node_ids or not isinstance(node_ids, list):
+        raise HTTPException(status_code=400, detail="Payload must contain a list 'node_ids'")
+    pipeline_id = payload.get("pipeline_id")  # optional; inferred from nodes when absent
+    try:
+        result = runner_utils.run_nodes(db_conn, node_ids, pipeline_id=pipeline_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return result
 
 @router.post("/duplicate_nodes_in_pipeline")
 def duplicate_nodes_in_pipeline_route(payload: dict, db_conn=Depends(get_db)):
@@ -707,3 +722,115 @@ def unblock_pipeline_route(pipeline_id: str, db_conn=Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
     
     return {"message": f"Pipeline {pipeline_id} and all its nodes unblocked successfully"}
+
+
+# ---------------------------------------------------------------------------
+# Visual node group routes (purely for frontend grouping; no execution impact)
+# ---------------------------------------------------------------------------
+
+@router.post("/create_node_group")
+def create_node_group_route(payload: dict, db_conn=Depends(get_db)):
+    """
+    Create a visual node group container grouping a set of nodes inside a pipeline.
+
+    Payload: {pipeline_id, node_ids, tag?, pos_x, pos_y, width, height}
+    Returns: {group_id, message}
+    """
+    cur = db_conn.cursor()
+    pipeline_id = payload.get("pipeline_id")
+    node_ids = payload.get("node_ids", [])
+    tag = payload.get("tag", None)
+    pos_x = float(payload.get("pos_x", 0.0))
+    pos_y = float(payload.get("pos_y", 0.0))
+    width = float(payload.get("width", 400.0))
+    height = float(payload.get("height", 300.0))
+
+    if not pipeline_id or not node_ids or not isinstance(node_ids, list):
+        raise HTTPException(status_code=400, detail="pipeline_id and node_ids (list) are required")
+
+    # Enforce: each node may belong to at most one node group
+    for node_id in node_ids:
+        existing = db_utils.get_group_for_node(cur, node_id)
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Node {node_id} already belongs to node group {existing}"
+            )
+
+    group_id = "ng_" + pip_utils.generate_id()
+    try:
+        db_utils.create_node_group(cur, group_id, pipeline_id, tag=tag,
+                                   pos_x=pos_x, pos_y=pos_y, width=width, height=height)
+        for node_id in node_ids:
+            db_utils.add_node_to_group_relation(cur, node_id, group_id)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"group_id": group_id, "message": "Node group created successfully"}
+
+
+@router.delete("/delete_node_group/{group_id}")
+def delete_node_group_route(group_id: str, db_conn=Depends(get_db)):
+    """Remove a node group container. Member nodes remain in the pipeline untouched."""
+    cur = db_conn.cursor()
+    try:
+        db_utils.delete_node_group(cur, group_id)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Node group {group_id} deleted successfully"}
+
+
+@router.post("/update_node_group_collapse/{group_id}")
+def update_node_group_collapse_route(group_id: str, payload: dict, db_conn=Depends(get_db)):
+    """Persist the collapsed/expanded state of a node group. Payload: {collapsed: bool}"""
+    collapsed = payload.get("collapsed")
+    if collapsed is None:
+        raise HTTPException(status_code=400, detail="'collapsed' is required")
+    cur = db_conn.cursor()
+    try:
+        db_utils.update_node_group_collapse(cur, group_id, bool(collapsed))
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Node group {group_id} collapse state updated to {collapsed}"}
+
+
+@router.post("/update_node_group_position/{group_id}")
+def update_node_group_position_route(group_id: str, payload: dict, db_conn=Depends(get_db)):
+    """Persist the canvas position and dimensions of a node group container.
+    Payload: {pos_x, pos_y, width, height}"""
+    cur = db_conn.cursor()
+    try:
+        db_utils.update_node_group_position(
+            cur, group_id,
+            float(payload.get("pos_x", 0.0)),
+            float(payload.get("pos_y", 0.0)),
+            float(payload.get("width", 400.0)),
+            float(payload.get("height", 300.0)),
+        )
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Node group {group_id} position updated"}
+
+
+@router.post("/update_node_group_tag/{group_id}")
+def update_node_group_tag_route(group_id: str, payload: dict, db_conn=Depends(get_db)):
+    """Update the display label of a node group. Payload: {tag}"""
+    tag = payload.get("tag")
+    if tag is None:
+        raise HTTPException(status_code=400, detail="'tag' is required")
+    cur = db_conn.cursor()
+    try:
+        db_utils.update_node_group_tag(cur, group_id, tag)
+        db_conn.commit()
+    except Exception as e:
+        db_conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Node group {group_id} tag updated to '{tag}'"}

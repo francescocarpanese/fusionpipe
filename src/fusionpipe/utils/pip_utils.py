@@ -623,7 +623,10 @@ def db_to_project_graph_from_project_id(cur, project_id):
 
 def db_to_pipeline_dict_from_pip_id(cur, pip_id):
     graph = db_to_pipeline_graph_from_pip_id(cur, pip_id)
-    return pipeline_graph_to_dict(graph)
+    pipeline_dict = pipeline_graph_to_dict(graph)
+    # Attach visual node group metadata (no execution impact)
+    pipeline_dict['groups'] = db_utils.get_groups_for_pipeline(cur, pip_id)
+    return pipeline_dict
 
 def db_to_project_dict_from_project_id(cur, project_id):
     graph = db_to_project_graph_from_project_id(cur, project_id)
@@ -870,6 +873,14 @@ def get_all_descendants(cur, pipeline_id, node_id):
     graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
     return list(nx.descendants(graph, node_id))
 
+
+def get_all_ancestors(cur, pipeline_id, node_id):
+    """
+    Get all ancestors (predecessors) of a node in the pipeline.
+    """
+    graph = db_to_pipeline_graph_from_pip_id(cur, pipeline_id)
+    return list(nx.ancestors(graph, node_id))
+
 def copy_with_permissions(src, dst, *, follow_symlinks=True):
     """Custom copy function to ensure destination files are writable."""
     if os.path.isdir(dst):
@@ -958,6 +969,7 @@ def duplicate_node_code_and_data(cur, source_node_id, new_node_id, withdata=True
             toml.dump(pyproject_data, file)
 
     # Initialize the .venv using uv
+
     code_folder_path = os.path.join(new_folder_path_nodes, "code")
     current_dir = os.getcwd()
     try:
@@ -967,6 +979,11 @@ def duplicate_node_code_and_data(cur, source_node_id, new_node_id, withdata=True
         # Add the ipykernel package to the virtual environment of the core user, in order to be able to run the node in Jupyter
         os.system("uv run python -m ipykernel install --user --name " + new_node_id + " --display-name " + new_node_id)
 
+        # Recursively find all .git directories in the new node folder and add them as safe directories
+        for root, dirs, files in os.walk(new_folder_path_nodes):
+            if ".git" in dirs:
+                git_parent = os.path.abspath(root)
+                os.system(f'git config --global --add safe.directory "{git_parent}"')
     finally:
         os.chdir(current_dir)
 
