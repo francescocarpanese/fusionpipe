@@ -250,7 +250,7 @@ chmod g+rx /path/to/folder
 # Set enviroment variables
 If you are the maintainer or single developer user, we recommend to collect all your environment variables into a single file `<myenvfile>.env`.
 Careful with the syntax, `.env` file does not allow for spaces in the definition definition of the environment variables. The strings needs to be withing `""` and not `''`. 
-The full set of environment variables needed to run all services of `fusionpipe` are:
+The core environment variables needed to run the backend, frontend, and normal production services of `fusionpipe` are:
 
 ```bash
 FUSIONPIPE_DATA_PATH="<absolute/path/to/fusionpipe/data/folder>"
@@ -279,6 +279,60 @@ In the following some explanation of the different environment variables:
 - `<absolute/path/to/user/utils>`: This is the absolute path the user utilities are stored, and needs to be readable by all users.
 - `<abosolute/path/to/matlab/executable>`: It is conveninet to set-up the path to your local installation of matlab if you are considering using it for development.
 - `<database_test_name>`: The database name used for the test suite. Usually `fusionpipe_test`.
+
+If `TMPDIR`, `TMP`, and `TEMP` are left unset in production, fusionpipe falls back to the default temporary-directory behavior of the operating system and Python runtime. They are not required production variables.
+
+### Recommended variables for running tests
+
+The following variables are recommended when running the pytest suite locally or from VS Code:
+
+- `FUSIONPIPE_DATA_PATH`
+- `UV_CACHE_DIR`
+- `TMPDIR`
+- `TMP`
+- `TEMP`
+- `DATABASE_URL_TEST`
+- `USER_UTILS_FOLDER_PATH`
+
+`DATABASE_URL`, `BACKEND_HOST`, `BACKEND_PORT`, `VITE_*`, and `FP_MATLAB_RUNNER_PATH` are still useful for normal development, but they are not required for most backend unit tests.
+
+If `TMPDIR`, `TMP`, and `TEMP` are not provided for tests, the pytest bootstrap in `tests/conftest.py` will choose a default temp root under `FUSIONPIPE_DATA_PATH/tmp` when `FUSIONPIPE_DATA_PATH` is set, and otherwise it will fall back to the platform default temp directory.
+
+### Why `TMPDIR` should live on the same filesystem as `UV_CACHE_DIR`
+
+The test suite creates temporary project folders, and many tests initialize nodes that create a local `.venv` inside each node folder. `uv` reuses downloaded artifacts from `UV_CACHE_DIR`, but it can only reuse them efficiently when the cache and the target environment are on the same filesystem.
+
+If `UV_CACHE_DIR` is on one filesystem but pytest writes temporary folders on another one, uv has to copy files into each node-local `.venv` instead of using filesystem-level reuse. This makes every temporary node environment much larger and can fill the smaller disk.
+
+This only shows up on machines where those paths resolve to different filesystems or mounts. A common example is a developer machine where `/tmp` is on the root disk but the project data and uv cache are stored on a separate mounted volume such as `/mnt/data`.
+
+For this reason, use a configuration such as:
+
+```bash
+FUSIONPIPE_DATA_PATH="<path/on_shared_or_large_filesystem>/fusionpipe_dev_data"
+UV_CACHE_DIR="<path/on_shared_or_large_filesystem>/fusionpipe_dev_data/.cache/uv_cache"
+TMPDIR="<path/on_shared_or_large_filesystem>/fusionpipe_dev_data/tmp"
+TMP="${TMPDIR}"
+TEMP="${TMPDIR}"
+DATABASE_URL_TEST="dbname=<database_test_name> port=<postgres_port>"
+```
+
+The pytest configuration in `tests/conftest.py` is written to preserve this behavior even when tests are launched from the VS Code testing interface.
+
+### Run the test suite
+
+- Make sure PostgreSQL is running and that `DATABASE_URL_TEST` points to the intended test database.
+- Make sure `TMPDIR`, `TMP`, and `TEMP` all point to a folder on the same filesystem as `UV_CACHE_DIR`.
+- From a terminal, load the env file before running tests:
+
+```bash
+set -a
+source <myenvfile.env>
+set +a
+uv run pytest tests
+```
+
+- In VS Code, configure the Python test env file to point to the same env file so `Run Test` and `Debug Test` inherit the same paths.
 
 # Run the frontend and backend (developer mode)
 
