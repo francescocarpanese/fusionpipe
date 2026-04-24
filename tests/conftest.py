@@ -1,3 +1,32 @@
+"""Pytest fixtures and test environment bootstrap for fusionpipe.
+
+The test suite creates many temporary node folders, and each node can create its
+own `.venv`. We intentionally force pytest temporary directories onto the same
+mount as `UV_CACHE_DIR` and `FUSIONPIPE_DATA_PATH`.
+
+Why this matters:
+- if pytest falls back to a temp directory on a different filesystem than
+    `UV_CACHE_DIR`, uv cannot reuse files via hardlinks/reflinks across mounts
+    and ends up copying more data into each node-local `.venv`
+- keeping both the uv cache and the pytest temp root on the same filesystem
+    reduces duplicated disk usage during tests and avoids filling the wrong disk
+
+Environment variables used here:
+- `FUSIONPIPE_DATA_PATH`: base folder for fusionpipe data
+- `UV_CACHE_DIR`: shared uv cache directory
+- `TMPDIR`, `TMP`, `TEMP`: temporary directory root, used for pytest temp data
+- `DATABASE_URL_TEST`: PostgreSQL DSN used by the test database fixture
+- `USER_UTILS_FOLDER_PATH`: path to the editable helper package used by node init
+
+`developer.env` is loaded here as a fallback for pytest and VS Code test runs so
+the suite does not depend on the parent shell having exported these variables.
+Already exported variables still take precedence.
+
+Outside pytest, fusionpipe does not require `TMPDIR`, `TMP`, or `TEMP` to be
+set. When they are unset, normal runtime code keeps the platform default temp
+directory behavior provided by Python and the operating system.
+"""
+
 import pytest
 import os
 import tempfile
@@ -9,6 +38,45 @@ import string
 import re
 import shutil
 
+def _load_workspace_env():
+    """Load developer.env for test runs when the parent shell did not export it."""
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "developer.env")
+    if not os.path.exists(env_path):
+        return
+
+    with open(env_path) as env_file:
+        for raw_line in env_file:
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            os.environ.setdefault(key, os.path.expandvars(value))
+
+
+def _get_test_temp_root():
+    """Resolve a test temp root on the data mount and make tempfile use it."""
+    temp_root = os.environ.get("TMPDIR")
+    if not temp_root:
+        data_path = os.environ.get("FUSIONPIPE_DATA_PATH")
+        if data_path:
+            temp_root = os.path.join(data_path, "tmp")
+        else:
+            temp_root = tempfile.gettempdir()
+
+    os.makedirs(temp_root, exist_ok=True)
+    os.environ.setdefault("TMPDIR", temp_root)
+    os.environ.setdefault("TMP", temp_root)
+    os.environ.setdefault("TEMP", temp_root)
+    os.environ.setdefault("PYTEST_DEBUG_TEMPROOT", temp_root)
+    tempfile.tempdir = temp_root
+    return temp_root
+
+
+_load_workspace_env()
+TEST_TEMP_ROOT = _get_test_temp_root()
 DATABASE_URL_TEST = os.getenv('DATABASE_URL_TEST')
 
 @pytest.fixture(scope="function")
@@ -42,7 +110,7 @@ def pg_test_db():
 
 @pytest.fixture
 def tmp_base_dir():
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmpdir:
         yield tmpdir
 
 @pytest.fixture

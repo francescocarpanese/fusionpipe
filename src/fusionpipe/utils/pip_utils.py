@@ -1043,6 +1043,22 @@ def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_p
     subtree = graph.subgraph(subtree_nodes).copy()
     # Map old node ids to new node ids
     id_map = {old_id: generate_node_id() for old_id in subtree.nodes}
+
+    # For each node in subtree collect a dictionary, which for each node, gets the list parents which do not belong to the subtree, and the corresponding edge ids.
+    external_parents_dict = {}
+    for node in subtree_nodes:
+        parents = []
+        for parent in graph.predecessors(node):
+            if parent not in subtree_nodes:
+                # Tuple of (parent_id, edge_id)
+                parents.append((parent, db_utils.get_node_relation_edge_id(cur, child_id=node, parent_id=parent)))
+        external_parents_dict[node] = parents
+
+    if source_pipeline_id != target_pipeline_id:
+        for old_node_id, external_parents in external_parents_dict.items():
+            if external_parents:
+                raise ValueError(f"Cannot duplicate node {old_node_id} onto target pipeline {target_pipeline_id}, different than source pipeline {source_pipeline_id}, because it has parents outside of the subtree which might not be in the target pipeline. Consider duplicating the parent nodes as well.")
+    
     # Duplicate nodes in topological order (parents before children)
     for old_id in nx.topological_sort(subtree):
         new_id = id_map[old_id]
@@ -1060,16 +1076,7 @@ def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_p
             edge_id=db_utils.get_node_relation_edge_id(cur, child_id=old_child, parent_id=old_parent)
         )
 
-    # For each node in subtree collect a dictionary, which for each node, gets the list parents which do not belong to the subtree, and the corresponding edge ids.
-    external_parents_dict = {}
-    for node in subtree_nodes:
-        parents = []
-        for parent in graph.predecessors(node):
-            if parent not in subtree_nodes:
-                # Tuple of (parent_id, edge_id)
-                parents.append((parent, db_utils.get_node_relation_edge_id(cur, child_id=node, parent_id=parent)))
-        external_parents_dict[node] = parents
-    
+
     # Assign edge to nodes that have external parents
     for old_node_id, external_parents in external_parents_dict.items():
         if external_parents:
