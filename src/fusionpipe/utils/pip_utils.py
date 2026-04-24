@@ -1049,6 +1049,7 @@ def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_p
         # Duplicate node in DB (without parents/children relations)
         duplicate_node_in_pipeline_w_code_and_data(
             cur, source_pipeline_id,target_pipeline_id, old_id, new_id, parents=False, childrens=False, withdata=withdata)
+        
     # Set parent-child relations in the duplicated subtree
     for old_parent, old_child in subtree.edges:
         # Copy relation but preserve the edge id
@@ -1059,22 +1060,32 @@ def duplicate_nodes_in_pipeline_with_relations(cur, source_pipeline_id, target_p
             edge_id=db_utils.get_node_relation_edge_id(cur, child_id=old_child, parent_id=old_parent)
         )
 
-    if source_pipeline_id == target_pipeline_id:
-        # Find head nodes of the duplicated subtree (nodes with no incoming edges in the subtree)
-        head_nodes = [n for n in subtree.nodes if subtree.in_degree(n) == 0]
-        for old_head in head_nodes:
-            new_head = id_map[old_head]
-            # Find parents of the original head node in the full graph (outside the subtree)
-            for parent in graph.predecessors(old_head):
-                if parent not in subtree_nodes:
-                    # Copy relation but preserve the edge id
-                    db_utils.add_node_relation(
-                        cur,
-                        child_id=new_head,
-                        parent_id=parent, 
-                        edge_id=db_utils.get_node_relation_edge_id(cur, child_id=old_head, parent_id=parent)
-                    )                
+    # For each node in subtree collect a dictionary, which for each node, gets the list parents which do not belong to the subtree, and the corresponding edge ids.
+    external_parents_dict = {}
+    for node in subtree_nodes:
+        parents = []
+        for parent in graph.predecessors(node):
+            if parent not in subtree_nodes:
+                # Tuple of (parent_id, edge_id)
+                parents.append((parent, db_utils.get_node_relation_edge_id(cur, child_id=node, parent_id=parent)))
+        external_parents_dict[node] = parents
     
+    # Assign edge to nodes that have external parents
+    for old_node_id, external_parents in external_parents_dict.items():
+        if external_parents:
+            new_node_id = id_map[old_node_id]
+            for parent_id, edge_id in external_parents:
+                # Copy relation but preserve the edge id
+                db_utils.add_node_relation(
+                    cur,
+                    child_id=new_node_id,
+                    parent_id=parent_id, 
+                    edge_id=edge_id
+                )
+        
+
+    # if source_pipeline_id == target_pipeline_id:
+
     # Optionally shift the positions of the duplicated nodes to avoid overlap
     shift_x, shift_y = 40, 40  # You can adjust the shift values as needed
     for old_id, new_id in id_map.items():
